@@ -207,6 +207,16 @@ def test_build_success_deliverable():
     assert "phone_w = scad.var" in rendered.text and tb.build_failures == 0
 
 
+def test_build_records_last_build_content():
+    tb, ws, stub = make_box(checks=[PHONE_W, TILT])
+    assert ws.last_build_content is None
+    out = tb.call("build", {})
+    assert ws.last_build_content == out.content
+    tb2, ws2, _ = make_box(with_feature=False)   # 没有特征：不运行，走 _build_without_run
+    out2 = tb2.call("build", {})
+    assert ws2.last_build_content == out2.content and "NotebookError" in out2.content
+
+
 def test_build_failure_reports_cell():
     result = good_result(ok=False, error={"cell": "base", "type": "NameError", "message": "name 'wd' is not defined"}, checks=[], facts={})
     tb, ws, _ = make_box(result=result, checks=[PHONE_W, TILT])

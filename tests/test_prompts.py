@@ -2,12 +2,14 @@ import re
 from pathlib import Path
 
 from cad_agent.agent.api_docs import api_names
-from cad_agent.agent.state import PROMPT_DIR, load_system_prompt, render_state
+import json
+
+from cad_agent.agent.state import PROMPT_DIR, load_system_prompt, render_snapshot
 from cad_agent.brief import Brief
 from cad_agent.notebook import Feature, FeatureList
 from cad_agent.sandbox.guard import check_code
 from cad_agent.tools import Workspace
-from helpers import PHONE_W, TILT, bad_result, good_result, make_brief
+from helpers import PHONE_W, TILT, make_brief
 
 PROMPTS_DOC = Path(__file__).resolve().parent.parent / "docs" / "superpowers" / "plans" / "2026-11-09-cad-agent-v1-prompts.md"
 SECTIONS = ["基本体", "草图轮廓与拉伸", "多边形截面拉伸", "旋转体", "布尔运算", "移动与旋转", "阵列", "圆角与倒角", "选面选边（QL）", "常见报错与改法"]
@@ -86,45 +88,34 @@ def box_ws(confirmed: bool = False) -> Workspace:
     return Workspace(make_brief(confirmed), FeatureList(), [])
 
 
-def test_state_message_format_when_empty():
-    text = render_state(box_ws(), failures_left=3, calls_left=40)
+def test_snapshot_clarify_phase():
+    text = render_snapshot(box_ws())
     lines = text.splitlines()
-    assert lines[0] == "【当前状态】" and lines[1] == "阶段：澄清中（需求单未确认）" and lines[2] == "需求单："
-    assert '"part": {' in text and '"name": "手机支架"' in text  # ensure_ascii=False, indent=1
-    assert "特征（按顺序）：无" in text and "检查项：无" in text and "上次 build：未运行" in text
-    assert lines[-1] == "本轮剩余：建模失败还可 3 次，工具调用还可 40 次"
-    assert text.index("需求单：") < text.index('"part"') < text.index("特征（按顺序）")
+    assert lines[:3] == ["【当前状态（程序生成，不是用户说的话）】", "阶段：澄清中（需求单未确认）", "需求单："]
+    assert '"name": "手机支架"' in text   # ensure_ascii=False, indent=1
+    assert "特征（按顺序）：" not in text and "检查项：" not in text and "上次 build" not in text
 
 
-def test_state_message_with_features_checks_and_builds():
+def test_snapshot_modeling_phase():
     ws = box_ws(confirmed=True)
     ws.features.upsert(Feature("base", "build", "base = 1"))
     ws.features.upsert(Feature("hole", "subtract", "hole = 1"))
     ws.checks_raw = [PHONE_W, TILT]
-    text = render_state(ws, 2, 35)
+    text = render_snapshot(ws)
     assert "阶段：可以建模（需求单已确认）" in text
-    assert "特征（按顺序）：base(build)、hole(subtract)" in text and "检查项：width、tilt" in text
-    assert text.splitlines()[-1] == "本轮剩余：建模失败还可 2 次，工具调用还可 35 次"
-    ws.last_run = good_result()
-    assert "上次 build：通过" in render_state(ws, 3, 40)
-    ws.last_run = bad_result("boom", cell="hole")
-    assert "上次 build：没通过：hole" in render_state(ws, 3, 40)
-    ws.last_run = bad_result("boom", cell=None, type_="NotebookError")
-    assert "上次 build：没通过：" in render_state(ws, 3, 40) and "NotebookError" in render_state(ws, 3, 40)
-    failed = good_result(ok=False)
-    failed.checks[-1].passed = False
-    ws.last_run = failed
-    assert "上次 build：没通过：width" in render_state(ws, 3, 40)
+    assert "特征（按顺序）：\n--- base（build）---\nbase = 1\n\n--- hole（subtract）---\nhole = 1" in text
+    assert "检查项：\n" + json.dumps([PHONE_W, TILT], ensure_ascii=False, indent=1) in text
+    assert text.endswith("上次 build：\n未运行")
+    ws.last_build_content = '{"passed": true}'
+    assert render_snapshot(ws).endswith('上次 build：\n{"passed": true}')
+    assert text.index("需求单：") < text.index('"part"') < text.index("特征（按顺序）：") < text.index("检查项：") < text.index("上次 build：")
 
 
-def test_state_message_reports_missing_coverage_after_ok_run():
-    ws = box_ws(confirmed=True)
-    ws.checks_raw = [PHONE_W]  # tilt_deg 没有检查
-    ws.last_run = good_result()
-    assert "上次 build：没通过：缺少检查 tilt_deg" in render_state(ws, 3, 40)
+def test_snapshot_modeling_phase_empty():
+    text = render_snapshot(box_ws(confirmed=True))
+    assert "特征（按顺序）：\n无" in text and "检查项：\n无" in text
 
 
-def test_state_message_uses_brief_json():
+def test_snapshot_uses_brief_json():
     b = Brief(part_name="板", confirmed=True)
-    ws = Workspace(b, FeatureList(), [])
-    assert '"confirmed": true' in render_state(ws, 3, 40)
+    assert '"confirmed": true' in render_snapshot(Workspace(b, FeatureList(), []))

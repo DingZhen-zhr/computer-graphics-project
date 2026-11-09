@@ -56,8 +56,8 @@ def test_clarify_then_question(tmp_path):
     assert isinstance(turn, AgentTurn) and turn.kind == "question" and turn.llm_calls == 2
     assert "需要先确认两件事" in turn.text and "1. 手机多厚？我建议 12 mm" in turn.text and "2. 要横放吗？" in turn.text
     assert ws.brief.part_name == "手机支架" and ws.brief.open_questions == ["手机多厚？"]
-    assert llm.calls[0][-1] == {"role": "user", "content": "做一个放在桌上看视频的小支架"}
-    assert [m["role"] for m in llm.calls[0][:2]] == ["system", "system"]
+    assert llm.calls[0][-1]["role"] == "user" and llm.calls[0][-1]["content"].endswith("【用户说】\n做一个放在桌上看视频的小支架")
+    assert [m["role"] for m in llm.calls[0]] == ["system", "user"]
 
 
 def test_plain_reply(tmp_path):
@@ -80,7 +80,7 @@ def test_confirmation_then_delivery(tmp_path):
     assert sorted(p.name for p in v1.iterdir()) == ["brief.json", "changes.md", "checks.json", "model.py", "model.step", "view.png"]
     assert str(v1 / "view.png") in turn2.text and "width" in turn2.text and "通过" in turn2.text and "v1" in turn2.text
     assert (session.dir / "brief.json").exists() and (session.dir / "model.py").exists()
-    assert llm.calls[2][-1]["content"] == "（用户已确认需求单）"
+    assert llm.calls[2][-1]["content"].endswith("【用户说】\n（用户已确认需求单）")
     export_call = [c for c in runner.calls if c.get("export_step") is not None]
     assert len(export_call) == 1 and export_call[0]["render_png"] is not None
 
@@ -91,7 +91,7 @@ def test_mixed_confirmation_not_accepted(tmp_path):
     agent.handle_user("做一个支架")
     turn = agent.handle_user("可以，但角度改成70")
     assert not ws.brief.confirmed and not ws.awaiting_confirmation
-    assert llm.calls[-1][-1] == {"role": "user", "content": "可以，但角度改成70"}
+    assert llm.calls[-1][-1]["role"] == "user" and llm.calls[-1][-1]["content"].endswith("【用户说】\n可以，但角度改成70")
     assert turn.kind == "reply"
 
 
@@ -182,10 +182,10 @@ def test_every_tool_call_gets_a_tool_message_even_when_turn_ends_early(tmp_path)
     agent, ws, llm, *_ = make_agent(tmp_path, [two, LLMReply("好", [], {})], confirmed=False)
     assert agent.handle_user("来").kind == "question"
     agent.handle_user("12")
+    # 第 1.1 版（偏离 D7）：结束的一轮整轮折叠，旧轮里不再有 tool_calls / tool 消息，所以不会有"没有回应的工具调用"
     msgs = llm.calls[1]
-    assistant = [m for m in msgs if m["role"] == "assistant"][0]
-    tool_ids = [m["tool_call_id"] for m in msgs if m["role"] == "tool"]
-    assert tool_ids == [tc["id"] for tc in assistant["tool_calls"]] == ["call_1", "call_2"]
+    assert [m["role"] for m in msgs] == ["system", "user", "assistant", "user"]
+    assert not any("tool_calls" in m or m["role"] == "tool" for m in msgs)
 
 
 def test_llm_error_preserves_state(tmp_path):
@@ -231,21 +231,65 @@ def test_suggested_change_after_delivery_requires_reconfirmation(tmp_path):
     assert "需求单" in llm.calls[-1][-1]["content"]  # build 被挡住，模型看到的是“需求单未确认”
 
 
-def test_state_message_refreshed(tmp_path):
-    agent, ws, llm, *_ = make_agent(tmp_path, [FIRST_REQUEST, LLMReply("好的", [], {})], confirmed=False)
-    agent.handle_user("做一个支架")
-    first_state, second_state = llm.calls[0][1]["content"], llm.calls[1][1]["content"]
-    assert llm.calls[0][1]["role"] == "system" and llm.calls[1][1]["role"] == "system"
-    assert '"phone_w"' not in first_state and '"phone_w"' in second_state
-    assert first_state.startswith("【当前状态】") and "本轮剩余：建模失败还可 3 次，工具调用还可 40 次" in first_state
-    assert "工具调用还可 39 次" in second_state
+def last_user(call: list[dict]) -> dict:
+    return [m for m in call if m["role"] == "user"][-1]
 
 
-def test_state_message_is_not_kept_in_history(tmp_path):
-    agent, ws, llm, *_ = make_agent(tmp_path, [FIRST_REQUEST, LLMReply("好的", [], {})], confirmed=False)
+def test_prefix_stable_within_turn(tmp_path):
+    lookup = scripted_call("api_help", {"name": "make_box_rsolid"})
+    agent, ws, llm, *_ = make_agent(tmp_path, [lookup, scripted_call("api_help", {"name": "make_cylinder_rsolid"}), LLMReply("好", [], {})],
+                                    confirmed=False)
+    assert agent.handle_user("查一下").kind == "reply"
+    assert llm.calls[1][: len(llm.calls[0])] == llm.calls[0]
+    assert llm.calls[2][: len(llm.calls[1])] == llm.calls[1]
+
+
+def test_snapshot_fixed_within_turn(tmp_path):
+    first = scripted_call("update_brief", {"set_params": USER_PARAMS, "open_questions": ["手机多厚？"]})
+    agent, ws, llm, *_ = make_agent(tmp_path, [first, LLMReply("好", [], {}), LLMReply("嗯", [], {})], confirmed=False)
     agent.handle_user("做一个支架")
+    assert last_user(llm.calls[0]) == last_user(llm.calls[1])   # 同一轮里快照不变，哪怕需求单已经改了
+    assert "phone_w" not in last_user(llm.calls[0])["content"] and "phone_w" not in last_user(llm.calls[1])["content"]
+    agent.handle_user("12 mm")
+    assert "phone_w" in last_user(llm.calls[2])["content"]   # 下一轮的新快照才反映改动
+
+
+def test_old_turns_are_compacted(tmp_path):
+    both = scripted_call("update_brief", {"set_params": USER_PARAMS, "open_questions": ["手机多厚？"]}, "", ("ask_user", {"questions": ["手机多厚？"]}))
+    agent, ws, llm, *_ = make_agent(tmp_path, [both, LLMReply("好的", [], {})], confirmed=False)
+    turn1 = agent.handle_user("做一个支架")
+    assert turn1.kind == "question"
+    agent.handle_user("12 mm")
     second = llm.calls[1]
-    assert [m["role"] for m in second].count("system") == 2
+    assert [m["role"] for m in second] == ["system", "user", "assistant", "user"]
+    assert second[1]["content"] == "做一个支架" and second[2]["content"] == turn1.text
+    assert len([m for m in second if "【当前状态" in m["content"]]) == 1
+
+
+def test_warning_when_few_tool_calls_left(tmp_path):
+    replies = [scripted_call("api_help", {"name": "make_box_rsolid"}) for _ in range(6)]
+    agent, ws, llm, *_ = make_agent(tmp_path, replies, max_tool_calls=6)
+    assert agent.handle_user("查一下").kind == "failed"
+    assert "本轮工具调用只剩 5 次" in llm.calls[1][-1]["content"]
+    assert "warning" not in llm.calls[0][-1]["content"]
+
+
+def test_llm_error_turn_is_compacted(tmp_path):
+    agent, ws, llm, *_ = make_agent(tmp_path, [LLMError("网络连接失败，已重试 2 次"), LLMReply("好", [], {})], confirmed=False)
+    assert agent.handle_user("你好").kind == "failed"
+    agent.handle_user("再试一次")
+    second = llm.calls[1]
+    assert [m["role"] for m in second] == ["system", "user", "assistant", "user"]
+    assert second[2]["content"].startswith("模型调用失败")
+
+
+def test_snapshot_after_tool_cap_has_last_build(tmp_path):
+    agent, ws, llm, *_ = make_agent(tmp_path, [UPSERT, SET_CHECKS, BUILD, LLMReply("好", [], {})], runner=Runner(bad_result("boom")),
+                                    max_tool_calls=3)
+    assert agent.handle_user("开始建模").kind == "failed"
+    agent.handle_user("继续")
+    snapshot = last_user(llm.calls[3])["content"]
+    assert '"passed": false' in snapshot and "boom" in snapshot
 
 
 def test_system_prompt_is_first_message(tmp_path):

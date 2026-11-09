@@ -157,3 +157,10 @@
 - 测试数量：没有新增，全部测试保持 359 个（本任务提交前重新跑过）。
 - 结果：phone_stand 成功（修复 5 次，¥2.02）、flange 成功（修复 1 次，¥0.26）、l_bracket 没成功（总体积偏差约 −4.4%，其余验收都过；¥1.53）。三个任务合计 ¥3.81、69 次调用，输入 1,832,794 token（命中缓存 494,336，约 27%）。基线按实际结果记录，没有重跑。
 - 说明：命中缓存的比例只有约 27%，和设计文档 P2 的判断一致（状态消息在历史前面，每次调用都变）。
+
+## 1.1 版 Task 5：每轮快照与上下文折叠 —— 完成
+
+- 做了什么：新文件 `cad_agent/agent/context.py`（`USER_HEADER`、`CONFIRM_COMPACT`、`compact_text`、`with_warning`、`Context`）；`state.py` 的 `render_state` 换成 `render_snapshot`（格式见提示词文档第 2 节，删掉 `_last_build`）；`tools.py` 的 `Workspace.last_build_content`（`_build` 和 `_build_without_run` 都设）；`loop.py` 用 `self.context` 代替 `self.messages`，每轮开始 `start_turn(content, render_snapshot(ws))`，`_end` 里 `end_turn`，每条 tool 消息过 `with_warning`，删掉 `_llm_messages`。
+- 测试数量：全部测试 370 个全部通过。按清单改了 `test_clarify_then_question`、`test_confirmation_then_delivery`、`test_mixed_confirmation_not_accepted`；`test_state_message_refreshed`、`test_state_message_is_not_kept_in_history` 换成 `test_snapshot_fixed_within_turn`、`test_old_turns_are_compacted`；`test_prompts.py` 的 4 个 `test_state_message_*` 换成 4 个 `test_snapshot_*`。新增 `test_context.py`（5 个）、`test_build_records_last_build_content`、`test_prefix_stable_within_turn`、`test_warning_when_few_tool_calls_left`、`test_llm_error_turn_is_compacted`、`test_snapshot_after_tool_cap_has_last_build`。
+- 偏离：清单之外还有一条第一版测试必然失败——`test_every_tool_call_gets_a_tool_message_even_when_turn_ends_early`（它在第 2 轮里检查第 1 轮的 tool 消息，而第 1.1 版整轮折叠掉了）。按 CLAUDE.md 先记了偏离 D7，只改了这条测试的断言（改成"旧轮里没有悬空的 `tool_calls`、也没有 `tool` 消息"），并删掉了不再用的 `TURN_ENDED_MESSAGE`。
+- 说明：快照里本轮已经确认的那一轮，阶段在 `start_turn` 之前就按"已确认"算（确认处理在前）；`loop.py` 现在 255 行。

@@ -14,7 +14,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
 
-from cad_agent.agent.state import load_system_prompt, render_state
+from cad_agent.agent.context import Context, with_warning
+from cad_agent.agent.state import load_system_prompt, render_snapshot
 from cad_agent.checks.spec import CheckResult
 from cad_agent.config import Config
 from cad_agent.llm.client import LLM, LLMError, LLMReply, ToolCall
@@ -26,7 +27,6 @@ Kind = Literal["reply", "question", "confirm", "delivered", "failed"]
 AFFIRMATIVE = {"y", "yes", "ok", "确认", "可以", "没问题", "好", "对", "行"}
 _EDGE_PUNCT = re.compile(r"^[\W_]+|[\W_]+$")
 CONFIRMED_MESSAGE = "（用户已确认需求单）"
-TURN_ENDED_MESSAGE = json.dumps({"error": "本轮已经结束，这个调用没有执行"}, ensure_ascii=False)
 
 
 def is_affirmative(text: str) -> bool:
@@ -95,7 +95,7 @@ class Agent:
         self.llm, self.toolbox, self.session, self.config = llm, toolbox, session, config
         self.toolbox.max_build_failures = config.max_build_failures
         self.system_prompt = load_system_prompt()
-        self.messages: list[dict] = []        # 对话历史（不含系统消息；状态消息每次重新生成）
+        self.context = Context(self.system_prompt)  # 发给模型的消息：旧轮折叠，本轮开头一张快照，轮内只追加
         self._pending_changes: list[str] = []  # 上次交付以来需求单的变化行
 
     @property
@@ -112,16 +112,16 @@ class Agent:
                 self.ws.brief.confirmed = True
                 content = CONFIRMED_MESSAGE
             self.ws.awaiting_confirmation = False  # 无论用户怎么回，都不再等确认
-        self.messages.append({"role": "user", "content": content})
+        self.context.start_turn(content, render_snapshot(self.ws))
         self.session.log("user", text=text, sent_as=content)
 
         while True:
             try:
-                reply = self.llm.chat(self._llm_messages(c), self.toolbox.schemas())
+                reply = self.llm.chat(self.context.messages(), self.toolbox.schemas())
             except LLMError as e:
                 return self._end("failed", f"模型调用失败：{e}。需求单和已经写好的特征都还在，可以稍后再发一次。", c)
             c.add(reply)
-            self.messages.append(self._assistant_message(reply))
+            self.context.append(self._assistant_message(reply))
             self.session.log("assistant", content=reply.content, usage=reply.usage, cost=reply.cost,
                              tool_calls=[{"name": tc.name, "args": tc.arguments} for tc in reply.tool_calls])
             if not reply.tool_calls:
@@ -129,14 +129,6 @@ class Agent:
             ended = self._run_tools(reply, c)
             if ended is not None:
                 return ended
-
-    def _llm_messages(self, c: _Counters) -> list[dict]:
-        state = render_state(
-            self.ws,
-            max(0, self.config.max_build_failures - self.toolbox.build_failures),
-            max(0, self.config.max_tool_calls - c.tool_calls),
-        )
-        return [{"role": "system", "content": self.system_prompt}, {"role": "system", "content": state}, *self.messages]
 
     @staticmethod
     def _assistant_message(reply: LLMReply) -> dict:
@@ -150,18 +142,17 @@ class Agent:
 
     # ---------------------------------------------------------------- 工具
     def _run_tools(self, reply: LLMReply, c: _Counters) -> AgentTurn | None:
-        for i, tc in enumerate(reply.tool_calls):
+        for tc in reply.tool_calls:
             c.tool_calls += 1
             started = time.monotonic()
             outcome = self.toolbox.call(tc.name, tc.arguments)
-            self.messages.append({"role": "tool", "tool_call_id": tc.id, "content": outcome.content})
-            self.session.log("tool", name=tc.name, args=tc.arguments, content=outcome.content, end_turn=outcome.end_turn,
+            sent = with_warning(outcome.content, self.config.max_tool_calls - c.tool_calls)
+            self.context.append({"role": "tool", "tool_call_id": tc.id, "content": sent})
+            self.session.log("tool", name=tc.name, args=tc.arguments, content=sent, end_turn=outcome.end_turn,
                              deliverable=outcome.deliverable, duration_s=round(time.monotonic() - started, 3))
             ended = self._after_tool(tc, outcome, reply, c)
             if ended is not None:
-                for rest in reply.tool_calls[i + 1 :]:  # 每个工具调用都必须有对应的 tool 消息
-                    self.messages.append({"role": "tool", "tool_call_id": rest.id, "content": TURN_ENDED_MESSAGE})
-                return ended
+                return ended  # 本轮结束时整轮都折叠掉，本次回复里后面没执行的调用不会再发给模型
         return None
 
     def _after_tool(self, tc: ToolCall, outcome: ToolOutcome, reply: LLMReply, c: _Counters) -> AgentTurn | None:
@@ -253,6 +244,7 @@ class Agent:
 
     def _end(self, kind: Kind, text: str, c: _Counters, version_dir: Path | None = None) -> AgentTurn:
         self._save()
+        self.context.end_turn(kind, text)
         repairs = self.toolbox.build_failures
         self.session.log(kind, text=text, llm_calls=c.llm_calls, tool_calls=c.tool_calls, tokens=c.tokens, repairs=repairs,
                          version=version_dir.name if version_dir else None, prompt_tokens=c.prompt_tokens,

@@ -32,6 +32,7 @@ class Workspace:
     checks_raw: list[dict]
     last_run: RunResult | None = None
     awaiting_confirmation: bool = False
+    last_build_content: str | None = None   # 上次 build 返回给模型的 JSON 原文；_build 和 _build_without_run 都要设
 
 
 @dataclass
@@ -220,7 +221,8 @@ class ToolBox:
         }
         if missing:  # 计划的测试要求出现“缺少检查”；提示词文档的 hint 原文写的是“还没有检查”，所以多放一个字段
             body["coverage_note"] = f"缺少检查的用户参数：{'、'.join(missing)}"
-        return ToolOutcome(_json(body), build=run, deliverable=deliverable)
+        ws.last_build_content = _json(body)
+        return ToolOutcome(ws.last_build_content, build=run, deliverable=deliverable)
 
     def _build_without_run(self, err: dict) -> ToolOutcome:
         """渲染 notebook 或解析检查项时就出错了：没有运行，但仍然计一次失败。"""
@@ -233,7 +235,8 @@ class ToolBox:
             "failures_left": max(0, self.max_build_failures - self.build_failures),
             "hint": _hint(error, False, [], []),
         }
-        return ToolOutcome(_json(body), build=run)
+        self.ws.last_build_content = _json(body)
+        return ToolOutcome(self.ws.last_build_content, build=run)
 
     def _inspect(self, args: dict) -> ToolOutcome:
         kind = args["kind"]
