@@ -298,6 +298,11 @@ def _parse_one(item: Any, idx: int, params: set[str]) -> Check:
     return Check(cid, ctype, args, expected, tol, op, ctx.refs)
 
 
+def parse_where(raw: Any, param_names: set[str]) -> list[list]:
+    """单独校验一组 where 条件（inspect 工具和测量引擎用）。"""
+    return _Ctx("查询", set(param_names)).where(raw, "where")
+
+
 def parse_checks(raw: list[dict], param_names: set[str]) -> list[Check]:
     """解析模型写的检查项；结果总是以三条必做检查开头。"""
     if not isinstance(raw, list):

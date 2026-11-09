@@ -36,3 +36,13 @@
   1. `Check.args` 里放各类型自己的字段（bbox: `axis`；count: `kind`、`where`；angle: `a`、`b`；点: `point`；distance: `a`、`b`），`expected`/`tol`/`op` 在 `Check` 自己的字段里。`volume` 的 `tol` 存的是相对容差（默认 0.01）。必做检查的 `type` 等于它自己的 id（`valid`、`single_solid`、`positive_volume`）。
   2. 校验比计划更严的地方（都是为了让模型少走弯路）：`where` 的属性必须在已实测存在的 9 个里（`geom.radius` 这类不存在的属性在 SCA 里不会报错只是选不到，见笔记第 5 节）；出现不认识的字段会报错并列出可用字段；`bbox/angle/volume` 写了非 `==` 的 `op` 会报错。共用 schema 里有、但对该类型无关的字段（如 bbox 上的 `kind`）直接忽略。
   3. 表达式乘方次数超过 100 会拒绝，防止 `9**9**9` 卡死。
+
+## Task 5：测量引擎 —— 完成
+
+- 做了什么：`cad_agent/checks/engine.py`（`run_checks`、`query`、`body_facts`）、`tests/test_engine.py`（全部标记 `sca`）；`checks/spec.py` 里补了一个公开函数 `parse_where`（校验单独的一组 where 条件，`query` 和后面的 `inspect` 工具用）。
+- 测试数量：新增 19 个，全部测试 114 个全部通过。
+- 说明：
+  1. 所有测量写法来自笔记第 4、5、6、14 节：包围盒/体积/有效性/实体个数用 `inspect_shape_rbrepinspection`；点分类用 `BRepClass3d_SolidClassifier`；两组几何的最小距离先把选中的实体各拼成一个 compound 再算一次 `BRepExtrema_DistShapeShape`，避免两两配对；法向夹角用 `get_normal_at()`（平面法向朝材料外）。
+  2. `point_inside` 把“正好在表面上”也算在材料上，`point_outside` 只认“在材料外”（笔记第 14 节的约定）。
+  3. 面/边的类型名来自 OCP 的枚举（去掉 `GeomAbs_` 前缀转大写，如 `PLANE`、`CYLINDER`、`LINE`、`CIRCLE`），和 QL 里 `geom.type` 的写法一致。
+  4. `detail` 里最多列 8 个被选中几何（类型、中心、面积或长度、平面法向）；选中 0 个时写“选中 0 个”。每条检查各自捕获异常，出错的检查算不通过，原因写进 `detail`。
