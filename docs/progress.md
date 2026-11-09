@@ -83,3 +83,14 @@
   3. build 的计数：渲染 notebook 或解析检查项时就出错（没运行）也算一次失败；缺检查（模型和检查都通过但用户参数没被覆盖）同样算一次失败，因为不能交付。
   4. `api_help` 只定位 SCA 包路径不导入包；名字允许带 `scad.`、`ql.` 前缀，只接受标识符，防止路径穿越；文档超过 4000 字符会截断。
   5. 偏离记录：`docs/deviations.md` 的 D4（缺检查时多一个 `coverage_note` 字段）、D5（`ToolBox` 多了几个成员、多了 `tool_specs.py`）。
+
+## Task 10：主循环与提示词 —— 完成
+
+- 做了什么：`cad_agent/agent/loop.py`（`AFFIRMATIVE`、`is_affirmative`、`AgentTurn`、`Agent`）、`agent/state.py`（`load_system_prompt`、`render_state`）、`agent/prompts/system.md`（从提示词文档第 1 节脚本提取，逐字一致）、`agent/prompts/sca_cheatsheet.md`、`tests/test_loop.py`、`tests/test_prompts.py`、`tests/helpers.py`（假 `run_job` 等测试工具）。
+- 测试数量：新增 35 个（含 1 个 `sca` 标记的真实端到端测试：脚本里写出带孔板的完整流程，用真实 `run_job`，`v1` 里有 `model.step` 和 `view.png`），全部测试 262 个全部通过。
+- 说明：
+  1. 测试会逐字比对：`system.md` 与提示词文档第 1 节一致；速查表的分节与提示词文档第 6 节一致；速查表里每个“例：`…`”都是合法的单行 Python、能通过 guard，且用到的 `scad.xxx` 都在包内 API 文档里存在。
+  2. 速查表的每条写法都来自笔记第 12、13 节的实测。写速查表时发现减孔带 `skip_non_intersecting=False` 的几种组合（多个工具体、圆周/线性阵列、循环列表）和“按坐标范围选侧面 + exactly(1)”笔记里没有，已先补进探测脚本并跑通，补进笔记第 12.5、12.7、12.9 节，`docs/sca-probe-output.txt` 重新生成。速查表标题下多了一小段说明（参数名可直接运算、用关键字参数），分节标题没动。
+  3. 主循环的约定：一条用户消息一轮；每轮开始 `toolbox.begin_turn()`；确认只认整句在 `AFFIRMATIVE` 里（“可以，但角度改成70”会原样转给模型，且无论怎么回都清掉“等待确认”）；一条回复里有多个工具调用时，每个调用都有对应的 `tool` 消息（本轮提前结束时，后面的调用回“没有执行”）；参数不是合法 JSON 的调用，原文原样放回对话历史。
+  4. 结束条件的先后：build 通过（交付）→ 失败次数达到上限 → 要等用户的工具（提问/确认）→ 工具调用次数达到上限。交付时用 `export_step`/`render_png` 再跑一次 `run_job`，导出到临时目录再由 `session.new_version` 复制；`changes` 取自上次交付以来每次 `update_brief` 返回的变化行。每轮结束都保存当前状态（计划只要求交付和失败后保存，多存不影响）。
+  5. 日志的 `kind`：`user`、`assistant`、`tool`、`build`（每次 build 一条，含是否通过、出错特征、没通过的检查 id）、以及每轮结束的 `reply`/`question`/`confirm`/`delivered`/`failed`。

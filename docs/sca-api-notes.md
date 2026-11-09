@@ -322,6 +322,7 @@ cap    = scad.intersect_rsolid(base, _box)                   # [-10,-20,0, 10,20
 - `cut_rsolid(被减体, 工具1, 工具2, ...)`：一次可以减多个，也可以传工具体列表（嵌套序列会被展开）。
 - **工具体完全没碰到主体时，默认参数下不报错，悄悄跳过**（结果和原来一样，体积不变）。想让它报错就加 `skip_non_intersecting=False`。
 - 相切的两个工具体（如间距正好等于直径的相邻圆柱）会让 `cut_rsolid` 报 `Failed to compute the boolean cut`，工具体之间要留缝或干脆重叠。
+- **`skip_non_intersecting=False` 在所有减孔写法里都能用**（Task 10 补测）：两个工具体 `cut_rsolid(base, _h1, _h2, skip_non_intersecting=False)` → 2 个圆柱面；圆周阵列列表 → 6 个；线性阵列列表 → 3 个；循环生成的 Python 列表 → 6 个。工具体确实穿过主体时结果和不加参数完全一样（体积 17943.36 / 15872.31 / 17315.04 / 16787.26），只是工具体没碰到时会报错而不是悄悄跳过。所以速查表里减孔一律带这个参数。
 
 ### 12.6 移动与旋转
 ```python
@@ -373,7 +374,7 @@ ql.faces().where(ql.or_(ql.prop("geom.normal.z", ">=", 0.99), ql.prop("geom.norm
 ql.faces().where(ql.not_(ql.prop("geom.normal.z", ">=", 0.99))).resolve(body)                                            # 非顶面，5 个
 ```
 - `ql.prop(路径, 比较符, 值)`：比较符 `== != >= <= > <`；`geom.type` 的值是大写字面量。
-- 选坐标用范围，不要用 `==`。
+- 选坐标用范围，不要用 `==`。例：侧面 `ql.faces().where(ql.and_(ql.prop("geom.type", "==", "PLANE"), ql.prop("geom.center.x", ">=", 29.9), ql.prop("geom.center.x", "<=", 30.1))).exactly(1).resolve(base)`（60×40×8 的板，选中 1 个，Task 10 补测）。
 
 ## 13. 常见报错原文（第 15 项）
 

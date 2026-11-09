@@ -246,8 +246,49 @@ def errors() -> None:
         "base = scad.make_box(width=base_w, height=base_d, depth=base_t)", ["base"])])
 
 
+def skip_flag_variants() -> None:
+    """速查表里减孔的写法都带 skip_non_intersecting=False：多个工具体、阵列、循环列表都要实测。"""
+    from simplecadapi import ql
+
+    def cyl_faces(r) -> int:
+        return len(ql.faces().where(ql.prop("geom.type", "==", "CYLINDER")).resolve(r.product.body))
+
+    two = Cell("holes", "subtract", ["base", "base_t", "hole_d"],
+               "_h1 = scad.make_cylinder_rsolid(radius=hole_d / 2, height=base_t + 2, bottom_face_center=(-15, 0, -1))\n"
+               "_h2 = scad.make_cylinder_rsolid(radius=hole_d / 2, height=base_t + 2, bottom_face_center=(15, 0, -1))\n"
+               "holes = scad.cut_rsolid(base, _h1, _h2, skip_non_intersecting=False)", ["holes"])
+    r = case("14 布尔/cut_rsolid 两个工具体 + skip_non_intersecting=False", [BASE, two], (-30, -20, 0, 30, 20, 8))
+    if r is not None:
+        say("14 布尔/cut + flag", f"圆柱面个数={cyl_faces(r)}（期望 2）")
+    radial = Cell("bolt-holes", "pattern", ["base", "base_t", "hole_d", "n_holes", "pcd"],
+                  "_hole = scad.make_cylinder_rsolid(radius=hole_d / 2, height=base_t + 2, bottom_face_center=(pcd / 2, 0, -1))\n"
+                  "_holes = scad.radial_pattern_rsolidlist(shape=_hole, center=(0, 0, 0), axis=(0, 0, 1), count=n_holes, total_rotation_angle=360)\n"
+                  "bolt_holes = scad.cut_rsolid(base, _holes, skip_non_intersecting=False)", ["bolt_holes"])
+    r = case("14 阵列/radial + skip_non_intersecting=False", [BASE, radial], (-30, -20, 0, 30, 20, 8), product="bolt_holes")
+    if r is not None:
+        say("14 阵列/radial + flag", f"圆柱面个数={cyl_faces(r)}（期望 6）")
+    linear = Cell("row-holes", "pattern", ["base", "base_t", "hole_d"],
+                  "_hole = scad.make_cylinder_rsolid(radius=hole_d / 2, height=base_t + 2, bottom_face_center=(-15, 0, -1))\n"
+                  "_holes = scad.linear_pattern_rsolidlist(shape=_hole, direction=(1, 0, 0), count=3, spacing=15)\n"
+                  "row_holes = scad.cut_rsolid(base, _holes, skip_non_intersecting=False)", ["row_holes"])
+    r = case("14 阵列/linear + skip_non_intersecting=False", [BASE, linear], (-30, -20, 0, 30, 20, 8), product="row_holes")
+    if r is not None:
+        say("14 阵列/linear + flag", f"圆柱面个数={cyl_faces(r)}（期望 3）")
+    loop = Cell("row-holes", "pattern", ["base", "base_t", "hole_d", "n_holes"],
+                "_tools = [scad.make_cylinder_rsolid(radius=hole_d / 2.5, height=base_t + 2, bottom_face_center=(-25 + i * 10, 0, -1)) for i in range(n_holes)]\n"
+                "row_holes = scad.cut_rsolid(base, _tools, skip_non_intersecting=False)", ["row_holes"])
+    r = case("14 阵列/循环列表 + skip_non_intersecting=False", [BASE, loop], (-30, -20, 0, 30, 20, 8), product="row_holes")
+    if r is not None:
+        say("14 阵列/循环 + flag", f"圆柱面个数={cyl_faces(r)}（期望 6）")
+    side = Cell("side-faces", "modify", ["base"],
+                "side_faces = base\n"
+                "_side = ql.faces().where(ql.and_(ql.prop('geom.type', '==', 'PLANE'), ql.prop('geom.center.x', '>=', 29.9), ql.prop('geom.center.x', '<=', 30.1)))\n"
+                "_n = len(_side.exactly(1).resolve(base))", ["side_faces"])
+    case("14 QL/按坐标范围选侧面 + exactly(1)", [BASE, side], (-30, -20, 0, 30, 20, 8), product="side_faces")
+
+
 def main() -> None:
-    for fn in (basics, sketches, revolve, booleans_and_transforms, patterns, fillet_chamfer_and_ql, errors):
+    for fn in (basics, sketches, revolve, booleans_and_transforms, patterns, skip_flag_variants, fillet_chamfer_and_ql, errors):
         print(f"\n==== {fn.__name__} ====", flush=True)
         try:
             fn()
