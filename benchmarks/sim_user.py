@@ -27,16 +27,29 @@ CONFIRM_LINE = r'''（助手正在请你确认需求单）'''
 
 FALLBACK_REPLY = "你定吧"
 
+# 1.2 补丁：用户提出修改以后，隐藏需求里要加上这条修改，免得核对需求单时拿旧的需求把修改改回去
+# 原文取自 docs/superpowers/plans/2026-11-09-cad-agent-v1.2-fixes.md（Task 1）
+CHANGE_LINE = r'''- （后来你提出了修改，以修改后的为准）<change>'''
+
 
 class SimUser:
     """每次调用都是独立的：系统提示词里有隐藏需求，用户消息只有助手刚说的话（见提示词文档）。"""
 
     def __init__(self, llm: LLM, hidden_spec: str) -> None:
         self.llm = llm
-        self.system = SYSTEM_TEMPLATE.replace("<hidden_spec>", hidden_spec.strip())
+        self._spec_lines = [hidden_spec.strip()]
+        self.system = self._render()
         self.calls = 0
         self.tokens = 0
         self._costs: list[float | None] = []
+
+    def _render(self) -> str:
+        return SYSTEM_TEMPLATE.replace("<hidden_spec>", "\n".join(self._spec_lines))
+
+    def add_change(self, change: str) -> None:
+        """把修改请求原文加到隐藏需求后面（每条一行），并重新生成系统提示词。"""
+        self._spec_lines.append(CHANGE_LINE.replace("<change>", change))
+        self.system = self._render()
 
     @property
     def cost(self) -> float | None:

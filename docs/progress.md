@@ -209,3 +209,9 @@
   2. `l_bracket` 把立板叠在底板上面（总高 65 而不是 60）：三轮迭代都没解决，E2 的 12 遍里出现了 8 遍。任务说明对"立板高 60"含不含底板厚度有歧义，模拟用户的回答也不明确。
   3. 留出任务只看了结果表，没有读对话日志，也没有为它们改过提示词。
   4. 应用进程的环境变量里没有 `DEEPSEEK_API_KEY`（用户级环境变量里有），所有评测命令都只在命令的进程内把它读进环境变量，没有打印或写入任何文件；提交前对结果文档等逐个做了 key 检查，结果都是 False。
+
+## 1.2 版 Task 1：模拟用户知道修改 —— 完成
+
+- 做了什么：`benchmarks/sim_user.py` 加 `CHANGE_LINE`（原文照 1.2 计划）和 `SimUser.add_change`（把修改请求原文按 `CHANGE_LINE` 加在隐藏需求后面，每条一行，重新生成系统提示词；`SYSTEM_TEMPLATE` 不变）；`benchmarks/run.py` 的 `run_task` 在每个修改阶段发出修改请求之前调用 `sim_user.add_change(修改请求原文)`。
+- 测试数量：新增 4 个（`test_sim_user_add_change`、`test_run_task_tells_sim_user_each_modification`，另加 `CHANGE_LINE` 与计划原文逐字一致、多条修改按顺序累加两个），全部测试 447 个全部通过。旧测试没动。
+- 说明：没有偏离。

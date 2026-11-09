@@ -180,6 +180,51 @@ def test_sim_user_prompts_are_verbatim_copy():
     assert [SYSTEM_TEMPLATE, USER_TEMPLATE, CONFIRM_LINE] == blocks
 
 
+def test_sim_user_add_change():
+    llm = ScriptedLLM([LLMReply("好", [], {})])
+    user = SimUser(llm, "板宽 78 mm")
+    user.add_change("板宽改成 80 mm")
+    user.reply("……", "reply")
+    system = llm.calls[0][0]
+    assert system["role"] == "system"
+    assert system["content"] == SYSTEM_TEMPLATE.replace("<hidden_spec>", "板宽 78 mm\n- （后来你提出了修改，以修改后的为准）板宽改成 80 mm")
+
+
+def test_sim_user_change_line_is_verbatim_copy():
+    from benchmarks.sim_user import CHANGE_LINE
+
+    doc = (PROMPTS_DOC.parent / "2026-11-09-cad-agent-v1.2-fixes.md").read_text(encoding="utf-8")
+    block = re.findall(r"```text\n(.*?)\n```", doc.split("`CHANGE_LINE` 的原文：")[1].split("- [ ] **Step 1")[0], flags=re.S)
+    assert block == [CHANGE_LINE]
+
+
+def test_sim_user_changes_accumulate_in_order():
+    llm = ScriptedLLM([LLMReply("好", [], {})])
+    user = SimUser(llm, "  板宽 78 mm\n")
+    user.add_change("板宽改成 80 mm")
+    user.add_change("再加厚 2 mm")
+    user.reply("……", "reply")
+    spec = llm.calls[0][0]["content"]
+    assert "板宽 78 mm\n- （后来你提出了修改，以修改后的为准）板宽改成 80 mm\n- （后来你提出了修改，以修改后的为准）再加厚 2 mm" in spec
+    assert spec.index("板宽改成 80 mm") < spec.index("再加厚 2 mm") and "<hidden_spec>" not in spec and "<change>" not in spec
+
+
+def test_run_task_tells_sim_user_each_modification(tmp_path):
+    class Recording(SimUser):
+        def __init__(self, *a, **k):
+            super().__init__(*a, **k)
+            self.changes: list[str] = []
+
+        def add_change(self, change: str) -> None:
+            self.changes.append(change)
+            super().add_change(change)
+
+    user = Recording(ScriptedLLM([LLMReply("确认", [], {"total_tokens": 3})]), DEMO["hidden_spec"])
+    runner = BenchRunner()
+    result = run_task(DEMO, agent_factory(FULL_SCRIPT, runner), user, tmp_path / "t", run_job=runner)
+    assert result["success"] is True and user.changes == DEMO["modifications"]
+
+
 def test_sim_user_reply_formats_messages():
     llm = ScriptedLLM([LLMReply(" 78 毫米 ", [], {"total_tokens": 11}), LLMReply("确认", [], {"total_tokens": 4}), LLMReply("", [], {})])
     user = SimUser(llm, "手机宽 78 mm\n角度 65 度\n")

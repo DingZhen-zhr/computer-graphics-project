@@ -131,7 +131,9 @@ def run_task(task: dict, make_agent: Callable[[Path], object], sim_user: SimUser
     messages = [task["initial"], *task.get("modifications", [])]
     stages: list[dict] = []
     for index, (stage, message) in enumerate(zip(names, messages)):
-        turn = _converse(agent, sim_user, message, max_turns, totals, costs)
+        if index > 0:  # 修改阶段：先让模拟用户知道这条修改，再发出修改请求
+            sim_user.add_change(message)
+        turn =_converse(agent, sim_user, message, max_turns, totals, costs)
         if turn is None:
             reason = f"对话 {max_turns} 轮仍未交付"
             stages.append({"stage": stage, "delivered": False, "acceptance": [], "reason": reason})
