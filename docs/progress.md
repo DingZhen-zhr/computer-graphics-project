@@ -56,3 +56,9 @@
   2. 超时有两层：子进程里 `run_notebook(timeout=timeout_s)`，外层 `Popen.communicate(timeout=timeout_s+30)` 兜底，超时用 `taskkill /T` 结束整个进程树。子进程写完 `result.json` 后用 `os._exit(0)` 退出，不等跑不完的线程。
   3. 计划之外的小改动：guard 还拒绝最外层的 `return`/`yield`/`await`（会让 marimo 的 cell 提前返回）和所有双下划线开头的名字（挡住 `__builtins__['eval']` 这类绕法）；环境清理的名字匹配不区分大小写。偏离记录见 `docs/deviations.md` 的 D2（报错翻译）、D3（`-X utf8`）。
   4. 测试里有一个故意绕过 guard 的 notebook（在特征里 `import os as _os`），用来从子进程内部确认：密钥类环境变量已清掉、`PYTHONUTF8=1`、工作目录是 `cad-agent-*` 临时目录。
+
+## Task 7：会话目录与日志 —— 完成
+
+- 做了什么：`cad_agent/session.py`（`Session`：`dir`、`log`、`save_state`、`new_version`、`versions`）、`tests/test_session.py`。
+- 测试数量：新增 8 个，全部测试 159 个全部通过。
+- 说明：目录名同一秒内重名时加 `-2`、`-3`（测试里用可替换的 `_now()` 固定时间来验证）；`log` 的中文不转义，路径等非 JSON 类型转成字符串；`new_version` 的编号取现有最大编号加 1（有 v10 时下一个是 v11）；没有参数变化时 `changes.md` 写“（需求单参数没有变化）”。
