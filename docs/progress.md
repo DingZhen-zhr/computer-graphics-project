@@ -171,3 +171,9 @@
 - 测试数量：全部测试 399 个全部通过（新增 29 个）。按清单改了第一版测试：`test_confirmation_then_delivery`、`test_mixed_confirmation_not_accepted`、`test_non_affirmative_answer_still_clears_waiting_flag`、`test_real_build_end_to_end`、`test_suggested_change_after_delivery_requires_reconfirmation`、`test_modification_keeps_old_checks`、`test_coverage_gap_counts_as_failure`（换成 `test_coverage_gap_does_not_count_as_failure`）、`FULL_SCRIPT`、`test_run_task_with_fakes`（7 → 5）、`test_run_task_counts_repairs`。Review Focus 第 1、2 条分别对应 `test_build_in_same_reply_blocked_then_auto_confirm` 和 `test_no_auto_build_when_nothing_changed`。
 - 偏离：自动重建用的是偏离 D6 的备用写法（追加 `user` 消息 `AUTO_BUILD_NOTE + "\n" + build 返回的 JSON`，不追加 `auto-build-<n>` 的 assistant/tool 消息）；`test_auto_build_failure_lets_model_repair` 的断言按计划里已同步的描述写。没有新的偏离。
 - 说明：`loop.py` 254 行，没超过 300，但失败文字、交付文字、导出已经按 Global Constraints 的办法放进 `delivery.py`（不拆的话约 310 行）。自动重建也计一次工具调用，参与每轮 40 次的上限。多加的测试：自动请确认保留模型的开头文字、自动重建编号递增、跳过的 build 仍计一次工具调用、缺检查的 build 不结束本轮、真实失败仍计数。
+
+## 1.1 版 Task 7：按阶段选模型 —— 完成
+
+- 做了什么：`Agent.__init__` 多一个参数 `modeling_llm: LLM | None = None`；一轮开始、处理完确认之后按 `ws.brief.can_build()[0]` 决定本轮用哪个模型（建模阶段且有 `modeling_llm` 才用它），这一轮里不再换；日志的 `user` 记录多了 `phase`（`clarify` 或 `modeling`）。`cli.build_agent` 现在用 `make_llm(config, "clarify", key)` 和 `modeling_llm=make_llm(config, "modeling", key)`。README"配置模型"一节补了 `extra_body`、`[llm.pricing]`、`[llm.clarify]`、`[llm.modeling]` 的说明，例子用笔记里实测可行的 `{thinking = {type = "disabled"}}`。
+- 测试数量：新增 5 个（`test_phase_picks_llm`、`test_without_modeling_llm_everything_uses_the_default`、`test_llm_fixed_within_turn`、`test_user_log_has_phase`、`test_build_agent_uses_phase_settings`），全部测试 404 个全部通过。测试里的 `make_agent` 多了一个可选参数 `modeling_replies`。
+- 说明：模拟用户仍然只用 `[llm]`（评测里用 `make_llm(config, "base", key)`）。没有偏离。

@@ -231,6 +231,20 @@ def test_ctrl_c_exits_cleanly(monkeypatch, tmp_path):
     assert cli.main(["--config", str(EXAMPLE)], input_fn=interrupt, print_fn=lambda *a, **k: out.append(" ".join(map(str, a)))) == 0
 
 
+def test_build_agent_uses_phase_settings(monkeypatch, tmp_path):
+    from dataclasses import replace
+
+    from cad_agent.config import load_config
+
+    monkeypatch.setenv("DEEPSEEK_API_KEY", "test-key-not-real")
+    cfg = tmp_path / "c.toml"
+    cfg.write_text('[llm]\nbase_url = "http://x"\nmodel = "base"\n[llm.clarify]\nmodel = "c"\nextra_body = {x = 1}\n[llm.modeling]\nmodel = "m2"\n',
+                   encoding="utf-8")
+    agent, _ = cli.build_agent(replace(load_config(cfg), sessions_dir=tmp_path / "s"))
+    assert agent.llm.model == "c" and agent.llm.extra_body == {"x": 1}
+    assert agent.modeling_llm.model == "m2" and agent.modeling_llm.extra_body == {}
+
+
 def test_build_agent_wires_everything(monkeypatch, tmp_path):
     from cad_agent.config import load_config
 

@@ -33,10 +33,10 @@ HELP = """可用命令：
 def build_agent(config: Config) -> tuple[Agent, Session]:
     """按配置组装智能体。没有设置 API key 时抛 ConfigError（此时还不会创建会话目录）。"""
     key = config.api_key()
-    llm = make_llm(config, "base", key)
     toolbox = ToolBox(Workspace(Brief(), FeatureList(), []), timeout_s=config.run_timeout_s, secret_names=(config.api_key_env,))
     session = Session(config.sessions_dir)
-    return Agent(llm, toolbox, session, config), session
+    agent = Agent(make_llm(config, "clarify", key), toolbox, session, config, modeling_llm=make_llm(config, "modeling", key))
+    return agent, session
 
 
 def find_sca() -> str | None:

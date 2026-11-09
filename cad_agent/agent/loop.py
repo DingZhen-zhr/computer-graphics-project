@@ -90,8 +90,9 @@ def _raw_arguments(tc: ToolCall) -> str:
 
 
 class Agent:
-    def __init__(self, llm: LLM, toolbox: ToolBox, session: Session, config: Config) -> None:
+    def __init__(self, llm: LLM, toolbox: ToolBox, session: Session, config: Config, modeling_llm: LLM | None = None) -> None:
         self.llm, self.toolbox, self.session, self.config = llm, toolbox, session, config
+        self.modeling_llm = modeling_llm  # 建模阶段（需求单已确认）用的模型；没有就一直用 llm
         self.toolbox.max_build_failures = config.max_build_failures
         self.system_prompt = load_system_prompt()
         self.context = Context(self.system_prompt)  # 发给模型的消息：旧轮折叠，本轮开头一张快照，轮内只追加
@@ -112,12 +113,15 @@ class Agent:
                 self.ws.brief.confirmed = True
                 content = CONFIRMED_MESSAGE
             self.ws.awaiting_confirmation = False  # 无论用户怎么回，都不再等确认
+        # 阶段在一轮开始、处理完确认之后决定，这一轮内不换模型（换了缓存就断了）
+        phase = "modeling" if self.ws.brief.can_build()[0] else "clarify"
+        llm = self.modeling_llm if phase == "modeling" and self.modeling_llm is not None else self.llm
         self.context.start_turn(content, render_snapshot(self.ws))
-        self.session.log("user", text=text, sent_as=content)
+        self.session.log("user", text=text, sent_as=content, phase=phase)
 
         while True:
             try:
-                reply = self.llm.chat(self.context.messages(), self.toolbox.schemas())
+                reply = llm.chat(self.context.messages(), self.toolbox.schemas())
             except LLMError as e:
                 return self._end("failed", f"模型调用失败：{e}。需求单和已经写好的特征都还在，可以稍后再发一次。", c)
             c.add(reply)

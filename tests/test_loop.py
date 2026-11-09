@@ -22,7 +22,7 @@ SET_CHECKS = scripted_call("set_checks", {"checks": [PHONE_W, TILT]})
 BUILD = scripted_call("build", {})
 
 
-def make_agent(tmp_path, replies, runner=None, confirmed=True, **config):
+def make_agent(tmp_path, replies, runner=None, confirmed=True, modeling_replies=None, **config):
     brief = Brief()
     ws = Workspace(brief, FeatureList(), [])
     if confirmed:
@@ -33,7 +33,8 @@ def make_agent(tmp_path, replies, runner=None, confirmed=True, **config):
     llm = ScriptedLLM(replies)
     toolbox = ToolBox(ws, run_job=runner)
     session = Session(tmp_path / "sessions")
-    agent = Agent(llm, toolbox, session, Config(base_url="http://x", model="m", **config))
+    modeling_llm = None if modeling_replies is None else ScriptedLLM(modeling_replies)
+    agent = Agent(llm, toolbox, session, Config(base_url="http://x", model="m", **config), modeling_llm=modeling_llm)
     return agent, ws, llm, runner, session
 
 
@@ -459,6 +460,37 @@ def test_turn_cost_none_without_successful_call(tmp_path):
     assert turn.kind == "failed" and turn.llm_calls == 0 and turn.cost is None and turn.prompt_tokens == 0
     end = [r for r in log_rows(session) if r["kind"] == "failed"][0]
     assert end["cost"] is None and end["cached_tokens"] == 0
+
+
+def test_phase_picks_llm(tmp_path):
+    agent, ws, clarify, runner, session = make_agent(tmp_path, [FIRST_REQUEST], confirmed=False, modeling_replies=[UPSERT, SET_CHECKS, BUILD])
+    modeling = agent.modeling_llm
+    assert agent.handle_user("做一个支架").kind == "confirm"
+    assert agent.handle_user("确认").kind == "delivered"
+    assert len(clarify.calls) == 1 and len(modeling.calls) == 3
+
+
+def test_without_modeling_llm_everything_uses_the_default(tmp_path):
+    agent, ws, llm, *_ = make_agent(tmp_path, [FIRST_REQUEST, UPSERT, SET_CHECKS, BUILD], confirmed=False)
+    assert agent.modeling_llm is None
+    agent.handle_user("做一个支架")
+    assert agent.handle_user("确认").kind == "delivered" and len(llm.calls) == 4
+
+
+def test_llm_fixed_within_turn(tmp_path):
+    ask = scripted_call("update_brief", {"open_questions": ["托唇要多高？"]})
+    agent, ws, clarify, *_ = make_agent(tmp_path, [], modeling_replies=[ask, LLMReply("要问一下", [], {})])
+    turn = agent.handle_user("加个托唇")
+    # 本轮开始时已确认，是建模阶段；中途需求单被取消确认也不换模型，保证本轮缓存连续
+    assert turn.kind == "reply" and not ws.brief.confirmed
+    assert clarify.calls == [] and len(agent.modeling_llm.calls) == 2
+
+
+def test_user_log_has_phase(tmp_path):
+    agent, ws, llm, runner, session = make_agent(tmp_path, [FIRST_REQUEST], confirmed=False, modeling_replies=[LLMReply("好", [], {})])
+    agent.handle_user("做一个支架")
+    agent.handle_user("确认")
+    assert [r["phase"] for r in log_rows(session) if r["kind"] == "user"] == ["clarify", "modeling"]
 
 
 def test_log_records_everything(tmp_path):

@@ -25,6 +25,17 @@ python -m venv .venv
 
    `config.toml` 里是模型地址、模型名、key 所在的环境变量名、超时和重试上限。默认用 DeepSeek；换成 GLM、通义、Kimi 等任何 OpenAI 兼容接口，只改 `[llm]` 里的 `base_url`、`model`、`api_key_env`，不用改代码。`config.toml` 已在 `.gitignore` 里，不会被提交。
 
+   还有几项可选的设置（都在 `config.example.toml` 里用注释写出来了，不写就和以前完全一样）：
+
+   - `extra_body`（写在 `[llm]` 里）：原样作为请求的 `extra_body` 发给接口，程序不认识里面的内容。比如 DeepSeek 实测可以这样关掉思考（`docs/llm-api-notes.md` 第 4 节）：`extra_body = {thinking = {type = "disabled"}}`。
+   - `[llm.pricing]`：`input_hit`、`input_miss`、`output` 三项，单位是 元 / 百万 token，**照模型服务的价目页自己填**（代码里不放任何价格）。填了以后每轮结束会显示本轮的大概费用，评测报告里也会有费用。
+   - `[llm.clarify]`（澄清阶段，需求单还没确认）和 `[llm.modeling]`（建模阶段，需求单已确认）：可以单独换 `model`、`temperature`、`extra_body`、`pricing`，没写的项沿用 `[llm]`；`extra_body` 是整体替换，不合并。一轮开始时按需求单有没有确认决定用哪个模型，这一轮里不换。例如只让澄清阶段不思考：
+
+     ```toml
+     [llm.clarify]
+     extra_body = {thinking = {type = "disabled"}}
+     ```
+
 2. **API key 只放在环境变量里，不写进任何文件。** 在 PowerShell 里这样设置（把引号里换成你自己的 key；只对当前这个终端窗口有效）：
 
    ```powershell
