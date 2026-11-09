@@ -17,3 +17,13 @@
 - 做了什么：`cad_agent/brief.py`（`Param`、`Brief`、`BriefError`）、`tests/test_brief.py`。
 - 测试数量：新增 25 个（计划列出的 10 个，加上未改动的建议值不清零、非法来源/数值、未知字段、失败的 patch 不改任何东西、保留名、to_dict 格式等），全部测试 26 个全部通过。
 - 说明：`apply_patch` 先在副本上做完全部检查再一次性生效，所以失败时需求单保持原样。参数名除了“小写合法标识符”，还拒绝 Python 关键字和 `scad/ql/math/model/sin/pi` 等会与 notebook 或检查表达式冲突的保留名（计划之外的输入校验，没有改任何接口）。
+
+## Task 3：特征列表 → notebook 文件 —— 完成
+
+- 做了什么：`cad_agent/notebook.py`（`ROLES`、`Feature`、`FeatureList`、`RenderedNotebook`、`render_notebook`、`NotebookError`）、`tests/test_notebook.py`。
+- 测试数量：新增 32 个（含 1 个 `sca` 标记的真实运行测试），全部测试 58 个全部通过。
+- 说明：
+  1. `NotebookError` 多了一个可选属性 `feature`（相关 slug，不确定时为 None），Task 9 的 build 返回要用它；构造方式 `NotebookError(message, feature=None)`，对计划里的 `NotebookError(ValueError)` 是兼容的。
+  2. 除计划列出的检查外，还拦了：特征变量名与参数名/前面特征重名、slug 对应的变量名是保留名或 Python 关键字（`model`、`scad`、`if` 等）、语法错误（带行号和 slug）、顶层循环变量没有下划线。
+  3. 输入推断用 `ast`，函数、lambda、推导式里的局部名字不算最外层赋值；没有参数时不生成参数 cell。
+  4. notebook 末尾带标准的 `if __name__ == "__main__": app.run()`，方便直接 `python model.py`；`cell_lines` 的范围是从 `@app.cell` 到该 cell 的 `return` 行。
