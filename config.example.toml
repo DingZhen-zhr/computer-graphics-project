@@ -6,6 +6,19 @@ base_url = "https://api.deepseek.com"   # OpenAI 兼容接口地址；换成 GLM
 model = "deepseek-chat"
 api_key_env = "DEEPSEEK_API_KEY"        # 存放 key 的环境变量名
 temperature = 0.2
+# extra_body = {}   # 可选：原样作为请求的 extra_body 发给接口（比如关掉思考的厂商参数）；代码里不认识里面的任何内容
+
+# 下面三段都是可选的，默认不写。
+#
+# [llm.pricing]     # 用来算每次调用的费用。价格不写在代码里：请照模型服务的价目页自己填，单位是 元 / 百万 token，三项都要写。
+# input_hit = <缓存命中的输入价格>
+# input_miss = <缓存未命中的输入价格>
+# output = <输出价格>
+#
+# [llm.clarify]     # 澄清阶段（需求单还没确认）用的设置；只写想改的项：model、temperature、extra_body、pricing（写成 [llm.clarify.pricing]）
+# [llm.modeling]    # 建模阶段（需求单已确认）用的设置；可以改的项同上
+#                   # 覆盖段里写了 extra_body 就整体替换 [llm] 里的，不合并；没写覆盖段的阶段直接用 [llm]。
+#                   # 模拟用户（评测用）只用 [llm]。
 
 [agent]
 run_timeout_s = 60        # 运行一次模型的超时（秒）

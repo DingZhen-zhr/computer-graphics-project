@@ -16,7 +16,7 @@ from cad_agent import __version__
 from cad_agent.agent.loop import Agent
 from cad_agent.brief import Brief
 from cad_agent.config import Config, ConfigError, load_config
-from cad_agent.llm.client import OpenAICompatLLM
+from cad_agent.llm.factory import make_llm
 from cad_agent.notebook import FeatureList
 from cad_agent.session import Session
 from cad_agent.tools import ToolBox, Workspace
@@ -33,7 +33,7 @@ HELP = """可用命令：
 def build_agent(config: Config) -> tuple[Agent, Session]:
     """按配置组装智能体。没有设置 API key 时抛 ConfigError（此时还不会创建会话目录）。"""
     key = config.api_key()
-    llm = OpenAICompatLLM(config.base_url, config.model, key, temperature=config.temperature)
+    llm = make_llm(config, "base", key)
     toolbox = ToolBox(Workspace(Brief(), FeatureList(), []), timeout_s=config.run_timeout_s, secret_names=(config.api_key_env,))
     session = Session(config.sessions_dir)
     return Agent(llm, toolbox, session, config), session

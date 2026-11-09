@@ -129,3 +129,13 @@
   1. 应用进程的环境里读不到 `DEEPSEEK_API_KEY`（应用启动时变量还没设），但用户级环境变量里有。探测命令里只在该命令的进程内把它从用户级环境变量读进 `$env:DEEPSEEK_API_KEY`，不打印、不写文件；探测脚本输出前会把 key 替换成 `<已隐藏>`。
   2. 3a~3c 追加内容太少、间隔太短，回答不了"追加的历史能不能被缓存"；6 里思考只有十几个 token，分不清思考有没有计入输入。所以补了 3d（全新前缀、追加约 300 token、间隔 10/30 秒）和 6b（让模型想久一点，并对比放回 `reasoning_content` 与否），第一次运行的输出被带补充实验的第二次完整运行覆盖，提交的输出文件和提交的脚本一致。
   3. 同一轮里思考会计入下一次输入，且放不放回 `reasoning_content` 数字一样（下一次 prompt 比上一次多出"上一次全部输出 + 16"），写进了笔记第 6 节。
+
+## 1.1 版 Task 2：模型客户端与配置 —— 完成
+
+- 做了什么：`cad_agent/llm/client.py`（`USAGE_KEYS`、`Pricing`、`normalize_usage`、`call_cost`、`LLMReply.cost`、`OpenAICompatLLM` 的 `extra_body`/`pricing`）、`cad_agent/llm/factory.py`（`make_llm`）、`cad_agent/config.py`（`Phase`、`PhaseOverride`、`LLMSettings`、`Config.llm_settings`、`[llm.pricing]`/`[llm.clarify]`/`[llm.modeling]`/`extra_body` 的读取和中文报错）、`config.example.toml`（新段用注释写出，不含任何价格数字）；`cli.build_agent` 和评测的模拟用户改用 `make_llm(config, "base", key)`。
+- 测试数量：新增 25 个，全部测试 334 个全部通过。按清单改了 `test_llm.py` 的 `test_parse_tool_calls`、`test_plain_reply_without_usage_or_content`（usage 期望值加两项为 0），其余第一版测试没动。
+- 说明：
+  1. 用量字段名和 `docs/llm-api-notes.md` 一致（`prompt_cache_hit_tokens`、`prompt_tokens_details.cached_tokens`、`completion_tokens_details.reasoning_tokens`），没有偏离。关思考时 `completion_tokens_details` 是 `null`，取值时已处理；另有一个用真实 `openai.types.CompletionUsage` 对象的测试，确认 SDK 保留的额外字段 `prompt_cache_hit_tokens` 读得到。
+  2. 计划之外加的小保护：命中数大于输入数时，没命中的部分按 0 算（不会变成负费用），有测试。
+  3. 配置里 `[llm.clarify.pricing]`、`[llm.modeling.pricing]` 也支持（设计文档第 7 节说覆盖段可以覆盖 pricing），规则和 `[llm.pricing]` 相同，报错里写明段名。
+  4. 第一次用 Python heredoc 往测试文件里写 `\n` 时被转成了真换行，测试文件语法错误；用 `git checkout` 还原这两个文件（只有我自己没提交的改动）后，改用 Edit 工具重写。

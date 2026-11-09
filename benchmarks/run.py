@@ -20,7 +20,7 @@ from benchmarks.sim_user import SimUser
 from cad_agent.checks.spec import MANDATORY_IDS, CheckSpecError, parse_checks
 from cad_agent.cli import build_agent
 from cad_agent.config import ConfigError, load_config
-from cad_agent.llm.client import OpenAICompatLLM
+from cad_agent.llm.factory import make_llm
 from cad_agent.notebook import RenderedNotebook
 from cad_agent.sandbox import execute
 
@@ -216,7 +216,7 @@ def main(argv: list[str] | None = None, print_fn: Callable[..., None] = print) -
         return build_agent(replace(config, sessions_dir=root / "sessions"))[0]
 
     def make_sim_user(hidden_spec: str) -> SimUser:
-        return SimUser(OpenAICompatLLM(config.base_url, config.model, key, temperature=config.temperature), hidden_spec)
+        return SimUser(make_llm(config, "base", key), hidden_spec)
 
     results_dir = Path(args.out) / datetime.now().strftime("%Y%m%d-%H%M%S")
     results = run_benchmarks(args.tasks, make_agent, make_sim_user, results_dir, print_fn=print_fn)

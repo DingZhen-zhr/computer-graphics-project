@@ -8,7 +8,12 @@ try:  # openai 3.x 用 httpx2，旧版本用 httpx；测试只需要用它造请
 except ImportError:  # pragma: no cover
     import httpx
 
-from cad_agent.llm.client import LLMError, LLMReply, OpenAICompatLLM, ToolCall
+from openai.types import CompletionUsage
+
+from cad_agent.config import load_config
+from cad_agent.llm.client import (USAGE_KEYS, LLMError, LLMReply, OpenAICompatLLM, Pricing, ToolCall, call_cost,
+                                  normalize_usage)
+from cad_agent.llm.factory import make_llm
 from cad_agent.llm.fake import ScriptedLLM, scripted_call
 
 REQ = httpx.Request("POST", "https://example.invalid/v1/chat/completions")
@@ -55,7 +60,7 @@ def test_parse_tool_calls():
     assert reply.content == "好的"
     assert reply.tool_calls == [ToolCall("c1", "upsert_feature", {"slug": "base"})]
     assert reply.tool_calls[0].arguments == {"slug": "base"}
-    assert reply.usage == {"prompt_tokens": 10, "completion_tokens": 5, "total_tokens": 15}
+    assert reply.usage == {"prompt_tokens": 10, "completion_tokens": 5, "total_tokens": 15, "cached_tokens": 0, "reasoning_tokens": 0}
 
 
 def test_request_parameters():
@@ -73,7 +78,8 @@ def test_no_tools_key_when_tool_list_empty():
 
 def test_plain_reply_without_usage_or_content():
     reply = make(FakeClient(response(None, usage=None))).chat(MESSAGES, TOOLS)
-    assert reply == LLMReply(content="", tool_calls=[], usage={"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0})
+    assert reply == LLMReply(content="", tool_calls=[], usage={"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0,
+                                                              "cached_tokens": 0, "reasoning_tokens": 0})
 
 
 def test_malformed_arguments_kept_raw():
@@ -161,3 +167,88 @@ def test_scripted_llm_can_raise():
     llm.chat([], [])
     with pytest.raises(LLMError, match="断网"):
         llm.chat([], [])
+
+
+# ---------------------------------------------------------------- 1.1 版：用量、费用、额外参数
+
+
+def write_config(tmp_path, text):
+    p = tmp_path / "config.toml"
+    p.write_text(text, encoding="utf-8")
+    return p
+
+
+def test_usage_deepseek_fields():
+    u = SimpleNamespace(prompt_tokens=100, completion_tokens=50, total_tokens=150, prompt_cache_hit_tokens=80,
+                        completion_tokens_details=SimpleNamespace(reasoning_tokens=30))
+    assert normalize_usage(u) == {"prompt_tokens": 100, "completion_tokens": 50, "total_tokens": 150, "cached_tokens": 80, "reasoning_tokens": 30}
+
+
+def test_usage_openai_details():
+    u = SimpleNamespace(prompt_tokens=100, completion_tokens=5, total_tokens=105, prompt_tokens_details=SimpleNamespace(cached_tokens=64))
+    assert normalize_usage(u)["cached_tokens"] == 64 and normalize_usage(u)["reasoning_tokens"] == 0
+
+
+def test_usage_missing_is_zero():
+    assert normalize_usage(None) == dict.fromkeys(USAGE_KEYS, 0)
+    assert normalize_usage(SimpleNamespace(prompt_tokens=None, completion_tokens=None, total_tokens=None)) == dict.fromkeys(USAGE_KEYS, 0)
+
+
+def test_usage_null_details_is_zero():
+    # 关掉思考时 DeepSeek 返回 completion_tokens_details=None（docs/llm-api-notes.md 第 2 节）
+    u = SimpleNamespace(prompt_tokens=54, completion_tokens=24, total_tokens=78, completion_tokens_details=None,
+                        prompt_tokens_details=None, prompt_cache_hit_tokens=0)
+    assert normalize_usage(u) == {"prompt_tokens": 54, "completion_tokens": 24, "total_tokens": 78, "cached_tokens": 0, "reasoning_tokens": 0}
+
+
+def test_usage_from_real_sdk_object():
+    # 缓存命中数不在 openai 官方类型里，是 SDK 保留的额外字段；确认真对象上也读得到
+    u = CompletionUsage.model_validate({
+        "completion_tokens": 177, "prompt_tokens": 4787, "total_tokens": 4964,
+        "completion_tokens_details": {"reasoning_tokens": 152}, "prompt_tokens_details": {"cached_tokens": 4608},
+        "prompt_cache_hit_tokens": 4608, "prompt_cache_miss_tokens": 179,
+    })
+    assert normalize_usage(u) == {"prompt_tokens": 4787, "completion_tokens": 177, "total_tokens": 4964, "cached_tokens": 4608, "reasoning_tokens": 152}
+
+
+def test_cost_from_pricing():
+    usage = {"prompt_tokens": 1_000_000, "completion_tokens": 100_000, "total_tokens": 1_100_000, "cached_tokens": 400_000, "reasoning_tokens": 0}
+    assert call_cost(usage, Pricing(0.5, 2.0, 8.0)) == pytest.approx(2.2)   # 0.4×0.5 + 0.6×2 + 0.1×8
+    assert call_cost(usage, None) is None
+
+
+def test_cost_clamps_cache_larger_than_prompt():
+    usage = dict.fromkeys(USAGE_KEYS, 0) | {"prompt_tokens": 100, "cached_tokens": 150}
+    assert call_cost(usage, Pricing(1.0, 100.0, 1.0)) == pytest.approx(150 * 1.0 / 1_000_000)  # 没命中的部分不会变成负数
+
+
+def test_cost_without_cache_fields():
+    reply = make(FakeClient(response("好")), pricing=Pricing(1.0, 2.0, 4.0)).chat(MESSAGES, TOOLS)
+    assert reply.cost == pytest.approx((10 * 2.0 + 5 * 4.0) / 1_000_000)
+
+
+def test_no_cost_without_pricing():
+    assert make(FakeClient(response("好"))).chat(MESSAGES, TOOLS).cost is None
+
+
+def test_extra_body_passed_through():
+    client = FakeClient(response("好"))
+    make(client, extra_body={"foo": {"bar": 1}}).chat(MESSAGES, TOOLS)
+    assert client.calls[0]["extra_body"] == {"foo": {"bar": 1}}
+
+
+def test_no_extra_body_when_empty():
+    client = FakeClient(response("好"))
+    make(client).chat(MESSAGES, TOOLS)
+    make(client, extra_body={}).chat(MESSAGES, TOOLS)
+    assert all("extra_body" not in c for c in client.calls)
+
+
+def test_make_llm_uses_phase_settings(tmp_path):
+    cfg = load_config(write_config(tmp_path, (
+        '[llm]\nbase_url = "https://example.invalid/v1"\nmodel = "a"\ntemperature = 0.2\n'
+        '[llm.pricing]\ninput_hit = 0.2\ninput_miss = 2.0\noutput = 8.0\n'
+        '[llm.clarify]\nmodel = "b"\nextra_body = {x = 1}\n')))
+    llm = make_llm(cfg, "clarify", "k")
+    assert llm.model == "b" and llm.temperature == 0.2 and llm.extra_body == {"x": 1} and llm.pricing == cfg.pricing
+    assert make_llm(cfg, "modeling", "k").model == "a" and make_llm(cfg, "base", "k").extra_body == {}
