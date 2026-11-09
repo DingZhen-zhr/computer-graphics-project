@@ -198,3 +198,14 @@
 - 测试数量：新增 9 个（`test_benchmarks.py` 3 个：`test_holdout_tasks_load`、`test_enclosure_acceptance_numbers`、`test_stepped_shaft_acceptance_numbers`；`test_benchmark_references.py` 的两个参数化测试各加 4 + 2 项），全部测试 443 个全部通过。标准答案模型：enclosure 用外壳 + 内腔 + 穿过前墙的 USB 口三个特征，stepped_shaft 用三个圆柱叠加 + 沿 y 的横向通孔（`make_cylinder_rsolid` 的 `axis=(0, 1, 0)`），两个任务在初始和修改后两个阶段的验收都通过。
 - 旧模型（壁厚还是 2 / 顶段直径还是 16）对修改后的验收：enclosure 恰好卡在 `volume`、`in-2`、`in-3` 三项，stepped_shaft 恰好卡在 `in-3`，测试里按这个集合断言。
 - 说明：留出任务的 `max_user_turns` 是 12。先写测试再写 YAML：为了让数字测试真的先失败，写完 YAML 后临时把它们挪走跑了一遍红灯（3 个 benchmarks 测试 + 6 个 references 测试失败），再挪回来补上 `HOLDOUT_TASKS`。没有偏离。
+
+## 1.1 版 Task 11：最终评测与结果 —— 完成（有没达到的标准，如实记在结果文档里）
+
+- 做了什么：E1（`config.toml`，开发任务各 3 遍 + 留出任务各 1 遍）、E2（`config-e2.toml`，澄清阶段 `extra_body = {thinking = {type = "disabled"}}`，开发任务各 3 遍）、三轮提示词迭代（每轮在 E2 上重跑开发任务 3 遍），用 `benchmarks.compare` 生成对比表；补全 `docs/results-v1.1.md`（9 节）；README"评测"一节补了 `--set`、`--repeat`、`benchmarks.compare` 的用法；`config.example.toml` 保持默认，只加了一段注释说明 E2 的实验结果在哪里看；`.gitignore` 加了 `config-*.toml`。
+- 测试数量：没有新增，全部测试 443 个全部通过。
+- 结果：E1 成功 8/9（3/3、3/3、2/3）、费用 ¥1.274 = 基线 ¥3.810 的 0.3345 倍（比 1/3 高 0.0012，没达到）；E2 成功 7/9、费用比 0.228；留出任务 enclosure 0/1、stepped_shaft 1/1。三轮提示词迭代（commit `7069668`、`3017bf9`、`4247aea`）后 E2 为 7/9、7/9、6/9，第 3 轮无效已用 `fd1045e` 撤销，最终提示词是第 2 轮状态。没有哪一组同时满足成功标准 1 和 2。
+- 遇到的问题和处理：
+  1. E2 `phone_stand` 第 1 遍失败的原因是模型在只改角度的那一轮也改了 `features`，程序因此没有自动重建，模型却说"会自动重建"。第 1 轮迭代针对这一点改了提示词，之后 phone_stand 三轮都是 3/3。
+  2. `l_bracket` 把立板叠在底板上面（总高 65 而不是 60）：三轮迭代都没解决，E2 的 12 遍里出现了 8 遍。任务说明对"立板高 60"含不含底板厚度有歧义，模拟用户的回答也不明确。
+  3. 留出任务只看了结果表，没有读对话日志，也没有为它们改过提示词。
+  4. 应用进程的环境变量里没有 `DEEPSEEK_API_KEY`（用户级环境变量里有），所有评测命令都只在命令的进程内把它读进环境变量，没有打印或写入任何文件；提交前对结果文档等逐个做了 key 检查，结果都是 False。

@@ -90,14 +90,24 @@ sessions/20261109-153000/
 
 ## 评测
 
-`benchmarks/` 里有 3 个测试任务（手机支架、法兰盘、带加强筋的 L 形安装支架），每个任务有一句话的初始需求、“用户心里的完整需求”、修改请求和人工写的验收检查。评测时由一个模拟用户（也是大模型）扮演提需求的人：
+`benchmarks/` 里有 3 个开发任务（手机支架、法兰盘、带加强筋的 L 形安装支架）和 2 个留出任务（电路板小盒、阶梯轴；只用来测，不许为它们调提示词），每个任务有一句话的初始需求、“用户心里的完整需求”、修改请求和人工写的验收检查。评测时由一个模拟用户（也是大模型）扮演提需求的人：
 
 ```powershell
-.venv\Scripts\python -m benchmarks.run --config config.toml
+.venv\Scripts\python -m benchmarks.run --config config.toml                      # 开发任务各跑 1 遍
+.venv\Scripts\python -m benchmarks.run --config config.toml --set dev --repeat 3  # 开发任务各跑 3 遍
+.venv\Scripts\python -m benchmarks.run --config config.toml --set holdout         # 留出任务（--set all 两组都跑）
 .venv\Scripts\python -m benchmarks.run --tasks phone_stand flange --config config.toml
 ```
 
-结果写到 `benchmarks/results/<时间>/results.json` 和 `results.md`，表里有：是否成功、修复次数、耗时、模型调用次数、token 用量、最大尺寸偏差。评测会调用真实的大模型，需要先设置好 API key，会产生费用。
+结果写到 `benchmarks/results/<时间>/results.json` 和 `results.md`：`results.md` 开头是按任务汇总的表（成功次数 / 遍数、平均费用、平均耗时、平均模型调用、平均输入和其中命中缓存、平均输出和其中思考），后面是每一遍的明细。费用按 `config.toml` 里的 `[llm.pricing]` 算，没填价目表时费用显示 `-`。评测会调用真实的大模型，需要先设置好 API key，会产生费用。
+
+两次评测结果的前后对比（Markdown 表和总费用之比）：
+
+```powershell
+.venv\Scripts\python -m benchmarks.compare 旧目录\results.json 新目录\results.json --out compare.md
+```
+
+第 1.1 版的完整评测结果、成功标准的对照和没做到的地方见 `docs/results-v1.1.md`。
 
 ## 测试
 
