@@ -10,7 +10,7 @@ from cad_agent.notebook import FeatureList
 from cad_agent.sandbox.execute import RunResult
 from cad_agent.tools import ToolBox, ToolOutcome, Workspace
 
-PROMPTS_DOC = Path(__file__).resolve().parent.parent / "docs" / "superpowers" / "plans" / "2026-11-09-cad-agent-v1-prompts.md"
+PROMPTS_DOC = Path(__file__).resolve().parent.parent / "docs" / "superpowers" / "plans" / "2026-11-09-cad-agent-v1.1-prompts.md"
 BOX = "base = scad.make_box_rsolid(width=phone_w, height=40, depth=8, bottom_face_center=(0, 0, 0))"
 PHONE_W = {"id": "width", "type": "bbox", "axis": "x", "expected": "phone_w"}
 TILT = {"id": "tilt", "type": "angle", "expected": "tilt_deg",
@@ -91,7 +91,7 @@ def test_schemas_by_phase():
 
 def test_schemas_are_verbatim_copy_of_prompts_doc():
     text = PROMPTS_DOC.read_text(encoding="utf-8")
-    section = text.split("## 3. 工具说明")[1].split("## 4. build 返回给模型的格式")[0]
+    section = text.split("## 4. 工具说明")[1].split("## 5. 程序代按按钮时用到的原文")[0]
     expected = [json.loads(b) for b in re.findall(r"```json\n(.*?)\n```", section, flags=re.S)]
     assert [e["name"] for e in expected] == ALL_TOOLS
     tb, _, _ = make_box(with_feature=False)

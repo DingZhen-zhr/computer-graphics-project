@@ -184,3 +184,10 @@
 - 测试数量：新增 31 个（`test_check_recipes.py` 29 个：1 个覆盖顺序 + 9 个正确 + 18 个偏大/偏小；`test_prompts.py` 2 个：`test_cheatsheet_has_check_recipes`、`test_check_recipe_examples_match_tests`），全部测试 434 个全部通过。按清单改了 `test_prompts.py` 的 `SECTIONS`（末尾加 `"检查写法"`）和 `test_cheatsheet_sections_follow_the_prompts_doc`（第一版模板 `== SECTIONS[:-1]`，并断言第 1.1 版文档第 8 节含 `## 检查写法`）。
 - 结果：9 条写法全部做到了"偏 20% 就不通过"，没有降级成"只能粗略检查"的条目，所以没有偏离记录。孔位偏小时只有孔心那条检查能抓住，槽宽偏大和偏小各由一条检查抓住（两条互补，所以例子里各写了两个"例："）。第一版的 `test_cheatsheet_examples_use_real_functions_and_pass_the_guard` 对新加的 JSON 例子也通过了（JSON 对象本身是合法的单行 Python 表达式），没有改动。
 - 说明：做错的写法要求"模型能建出来，是检查把它挡住"（测试里断言 `error is None`，且不通过的只能是这条写法自己的检查）。系统提示词变长了约 3500 字（速查表是系统提示词的一部分），费用上只多一次缓存。
+
+## 1.1 版 Task 9：第 1.1 版提示词 —— 完成
+
+- 做了什么：先按清单改了两处第一版测试（`test_prompts.py::test_system_prompt_is_verbatim_copy` 改读第 1.1 版提示词文档第 1 节到第 2 节之间的 text 块；`test_tools.py` 里比对工具说明的测试，`PROMPTS_DOC` 改指第 1.1 版文档，取第 4 节的 json 块），确认两条失败；然后用脚本从第 1.1 版提示词文档逐字生成 `cad_agent/agent/prompts/system.md`（第 1 节）和 `cad_agent/tool_specs.py`（第 4 节的 9 个 json 块，`PRE_CONFIRM_TOOLS`、`TOOL_NAMES` 不变）。
+- 测试数量：没有新增，全部测试 434 个全部通过。
+- 偏离：新记 D8——系统提示词里自己写了两次"【当前状态】"，Task 5 新加的 `test_old_turns_are_compacted` 里"只有一处含 `【当前状态`"变成了 2 处；只改了这条自己新加的测试，改成数完整的快照标题，断言没放松。
+- 说明：这一版的系统提示词 + 速查表约 1.2 万字符。

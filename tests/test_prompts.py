@@ -22,8 +22,8 @@ def read(name: str) -> str:
 
 
 def test_system_prompt_is_verbatim_copy():
-    doc = PROMPTS_DOC.read_text(encoding="utf-8")
-    block = re.findall(r"```text\n(.*?)\n```", doc.split("## 1. 系统提示词")[1].split("## 2. 状态消息格式")[0], flags=re.S)
+    doc = PROMPTS_DOC_V11.read_text(encoding="utf-8")   # 第 1.1 版的提示词文档
+    block = re.findall(r"```text\n(.*?)\n```", doc.split("## 1. 系统提示词")[1].split("## 2. 快照格式")[0], flags=re.S)
     assert len(block) == 1 and read("system.md").rstrip("\n") == block[0]
 
 

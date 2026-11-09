@@ -1,6 +1,6 @@
 """工具说明（OpenAI function 格式的 description 和 parameters）。
 
-内容逐字取自 docs/superpowers/plans/2026-11-09-cad-agent-v1-prompts.md 第 3 节，不要改写。
+内容逐字取自 docs/superpowers/plans/2026-11-09-cad-agent-v1.1-prompts.md 第 4 节，不要改写。
 tests/test_tools.py 里有一个测试会把这里的内容和提示词文档逐项比对。
 """
 
@@ -11,7 +11,7 @@ import json
 _RAW: list[str] = [
     r'''{
   "name": "update_brief",
-  "description": "修改需求单。只传要改的部分：set_params 里的同名参数会被覆盖；features 和 open_questions 只要传了就整体替换。返回改动列表，以及现在能不能建模。",
+  "description": "修改需求单。只传要改的部分：set_params 里的同名参数会被覆盖；features 和 open_questions 只要传了就整体替换。返回改动列表，以及现在能不能建模。要提问时，在同一次回复里先调用本工具，再调用 ask_user。需求单完整、没有待问问题时，程序会自动请用户确认。交付后只改已有参数的数值时，程序会自动重新 build。",
   "parameters": {
     "type": "object",
     "properties": {
@@ -55,12 +55,12 @@ _RAW: list[str] = [
 }''',
     r'''{
   "name": "request_confirmation",
-  "description": "把当前需求单展示给用户，请用户确认，然后结束本轮。在需求单完整、没有待问问题时调用。用户确认之后才能建模。",
+  "description": "把当前需求单展示给用户，请用户确认，然后结束本轮。一般不用调用：需求单完整、没有待问问题时，程序会自动请用户确认。用户确认之后才能建模。",
   "parameters": {"type": "object", "properties": {}}
 }''',
     r'''{
   "name": "upsert_feature",
-  "description": "新增一个特征，或替换同名特征（替换时位置不变）。新增时默认放在最后，传 before 可以插到某个特征前面。code 只写这个特征的建模代码：最后把结果赋给与 slug 同名的变量（短横线换成下划线）；临时变量以下划线开头；不要 import，scad、ql、math 可以直接用；直接使用需求单里的参数名。",
+  "description": "新增一个特征，或替换同名特征（替换时位置不变）。新增时默认放在最后，传 before 可以插到某个特征前面。code 只写这个特征的建模代码：最后把结果赋给与 slug 同名的变量（短横线换成下划线）；临时变量以下划线开头；不要 import，scad、ql、math 可以直接用；直接使用需求单里的参数名。可以在同一次回复里连续调用多次，最后再调用 build。",
   "parameters": {
     "type": "object",
     "properties": {
@@ -83,7 +83,7 @@ _RAW: list[str] = [
 }''',
     r'''{
   "name": "set_checks",
-  "description": "整体替换检查项列表。程序会自动加上 3 条必做检查，不用你写。每个用户参数至少要被一条检查用到。\n表达式里可以用：参数名、数字、+ - * / **、括号、sin cos tan asin acos atan radians degrees sqrt abs min max、pi。\nwhere 是条件列表，每条写成 [属性, 比较符, 值]，条件之间是“并且”。属性有：geom.type（值写 PLANE、CYLINDER 等大写字样）、geom.center.x / y / z、geom.normal.x / y / z（只有平面有）、geom.area（面）、geom.length（边）。比较符有：== != >= <= > <。\n各类型的写法：\nbbox：整体在 axis（x、y、z）方向的尺寸；要写 axis、expected，tol 可选（默认 0.1）。\ncount：满足 where 的面（kind=faces）或边（kind=edges）有几个；要写 kind、where、expected，op 可选（== >= <=，默认 ==）。\nangle：a、b 各是一组 where，各取选中面里面积最大的平面，测两者法向的夹角（0 到 180 度）；要写 a、b、expected，tol 可选（默认 0.5）。\npoint_inside / point_outside：点 point=[x, y, z] 在材料里 / 不在材料里；只写 point。\ndistance：a、b 各是 {\"kind\": ..., \"where\": [...]}，测两组几何之间的最短距离；要写 a、b、expected，op 可选（默认 ==），tol 可选。\nvolume：整体体积；要写 expected，rel_tol 可选（默认 0.01，即 1%）。",
+  "description": "整体替换检查项列表，每次都要传全部检查。程序会自动加上 3 条必做检查，不用你写。每个用户参数至少要被一条检查用到；不知道怎么检查时，照速查表“检查写法”一节写。\n表达式里可以用：参数名、数字、+ - * / **、括号、sin cos tan asin acos atan radians degrees sqrt abs min max、pi。\nwhere 是条件列表，每条写成 [属性, 比较符, 值]，条件之间是“并且”。属性有：geom.type（值写 PLANE、CYLINDER 等大写字样）、geom.center.x / y / z、geom.normal.x / y / z（只有平面有）、geom.area（面）、geom.length（边）。比较符有：== != >= <= > <。\n各类型的写法：\nbbox：整体在 axis（x、y、z）方向的尺寸；要写 axis、expected，tol 可选（默认 0.1）。\ncount：满足 where 的面（kind=faces）或边（kind=edges）有几个；要写 kind、where、expected，op 可选（== >= <=，默认 ==）。\nangle：a、b 各是一组 where，各取选中面里面积最大的平面，测两者法向的夹角（0 到 180 度）；要写 a、b、expected，tol 可选（默认 0.5）。\npoint_inside / point_outside：点 point=[x, y, z] 在材料里 / 不在材料里；只写 point。\ndistance：a、b 各是 {\"kind\": ..., \"where\": [...]}，测两组几何之间的最短距离；要写 a、b、expected，op 可选（默认 ==），tol 可选。\nvolume：整体体积；要写 expected，rel_tol 可选（默认 0.01，即 1%）。",
   "parameters": {
     "type": "object",
     "properties": {
@@ -114,7 +114,7 @@ _RAW: list[str] = [
 }''',
     r'''{
   "name": "build",
-  "description": "按当前需求单、特征和检查项生成模型，运行并检查。返回内容：是否通过；出错时是哪个特征、什么错误；没通过的检查和详情（包括选中了哪些几何）；还缺检查的用户参数。全部通过且不缺检查时，程序会自动交付。",
+  "description": "按当前需求单、特征和检查项生成模型，运行并检查。写完特征和检查后，在同一次回复里最后调用它；同一次回复里前面的调用出错时，它不会运行，也不算失败。返回内容：是否通过；出错时是哪个特征、什么错误；没通过的检查和详情（包括选中了哪些几何）；还缺检查的用户参数。只是缺检查不算失败。全部通过且不缺检查时，程序会自动交付。",
   "parameters": {"type": "object", "properties": {}}
 }''',
     r'''{

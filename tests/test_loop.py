@@ -381,7 +381,8 @@ def test_old_turns_are_compacted(tmp_path):
     second = llm.calls[1]
     assert [m["role"] for m in second] == ["system", "user", "assistant", "user"]
     assert second[1]["content"] == "做一个支架" and second[2]["content"] == turn1.text
-    assert len([m for m in second if "【当前状态" in m["content"]]) == 1
+    # 整个列表里只有一张快照。（按完整标题数：系统提示词里也提到"【当前状态】"，见偏离 D8）
+    assert len([m for m in second if "【当前状态（程序生成，不是用户说的话）】" in m["content"]]) == 1
 
 
 def test_warning_when_few_tool_calls_left(tmp_path):
