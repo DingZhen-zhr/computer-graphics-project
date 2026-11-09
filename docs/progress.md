@@ -94,3 +94,12 @@
   3. 主循环的约定：一条用户消息一轮；每轮开始 `toolbox.begin_turn()`；确认只认整句在 `AFFIRMATIVE` 里（“可以，但角度改成70”会原样转给模型，且无论怎么回都清掉“等待确认”）；一条回复里有多个工具调用时，每个调用都有对应的 `tool` 消息（本轮提前结束时，后面的调用回“没有执行”）；参数不是合法 JSON 的调用，原文原样放回对话历史。
   4. 结束条件的先后：build 通过（交付）→ 失败次数达到上限 → 要等用户的工具（提问/确认）→ 工具调用次数达到上限。交付时用 `export_step`/`render_png` 再跑一次 `run_job`，导出到临时目录再由 `session.new_version` 复制；`changes` 取自上次交付以来每次 `update_brief` 返回的变化行。每轮结束都保存当前状态（计划只要求交付和失败后保存，多存不影响）。
   5. 日志的 `kind`：`user`、`assistant`、`tool`、`build`（每次 build 一条，含是否通过、出错特征、没通过的检查 id）、以及每轮结束的 `reply`/`question`/`confirm`/`delivered`/`failed`。
+
+## Task 11：命令行界面与说明文档 —— 完成
+
+- 做了什么：`cad_agent/cli.py`（`main`、`build_agent`、`find_sca`、`diff_briefs`）、`cad_agent/__main__.py`、`README.md`、`tests/test_cli.py`；补测了 `sca` 命令在中文目录下的表现，写进 `docs/sca-api-notes.md` 第 2、11 节。
+- 测试数量：新增 19 个，全部测试 281 个全部通过。另外手动跑了 `python -m cad_agent`：有（假的）环境变量时能启动、命令都能用、日志第一行是 `startup`（含 Python、simplecadapi、模型名、地址版本，不含 key）；没设置变量时打印“请先设置环境变量 DEEPSEEK_API_KEY”并返回 1。
+- 说明：
+  1. 计划里 `main(argv, input_fn, print_fn)` 没有注入智能体的位置，所以另有模块级函数 `build_agent(config) -> (Agent, Session)`，测试里替换它；没有 key 时 `build_agent` 在创建会话目录**之前**就抛 `ConfigError`。
+  2. `/view` 用 `Popen([sca 路径, "edit", 会话目录])`，`sca` 路径取与当前 python 同目录的 `sca.exe`（`shutil.which` 找不到）；已经有编辑器在跑就不再启动第二个；退出时统一关掉。实测：`sca ls`、`sca run` 在中文目录下正常，`sca edit --no-browser` 能启动并返回 200。**没有用浏览器点开 notebook 看编辑器里的实际效果**，留给 Task 13 联调时人工看一眼。
+  3. 每轮结束后顺带显示“本轮模型调用 N 次，约 M token”；Ctrl+C、输入结束（EOF）都会正常退出。

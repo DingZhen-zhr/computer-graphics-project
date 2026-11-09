@@ -42,7 +42,7 @@
 结论：
 - notebook 文件名一律用英文（`model.py`），目录是中文没问题。
 - 计划里的做法（在英文临时目录里运行，产物复制回会话目录）本来就稳妥，保持不变。
-- 没验证过 `sca edit` 在中文目录下的表现，留到 Task 11（`/view`）时测，测完补进本节。
+- `sca` 命令在中文目录下（Task 11 补测，目录 `...\会话测试\`，里面有 `model.py` 和 `versions\v1\model.py`）：`sca ls .` 把两个 notebook 都列出来（`error: null`）；`sca run model.py` 正常运行并返回 `definition_kind: single_solid`；`sca edit --no-browser --port 8765 <中文目录>` 能启动，访问 `http://127.0.0.1:8765/` 返回 200（页面标题 `SimpleCAD Studio`）。所以 `/view` 可以直接对会话目录用 `sca edit`，不需要改成英文路径。（没有用浏览器逐个点开 notebook 验证编辑器里的运行效果，留给 Task 13 联调时人工看一眼。）
 
 ## 3. 参数与单位
 
@@ -243,7 +243,7 @@ def slug_of_failed_cell(exc):
 
 - `shutil.which("sca")` 返回 `None`（虚拟环境的 `Scripts` 目录没在 PATH 上）。
 - 要用与 python 同目录的：`Path(sys.executable).parent / "sca.exe"`，实测存在：`.venv\Scripts\sca.exe`。
-- `sca edit [--host HOST] [--port PORT] [--no-browser] [workspace]`：打开代码优先编辑器，`workspace` 是放 notebook 的目录或单个 notebook。
+- `sca edit [--host HOST] [--port PORT] [--no-browser] [workspace]`：打开代码优先编辑器，`workspace` 是放 notebook 的目录或单个 notebook；默认会自动打开浏览器，`--no-browser` 只启动服务。会话目录里的 `model.py` 和各版本的 `versions\vN\model.py` 都会被当作 notebook 列出来（见第 2 节的实测）。
 - 其他子命令：`run`、`ls`、`params`、`export`、`snapshot`、`cell` 等。
 
 ## 12. 速查表条目实测（第 14 项）
