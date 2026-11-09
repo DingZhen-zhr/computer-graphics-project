@@ -114,3 +114,8 @@
   3. `run_task` 在计划的签名后多了两个仅限关键字的可选参数 `run_job`、`acceptance_timeout_s`（测试里用桩替换 `run_job`）；返回的 `acceptance` 条目除计划的 `id/expected/measured/deviation/passed` 外多了 `type`、`detail`，结果里多了 `sim_llm_calls`、`sim_tokens`（模拟用户自己的调用次数和 token）。“最大尺寸偏差”只统计长度类检查（bbox、distance，单位 mm），角度和体积的偏差不算。
   4. 阶段超过 `max_user_turns` 仍未交付：该阶段记 `delivered: false`，后面的阶段标 `skipped`，继续下一个任务；单个任务意外崩溃只记一条失败，不影响其余任务；每跑完一个任务就写一次 `results.json`/`results.md`。
   5. **没有做 Task 13**：没有碰 API key，没有联网调用任何大模型。
+
+## Task 13：接入真实模型联调 —— 完成（由用户提供 key，经环境变量临时使用）
+
+- 用户在对话里提供了 key 并要求先用它测试；key 现在存在用户的 Windows 用户环境变量 `DEEPSEEK_API_KEY` 里，没有写进任何文件、配置、日志或提交。模型名按账号可用列表（`deepseek-flash`、`deepseek-v4-pro`）选了 `deepseek-flash`；`config.toml` 在 `.gitignore` 里。
+- 评测一次跑通，3 个任务全部成功，详见 `docs/results-v1.md`。提示词和速查表没有改动。
