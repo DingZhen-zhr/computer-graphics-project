@@ -585,3 +585,39 @@ def test_real_build_end_to_end(tmp_path):
     v1 = turn.version_dir
     assert (v1 / "model.step").stat().st_size > 0 and (v1 / "view.png").stat().st_size > 0
     assert "def _" in (v1 / "model.py").read_text(encoding="utf-8")
+
+
+class StlRunner(Runner):
+    """在 Runner 的基础上，导出时也写出 STL（要求了 export_stl 才写）；stl_error 不为空时不写，并把原因放进结果。"""
+
+    def __init__(self, *results, stl_error=None):
+        super().__init__(*results)
+        self.stl_error = stl_error
+
+    def __call__(self, rendered, checks_raw, param_names, **kw):
+        result = super().__call__(rendered, checks_raw, param_names, **kw)
+        if kw.get("export_stl") is not None:
+            if self.stl_error:
+                result.stl_error = self.stl_error
+            else:
+                kw["export_stl"].write_bytes(b"STL")
+                result.stl_path = kw["export_stl"]
+        return result
+
+
+def test_delivery_exports_stl_too(tmp_path):
+    agent, ws, llm, runner, session = deliver_v1(tmp_path, [], runner=StlRunner())
+    v1 = session.dir / "versions" / "v1"
+    assert (v1 / "model.stl").read_bytes() == b"STL" and (v1 / "model.step").exists() and (v1 / "view.png").exists()
+    export_call = [c for c in runner.calls if c.get("export_step") is not None]
+    assert len(export_call) == 1 and export_call[0]["export_stl"] is not None
+
+
+def test_stl_failure_does_not_block_delivery(tmp_path):
+    runner = StlRunner(stl_error="STL 导出失败（RuntimeError）：boom")
+    agent, ws, llm, runner, session = deliver_v1(tmp_path, [], runner=runner)
+    v1 = session.dir / "versions" / "v1"
+    assert v1.is_dir() and (v1 / "model.step").exists() and (v1 / "view.png").exists() and not (v1 / "model.stl").exists()
+    rows = [r for r in log_rows(session) if r["kind"] == "stl_error"]
+    assert len(rows) == 1 and "boom" in rows[0]["message"]
+    assert [r["kind"] for r in log_rows(session)][-1] == "delivered"

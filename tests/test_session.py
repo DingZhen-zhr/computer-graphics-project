@@ -94,3 +94,21 @@ def test_next_version_follows_highest_number(tmp_path):
     s = Session(tmp_path)
     (s.dir / "versions" / "v10").mkdir(parents=True)
     assert make_version(s, tmp_path, []).name == "v11"
+
+
+def test_new_version_copies_stl(tmp_path):
+    s = Session(tmp_path)
+    stl = tmp_path / "in.stl"
+    stl.write_bytes(b"STL-DATA")
+    step, png = tmp_path / "in.step", tmp_path / "in.png"
+    step.write_bytes(b"STEP-DATA")
+    png.write_bytes(b"\x89PNG-DATA")
+    results = [CheckResult("valid", "valid", True, None, None, None, "几何体有效")]
+    v = s.new_version(notebook_text="# model\n", brief=make_brief(), check_results=results, changes=[], step_src=step, png_src=png, stl_src=stl)
+    assert (v / "model.stl").read_bytes() == b"STL-DATA"
+    assert sorted(p.name for p in v.iterdir()) == ["brief.json", "changes.md", "checks.json", "model.py", "model.step", "model.stl", "view.png"]
+
+
+def test_new_version_without_stl_has_no_model_stl(tmp_path):
+    v = make_version(Session(tmp_path), tmp_path, [])
+    assert not (v / "model.stl").exists()

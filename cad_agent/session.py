@@ -71,6 +71,7 @@ class Session:
         changes: list[str],
         step_src: Path,
         png_src: Path,
+        stl_src: Path | None = None,
     ) -> Path:
         existing = self.versions()
         n = int(VERSION_RE.match(existing[-1].name).group(1)) + 1 if existing else 1  # type: ignore[union-attr]
@@ -79,6 +80,8 @@ class Session:
         (v / "model.py").write_text(notebook_text, encoding="utf-8")
         shutil.copyfile(step_src, v / "model.step")
         shutil.copyfile(png_src, v / "view.png")
+        if stl_src is not None:
+            shutil.copyfile(stl_src, v / "model.stl")
         _write_json(v / "checks.json", [r.to_dict() for r in check_results])
         _write_json(v / "brief.json", brief.to_dict())
         lines = [f"# v{n} 变更说明", ""] + ([f"- {c}" for c in changes] if changes else ["- （需求单参数没有变化）"])

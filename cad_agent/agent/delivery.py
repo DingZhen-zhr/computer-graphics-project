@@ -50,14 +50,16 @@ def export_version(toolbox: ToolBox, session: Session, changes: list[str]) -> tu
         out = Path(tmp)
         result = toolbox.run_job(
             rendered, ws.checks_raw, set(ws.brief.param_values()), mode="build",
-            export_step=out / "model.step", render_png=out / "view.png",
+            export_step=out / "model.step", render_png=out / "view.png", export_stl=out / "model.stl",
             timeout_s=toolbox.timeout_s, secret_names=toolbox.secret_names,
         )
         if not result.ok or result.step_path is None or result.png_path is None:
             why = result.error["message"] if result.error else "检查没有全部通过或没有生成导出文件"
             return f"检查已经通过，但交付时导出出了问题：{why}"
+        if result.stl_error:  # STL 导出失败不影响交付：版本照常生成，只是没有 model.stl
+            session.log("stl_error", message=result.stl_error)
         version = session.new_version(
             notebook_text=rendered.text, brief=ws.brief, check_results=result.checks, changes=changes,
-            step_src=result.step_path, png_src=result.png_path,
+            step_src=result.step_path, png_src=result.png_path, stl_src=result.stl_path,
         )
     return version, result.checks

@@ -128,3 +128,26 @@ def test_workdir_is_removed(plate_nb, tmp_path, monkeypatch):
     monkeypatch.setattr(tempfile, "tempdir", str(tmp_path))
     r = run_job(plate_nb, [], set())
     assert r.ok and list(tmp_path.glob("cad-agent-*")) == []
+
+
+def test_exports_stl(plate_nb, tmp_path):
+    import struct
+
+    out = tmp_path / "中文目录"   # 路径里有中文也要能导出
+    out.mkdir()
+    r = run_job(plate_nb, [], {"w"}, export_stl=out / "model.stl")
+    assert r.ok and r.stl_error is None and r.stl_path == out / "model.stl"
+    data = r.stl_path.read_bytes()
+    triangles = struct.unpack("<I", data[80:84])[0]
+    assert triangles > 0 and len(data) == 84 + 50 * triangles   # 二进制 STL：80 字节头 + 4 字节个数 + 每个三角形 50 字节
+    assert r.step_path is None and r.png_path is None   # 没要求的不导出
+
+
+def test_exports_stl_together_with_step_and_png(plate_nb, tmp_path):
+    r = run_job(plate_nb, [], {"w"}, export_step=tmp_path / "model.step", render_png=tmp_path / "view.png", export_stl=tmp_path / "model.stl")
+    assert r.ok and r.step_path.stat().st_size > 0 and r.png_path.stat().st_size > 0 and r.stl_path.stat().st_size > 0
+
+
+def test_stl_not_requested_means_no_stl_fields(plate_nb):
+    r = run_job(plate_nb, [], {"w"})
+    assert r.stl_path is None and r.stl_error is None

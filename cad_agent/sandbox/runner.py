@@ -126,9 +126,11 @@ def _work(job: dict, out: dict[str, Any]) -> None:
         out["error"] = _error(None, e)
         return
 
+    cap = None
     try:
-        if job.get("export_step"):
+        if job.get("export_step") or job.get("export_stl"):
             cap = scad.capture(run.definition, workdir / "model.scadpkg")
+        if job.get("export_step"):
             exporter.export_product_package_to_step(cap.package, workdir / "model.step")
             out["step"] = True
         if job.get("render_png"):
@@ -136,6 +138,14 @@ def _work(job: dict, out: dict[str, Any]) -> None:
             out["png"] = True
     except Exception as e:  # noqa: BLE001 - 导出失败也要如实报告
         out["error"] = {"cell": None, "type": "ExportError", "message": f"导出失败（{type(e).__name__}）：{summarize_exception(e)}"}
+        return
+
+    if job.get("export_stl"):  # STL 只给网页预览用，导出失败不算交付失败，只把原因带回去
+        try:
+            exporter.export_product_package_to_stl(cap.package, workdir / "model.stl")
+            out["stl"] = True
+        except Exception as e:  # noqa: BLE001
+            out["stl_error"] = f"STL 导出失败（{type(e).__name__}）：{summarize_exception(e)}"
 
 
 def _json_default(o: Any) -> Any:
@@ -148,7 +158,7 @@ def _json_default(o: Any) -> Any:
 def main(argv: list[str]) -> int:
     job = json.loads(Path(argv[1]).read_text(encoding="utf-8"))
     out: dict[str, Any] = {
-        "error": None, "timed_out": False, "values": {}, "checks": [], "facts": {}, "query": None, "step": False, "png": False,
+        "error": None, "timed_out": False, "values": {}, "checks": [], "facts": {}, "query": None, "step": False, "png": False, "stl": False, "stl_error": None,
     }
     try:
         _work(job, out)

@@ -35,6 +35,8 @@ class RunResult:
     png_path: Path | None = None
     duration_s: float = 0.0
     timed_out: bool = False
+    stl_path: Path | None = None   # 网页预览用的 STL；导出失败时是 None，原因在 stl_error 里
+    stl_error: str | None = None
 
 
 def _kill_tree(proc: subprocess.Popen) -> None:
@@ -60,6 +62,7 @@ def run_job(
     query_spec: dict | None = None,
     export_step: Path | None = None,
     render_png: Path | None = None,
+    export_stl: Path | None = None,
     timeout_s: float = 60,
     secret_names: Iterable[str] = (),
 ) -> RunResult:
@@ -78,6 +81,7 @@ def run_job(
             "query_spec": query_spec,
             "export_step": export_step is not None,
             "render_png": render_png is not None,
+            "export_stl": export_stl is not None,
             "timeout_s": timeout_s,
         }
         job_path = workdir / "job.json"
@@ -113,10 +117,12 @@ def run_job(
         checks = [CheckResult.from_dict(d) for d in res["checks"]]
         step_path = _copy_out(workdir / "model.step", export_step) if export_step is not None and res["step"] else None
         png_path = _copy_out(workdir / "view.png", render_png) if render_png is not None and res["png"] else None
+        stl_path = _copy_out(workdir / "model.stl", export_stl) if export_stl is not None and res.get("stl") else None
         return RunResult(
             ok=res["error"] is None and all(c.passed for c in checks),
             error=res["error"], values=res["values"], checks=checks, facts=res["facts"], query=res["query"],
             step_path=step_path, png_path=png_path, duration_s=time.monotonic() - started, timed_out=bool(res["timed_out"]),
+            stl_path=stl_path, stl_error=res.get("stl_error"),
         )
     finally:
         shutil.rmtree(workdir, ignore_errors=True)  # 只是清理临时目录，删不掉（比如被占用）不应让整次运行失败

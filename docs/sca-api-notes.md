@@ -469,3 +469,20 @@ angle = math.degrees(math.acos(max(-1, min(1, n1.x*n2.x + n1.y*n2.y + n1.z*n2.z)
 - 孔位、槽宽用的是"点在不在材料里"，窗口是 ±0.5 mm：孔位偏差超过 0.5 mm 左右（孔心点落进材料）、槽宽偏差超过 1 mm 左右会被抓到，更小的偏差抓不到。孔位的两条检查互补，偏小时只有第一条（孔心）能抓住。
 - 点检查的 `point` 里可以放参数表达式（字符串），也可以夹数字。
 - 这 9 条都做到了"偏 20% 就不通过"，没有需要降级成"只能粗略检查"的条目，所以没有为此新增偏离记录。
+
+## 16. STL 导出（网页前端 Task 1）
+
+探测脚本 `scripts/probe_stl.py`（一块 60×40×8 带 φ10 通孔的板）：
+
+```python
+cap = scad.capture(run.definition, pkg_path)                       # 同导出 STEP
+report = exporter.export_product_package_to_stl(cap.package, "model.stl")   # 也可以直接传 .scadpkg 路径
+```
+
+- 签名：`export_product_package_to_stl(data, output_path, *, linear_deflection=0.1, angular_deflection_degrees=20.0, relative=False) -> ProductSTLExportReport`。
+- 返回 `ProductSTLExportReport`：`output_path`、`root_definition_id`、`solid_count`、`definition_count`、`vertex_count`、`triangle_count`、`linear_deflection`、`angular_deflection_degrees`、`relative`、`tessellation_backend`（`opencascade-brep-tessellation`）。实测板：160 个三角形、8084 字节。
+- 输出是**二进制 STL**：80 字节头（以 `Simpl` 开头，不是 `solid`，所以 three.js 的 `STLLoader` 会当二进制读）+ 4 字节三角形个数 + 每个三角形 50 字节；文件大小 = 84 + 50 × 三角形数。
+- 精度：`linear_deflection` 是最大弦高偏差（毫米）。0.5 → 112 个三角形（5684 字节）；0.1（默认）→ 160（8084）；0.02、角度 10° → 304（15284）。默认值对网页预览足够，不调。`relative=True` 在这块板上和默认结果一样。
+- 坐标就是模型自己的坐标，单位毫米，z 朝上、底面在 z=0：这块板的顶点范围 x ±30、y ±20、z 0~8。
+- 写进中文目录成功。
+- 第一个版本（STEP）已经在同一个 `capture` 的包上导出，所以网页版的交付在子进程里只多一步 STL 导出，不用再 `capture` 一次。

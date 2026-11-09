@@ -227,3 +227,9 @@
 - 做了什么：`ToolBox.unbuilt_edits`（update_brief 真的改了东西、upsert_feature、remove_feature、set_checks 成功后为 True；`_build` 和 `_build_without_run` 一运行就清成 False；出错的调用不改它）；`automation.should_build_before_reply(ws, unbuilt_edits, used_this_turn)`；`loop.py`：模型回复没有工具调用时，如果 `should_build_before_reply` 为真，本轮记下"已用过"，走 `_auto_build(..., "turn_end")`（user 消息写法、计工具调用、计失败、通过就交付），没结束就继续调用模型；每轮最多一次。日志的 `auto` build 记录多了 `reason`（C2 是 `param_change`，这里是 `turn_end`）。
 - 测试数量：新增 15 个（tools 2、automation 8 含参数化、loop 5 外加一个"自动 build 没通过时模型能接着修"），全部测试 463 个全部通过。`loop.py` 268 行。
 - 偏离：D9。`update_brief` 什么都没改时不算改动（否则旧测试 `test_no_auto_build_when_nothing_changed` 会变成交付 v2）；旧测试 `test_no_auto_build_when_param_added` 必然受新规则影响（脚本不够用），只改了脚本（多一条回复）和 `llm_calls`（2 → 3），并把"没有自动重建"改成"只有 reason 为 turn_end 的那一次"。
+
+## 网页前端 Task 1：交付时多导出一份 STL —— 完成
+
+- 做了什么：`scripts/probe_stl.py` 探测 `export_product_package_to_stl`（结果写进 `docs/sca-api-notes.md` 第 16 节：签名、二进制 STL、三角形数、精度选项、中文目录、坐标范围）；`run_job(..., export_stl=...)`，`RunResult.stl_path`、`RunResult.stl_error`；子进程里 STL 导出自己 try，失败只带回 `stl_error`，不影响 STEP、截图和 `ok`；`Session.new_version(..., stl_src=...)` 复制成版本目录里的 `model.stl`；`delivery.export_version` 交付时一起导出，STL 失败时日志记一条 `stl_error`，版本照常生成。
+- 测试数量：新增 7 个（`test_exports_stl`（sca，中文目录，校验二进制 STL 的大小 = 84 + 50 × 三角形数）、`test_exports_stl_together_with_step_and_png`、`test_stl_not_requested_means_no_stl_fields`、`test_new_version_copies_stl`、`test_new_version_without_stl_has_no_model_stl`、`test_delivery_exports_stl_too`、`test_stl_failure_does_not_block_delivery`），全部测试 470 个全部通过。旧测试没动（共用的假 `Runner` 也没改，STL 用的是测试里的子类 `StlRunner`）。
+- 说明：没有偏离。工作区里有 1.2 补丁 Task 4 留下的 `.gitignore` 改动（加了 `.worktrees/`）没有提交，这次提交只加了自己改的文件。
