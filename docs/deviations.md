@@ -22,3 +22,17 @@
 - 实际情况：`-I`（隔离模式）会忽略所有 `PYTHON*` 环境变量，包括 `PYTHONUTF8`，子进程的标准输出会退回本机的 GBK 编码。
 - 怎么改：命令改为 `[sys.executable, "-I", "-X", "utf8", "-m", "cad_agent.sandbox.runner", job.json]`，环境变量里仍然设 `PYTHONUTF8=1`（给渲染进程等孙进程用）。结果文件本来就显式用 utf-8 读写，所以这只是让子进程输出不乱码。
 - 影响：无。
+
+## D4（Task 9）缺检查时，build 返回里多一个字段 `coverage_note`
+
+- 原计划：build 返回的 JSON 格式和 `hint` 文字照抄提示词文档第 4 节；同时计划的测试 `test_build_coverage_gap_not_deliverable` 要求 content 含“缺少检查”和参数名。
+- 实际情况：提示词文档第 4 节“缺检查”那一行的 `hint` 原文是“模型和检查都通过了，但这些用户参数还没有检查：…”，写的是“还没有检查”，不含“缺少检查”。两处要求对不上。
+- 怎么改：`hint` 保持逐字不动；只在**缺检查时**多放一个字段 `"coverage_note": "缺少检查的用户参数：a、b"`。其他情况下返回的 JSON 字段和提示词文档完全一致。
+- 影响：只影响 Task 9 的 build 返回内容；Task 10 的状态消息和评测不依赖这个字段。
+
+## D5（Task 9）`ToolBox` 多了几个成员，`tools.py` 旁边多了一个 `tool_specs.py`
+
+- 原计划：`ToolBox(ws, run_job, timeout_s, secret_names)` 只有 `schemas()` 和 `call()`；工具说明在 `cad_agent/tools.py` 里组装。
+- 实际情况：build 返回里的 `failures_left` 需要“本轮已失败几次”和“上限”，而 `ToolBox` 的构造参数里没有这两个；`tools.py` 加上九个工具的说明会超过 300 行。
+- 怎么改：`ToolBox` 增加公开成员 `max_build_failures`（默认 3，主循环按配置设置）、`build_failures`（本轮 build 没通过的次数）、`begin_turn()`（每条新的用户消息前清零）、`available()`（当前可用的工具名）。构造函数签名和 `schemas()`、`call()` 不变。九个工具说明放进新文件 `cad_agent/tool_specs.py`：由脚本直接从提示词文档第 3 节的 json 块生成，保证逐字一致，`tests/test_tools.py::test_schemas_are_verbatim_copy_of_prompts_doc` 会逐项比对。
+- 影响：Task 10 的主循环要在每条用户消息开始时调用 `toolbox.begin_turn()`，并在启动时设置 `toolbox.max_build_failures = config.max_build_failures`。

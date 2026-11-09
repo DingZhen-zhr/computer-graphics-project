@@ -72,3 +72,14 @@
   2. 重试由 `OpenAICompatLLM` 自己做（SDK 自带的重试关掉）：网络断开、超时、429、5xx 重试，间隔 1 秒、2 秒，共 3 次调用；401/403 和其他 4xx 不重试，直接报错，信息里不含 API key。重试用完抛 `LLMError`，信息不带“模型调用失败”前缀（由 Task 10 的主循环加）。
   3. `ScriptedLLM` 的脚本里除了回复，也可以放异常对象（轮到时抛出），Task 10 测试 `LLMError` 时要用；`calls` 记录的是 messages 的拷贝。
   4. `load_config` 对未知的段、未知的项、类型错误、缺少 `base_url`/`model` 都给出中文信息；配置文件读写显式用 utf-8。
+
+## Task 9：工具层 —— 完成
+
+- 做了什么：`cad_agent/tools.py`（`Workspace`、`ToolOutcome`、`ToolBox`）、`cad_agent/tool_specs.py`（九个工具说明，逐字取自提示词文档）、`cad_agent/agent/__init__.py`、`agent/api_docs.py`（`lookup_api`、`api_names`）、`tests/test_tools.py`。
+- 测试数量：新增 39 个，全部测试 227 个全部通过。
+- 说明：
+  1. 需求单不能建模时，`schemas()` 只给 `update_brief`、`ask_user`、`request_confirmation`、`api_help`；直接调用建模工具会得到含“需求单”的错误，不会运行 `run_job`。
+  2. `call()` 从不抛异常：参数不是合法 JSON、工具不存在、缺必填参数、处理函数内部出错，都变成中文错误；`ask_user` 限 1–5 个非空问题；有待确认问题时 `request_confirmation` 会被拒绝。
+  3. build 的计数：渲染 notebook 或解析检查项时就出错（没运行）也算一次失败；缺检查（模型和检查都通过但用户参数没被覆盖）同样算一次失败，因为不能交付。
+  4. `api_help` 只定位 SCA 包路径不导入包；名字允许带 `scad.`、`ql.` 前缀，只接受标识符，防止路径穿越；文档超过 4000 字符会截断。
+  5. 偏离记录：`docs/deviations.md` 的 D4（缺检查时多一个 `coverage_note` 字段）、D5（`ToolBox` 多了几个成员、多了 `tool_specs.py`）。
