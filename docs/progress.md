@@ -46,3 +46,13 @@
   2. `point_inside` 把“正好在表面上”也算在材料上，`point_outside` 只认“在材料外”（笔记第 14 节的约定）。
   3. 面/边的类型名来自 OCP 的枚举（去掉 `GeomAbs_` 前缀转大写，如 `PLANE`、`CYLINDER`、`LINE`、`CIRCLE`），和 QL 里 `geom.type` 的写法一致。
   4. `detail` 里最多列 8 个被选中几何（类型、中心、面积或长度、平面法向）；选中 0 个时写“选中 0 个”。每条检查各自捕获异常，出错的检查算不通过，原因写进 `detail`。
+
+## Task 6：运行沙盒 —— 完成
+
+- 做了什么：`cad_agent/sandbox/__init__.py`、`guard.py`（`check_code`、`clean_env`）、`runner.py`（子进程入口）、`execute.py`（`RunResult`、`run_job`）、`tests/test_guard.py`、`tests/test_execute.py`（后者标记 `sca`）。
+- 测试数量：新增 37 个（guard 22 + execute 15），全部测试 151 个全部通过。
+- 说明：
+  1. 出错特征的定位按笔记第 9 节：用 `linecache` 读 marimo 临时 cell 的源码找特征注释；`cell_lines` 只作兜底。参数 cell、产品 cell 出错时 `error.cell` 为 None。
+  2. 超时有两层：子进程里 `run_notebook(timeout=timeout_s)`，外层 `Popen.communicate(timeout=timeout_s+30)` 兜底，超时用 `taskkill /T` 结束整个进程树。子进程写完 `result.json` 后用 `os._exit(0)` 退出，不等跑不完的线程。
+  3. 计划之外的小改动：guard 还拒绝最外层的 `return`/`yield`/`await`（会让 marimo 的 cell 提前返回）和所有双下划线开头的名字（挡住 `__builtins__['eval']` 这类绕法）；环境清理的名字匹配不区分大小写。偏离记录见 `docs/deviations.md` 的 D2（报错翻译）、D3（`-X utf8`）。
+  4. 测试里有一个故意绕过 guard 的 notebook（在特征里 `import os as _os`），用来从子进程内部确认：密钥类环境变量已清掉、`PYTHONUTF8=1`、工作目录是 `cad-agent-*` 临时目录。
