@@ -31,3 +31,4 @@ jobs:
           path: site
       - id: deployment
         uses: actions/deploy-pages@v4
+# 网址：https://dingzhen-zhr.github.io/computer-graphics-project/
