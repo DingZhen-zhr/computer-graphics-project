@@ -215,3 +215,9 @@
 - 做了什么：`benchmarks/sim_user.py` 加 `CHANGE_LINE`（原文照 1.2 计划）和 `SimUser.add_change`（把修改请求原文按 `CHANGE_LINE` 加在隐藏需求后面，每条一行，重新生成系统提示词；`SYSTEM_TEMPLATE` 不变）；`benchmarks/run.py` 的 `run_task` 在每个修改阶段发出修改请求之前调用 `sim_user.add_change(修改请求原文)`。
 - 测试数量：新增 4 个（`test_sim_user_add_change`、`test_run_task_tells_sim_user_each_modification`，另加 `CHANGE_LINE` 与计划原文逐字一致、多条修改按顺序累加两个），全部测试 447 个全部通过。旧测试没动。
 - 说明：没有偏离。
+
+## 1.2 版 Task 2：L 形支架的隐藏需求写清楚 —— 完成
+
+- 做了什么：`benchmarks/tasks/l_bracket.yaml` 的 `hidden_spec` 第二行改成计划里的原文（"立板从桌面算起总高 60 mm：它的下端和底板的这一端重叠，外侧面和底板的端面平齐，不是叠在底板上面"）；开头一句、修改请求、验收、其余各行都没动。
+- 测试数量：新增 1 个（`test_l_bracket_spec_says_total_height`，同时断言第二行是原文、一共仍是 5 行），全部测试 448 个全部通过。第一版的 `test_task_texts_follow_the_plan` 和标准答案模型的测试照常通过。
+- 说明：没有偏离。

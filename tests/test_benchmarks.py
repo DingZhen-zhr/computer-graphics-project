@@ -152,6 +152,14 @@ def test_stepped_shaft_acceptance_numbers():
     assert points(task, "after_mod_1", "outside") == [*outside[:2], [9.5, 0, 70], *outside[3:]]
 
 
+def test_l_bracket_spec_says_total_height():
+    spec = load_task("l_bracket")["hidden_spec"]
+    assert "从桌面算起总高 60 mm" in spec and "不是叠在底板上面" in spec
+    line = "- 立板在底板的一端，两块板垂直相接成 L 形；宽度方向（40 mm）对齐。立板从桌面算起总高 60 mm：它的下端和底板的这一端重叠，外侧面和底板的端面平齐，不是叠在底板上面。"
+    assert spec.splitlines()[1] == line   # 第二行，原文
+    assert len(spec.splitlines()) == 5    # 其余各行不变
+
+
 def test_load_task_rejects_bad_files(tmp_path):
     def write(text):
         p = tmp_path / "bad.yaml"
