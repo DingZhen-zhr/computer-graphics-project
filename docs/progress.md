@@ -221,3 +221,9 @@
 - 做了什么：`benchmarks/tasks/l_bracket.yaml` 的 `hidden_spec` 第二行改成计划里的原文（"立板从桌面算起总高 60 mm：它的下端和底板的这一端重叠，外侧面和底板的端面平齐，不是叠在底板上面"）；开头一句、修改请求、验收、其余各行都没动。
 - 测试数量：新增 1 个（`test_l_bracket_spec_says_total_height`，同时断言第二行是原文、一共仍是 5 行），全部测试 448 个全部通过。第一版的 `test_task_texts_follow_the_plan` 和标准答案模型的测试照常通过。
 - 说明：没有偏离。
+
+## 1.2 版 Task 3：建模阶段不留没 build 的改动 —— 完成
+
+- 做了什么：`ToolBox.unbuilt_edits`（update_brief 真的改了东西、upsert_feature、remove_feature、set_checks 成功后为 True；`_build` 和 `_build_without_run` 一运行就清成 False；出错的调用不改它）；`automation.should_build_before_reply(ws, unbuilt_edits, used_this_turn)`；`loop.py`：模型回复没有工具调用时，如果 `should_build_before_reply` 为真，本轮记下"已用过"，走 `_auto_build(..., "turn_end")`（user 消息写法、计工具调用、计失败、通过就交付），没结束就继续调用模型；每轮最多一次。日志的 `auto` build 记录多了 `reason`（C2 是 `param_change`，这里是 `turn_end`）。
+- 测试数量：新增 15 个（tools 2、automation 8 含参数化、loop 5 外加一个"自动 build 没通过时模型能接着修"），全部测试 463 个全部通过。`loop.py` 268 行。
+- 偏离：D9。`update_brief` 什么都没改时不算改动（否则旧测试 `test_no_auto_build_when_nothing_changed` 会变成交付 v2）；旧测试 `test_no_auto_build_when_param_added` 必然受新规则影响（脚本不够用），只改了脚本（多一条回复）和 `llm_calls`（2 → 3），并把"没有自动重建"改成"只有 reason 为 turn_end 的那一次"。

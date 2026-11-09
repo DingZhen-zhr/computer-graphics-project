@@ -76,3 +76,14 @@ def should_auto_build(ws: Workspace, calls: list[tuple[str, bool]], before: Brie
         and bool(ws.features.items)
         and bool(ws.checks_raw)
     )
+
+
+def should_build_before_reply(ws: Workspace, unbuilt_edits: bool, used_this_turn: bool) -> bool:
+    """建模阶段模型用纯文字结束一轮、但还有没 build 的改动时，程序先替它 build 一次（每轮最多一次）。"""
+    return (
+        unbuilt_edits
+        and not used_this_turn
+        and ws.brief.can_build()[0]
+        and bool(ws.features.items)
+        and bool(ws.checks_raw)
+    )

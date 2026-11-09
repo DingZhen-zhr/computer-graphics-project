@@ -3,7 +3,7 @@ import json
 import pytest
 
 from cad_agent.agent.automation import (AUTO_BUILD_NOTE, AUTO_BUILD_PREFIX, SKIPPED_BUILD_MESSAGE, BriefShape, brief_shape, has_error,
-                                        should_auto_build, should_auto_confirm)
+                                        should_auto_build, should_auto_confirm, should_build_before_reply)
 from cad_agent.brief import Brief
 from cad_agent.notebook import Feature, FeatureList
 from cad_agent.tools import Workspace
@@ -52,6 +52,24 @@ def ws_with(confirmed: bool = False, with_params: bool = True, open_questions: b
 ])
 def test_should_auto_confirm_cases(name, ws, calls, expected):
     assert should_auto_confirm(ws, calls) is expected, name
+
+
+@pytest.mark.parametrize("name,ws,unbuilt,used,expected", [
+    ("全部成立", ws_with(confirmed=True), True, False, True),
+    ("没有没 build 的改动", ws_with(confirmed=True), False, False, False),
+    ("这一轮已经兜底过一次", ws_with(confirmed=True), True, True, False),
+    ("需求单没确认", ws_with(confirmed=False), True, False, False),
+    ("还有待问问题", ws_with(confirmed=True, open_questions=True), True, False, False),
+    ("还没有特征", ws_with(confirmed=True, built=False), True, False, False),
+])
+def test_should_build_before_reply_cases(name, ws, unbuilt, used, expected):
+    assert should_build_before_reply(ws, unbuilt, used) is expected, name
+
+
+def test_should_build_before_reply_needs_checks():
+    ws = ws_with(confirmed=True)
+    ws.checks_raw = []
+    assert should_build_before_reply(ws, True, False) is False
 
 
 def test_brief_shape():

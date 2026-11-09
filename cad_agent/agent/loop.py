@@ -16,7 +16,7 @@ from pathlib import Path
 from typing import Literal
 
 from cad_agent.agent.automation import (AUTO_BUILD_NOTE, AUTO_BUILD_PREFIX, SKIPPED_BUILD_MESSAGE, brief_shape, has_error,
-                                        should_auto_build, should_auto_confirm)
+                                        should_auto_build, should_auto_confirm, should_build_before_reply)
 from cad_agent.agent.context import Context, with_warning
 from cad_agent.agent.delivery import delivery_text, export_version, failure_text
 from cad_agent.agent.state import load_system_prompt, render_snapshot
@@ -118,6 +118,7 @@ class Agent:
         llm = self.modeling_llm if phase == "modeling" and self.modeling_llm is not None else self.llm
         self.context.start_turn(content, render_snapshot(self.ws))
         self.session.log("user", text=text, sent_as=content, phase=phase)
+        built_before_reply = False  # 纯文字结束前的兜底 build，每轮最多一次
 
         while True:
             try:
@@ -129,6 +130,12 @@ class Agent:
             self.session.log("assistant", content=reply.content, usage=reply.usage, cost=reply.cost,
                              tool_calls=[{"name": tc.name, "args": tc.arguments} for tc in reply.tool_calls])
             if not reply.tool_calls:
+                if should_build_before_reply(self.ws, self.toolbox.unbuilt_edits, built_before_reply):
+                    built_before_reply = True
+                    ended = self._auto_build(reply, c, "turn_end")
+                    if ended is not None:
+                        return ended
+                    continue
                 return self._end("reply", reply.content.strip() or "（模型没有给出回复，可以换个说法再试一次）", c)
             ended = self._run_tools(reply, c)
             if ended is not None:
@@ -176,14 +183,17 @@ class Agent:
                 lead = reply.content.strip() + "\n\n" if reply.content.strip() else ""
                 return self._end("confirm", lead + self.ws.brief.render_text(), c)
         elif should_auto_build(self.ws, calls, before):
-            return self._auto_build(reply, c)
+            return self._auto_build(reply, c, "param_change")
         return None
 
-    def _auto_build(self, reply: LLMReply, c: _Counters) -> AgentTurn | None:
-        """C2：只改了已有参数的数值，程序替模型 build 一次；之后和模型自己调用 build 完全一样处理。"""
+    def _auto_build(self, reply: LLMReply, c: _Counters, reason: str) -> AgentTurn | None:
+        """程序替模型 build 一次；之后和模型自己调用 build 完全一样处理。
+
+        reason：param_change（C2，只改了已有参数的数值）或 turn_end（模型用纯文字结束一轮，但还有没 build 的改动）。
+        """
         self._auto_builds += 1
         call_id = f"{AUTO_BUILD_PREFIX}{self._auto_builds}"
-        self.session.log("auto", action="build", id=call_id)
+        self.session.log("auto", action="build", id=call_id, reason=reason)
         c.tool_calls += 1
         started = time.monotonic()
         outcome = self.toolbox.call("build", {})

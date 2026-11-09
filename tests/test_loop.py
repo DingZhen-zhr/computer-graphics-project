@@ -299,10 +299,12 @@ def test_auto_build_numbers_increase_within_one_agent(tmp_path):
 
 def test_no_auto_build_when_param_added(tmp_path):
     extra = scripted_call("update_brief", {"set_params": [{"name": "wall", "value": 3, "unit": "mm", "source": "user", "note": "壁厚"}]})
-    agent, ws, llm, runner, session = deliver_v1(tmp_path, [extra, LLMReply("还需要补一条壁厚的检查", [], {})])
+    # 1.2（偏离 D9）：模型用纯文字结束时还有没 build 的改动，程序会兜底 build 一次（reason 是 turn_end）；
+    # 新参数没有检查，build 不能交付，所以多一次模型调用，脚本里多一条回复。C2（param_change）仍然不会触发。
+    agent, ws, llm, runner, session = deliver_v1(tmp_path, [extra, LLMReply("还需要补一条壁厚的检查", [], {}), LLMReply("补上检查后再 build", [], {})])
     turn = agent.handle_user("加一个壁厚 3 mm")
-    assert turn.kind == "reply" and turn.llm_calls == 2 and [v.name for v in session.versions()] == ["v1"]
-    assert auto_rows(session, "build") == []
+    assert turn.kind == "reply" and turn.llm_calls == 3 and [v.name for v in session.versions()] == ["v1"]
+    assert [r["reason"] for r in auto_rows(session, "build")] == ["turn_end"]
 
 
 def test_no_auto_build_when_nothing_changed(tmp_path):
@@ -347,6 +349,58 @@ def test_coverage_gap_build_does_not_end_the_turn(tmp_path):
     agent, ws, llm, runner, session = make_agent(tmp_path, [UPSERT, only_width, BUILD, SET_CHECKS, BUILD], runner=runner)
     turn = agent.handle_user("开始建模")
     assert turn.kind == "delivered" and turn.repairs == 0   # 缺检查不算失败
+
+
+def test_build_before_reply_when_edits_unbuilt(tmp_path):
+    agent, ws, llm, runner, session = deliver_v1(tmp_path, [UPSERT, LLMReply("改好了", [], {})])
+    turn = agent.handle_user("把底座改一下")
+    assert turn.kind == "delivered" and turn.version_dir.name == "v2" and turn.llm_calls == 2
+    rows = [r for r in log_rows(session) if r["kind"] == "auto" and r["action"] == "build"]
+    assert len(rows) == 1 and rows[0]["reason"] == "turn_end" and rows[0]["id"] == "auto-build-1"
+    # 结果用 user 消息交给模型的写法和自动重建一样（偏离 D6）；这里本轮已经交付，所以没有下一次调用可看
+
+
+def test_build_before_reply_only_once_per_turn(tmp_path):
+    runner = Runner(good_result(), bad_result("e"))
+    agent, ws, llm, runner, session = deliver_v1(tmp_path, [UPSERT, LLMReply("改好了", [], {}), LLMReply("还是不行", [], {})], runner=runner)
+    builds_before = len([r for r in log_rows(session) if r["kind"] == "build"])
+    turn = agent.handle_user("把底座改一下")
+    assert turn.kind == "reply" and turn.text == "还是不行" and turn.llm_calls == 3
+    assert len([r for r in log_rows(session) if r["kind"] == "build"]) - builds_before == 1   # 本轮只多了 1 次 build
+    assert [v.name for v in session.versions()] == ["v1"]
+    # 失败的 build 结果在模型的第 3 次调用里（user 消息）
+    assert any(m["role"] == "user" and m["content"].startswith(AUTO_BUILD_NOTE + "\n") for m in llm.calls[-1])
+
+
+def test_build_before_reply_lets_the_model_repair_a_failed_build(tmp_path):
+    runner = Runner(good_result(), bad_result("e"), good_result())
+    agent, ws, llm, runner, session = deliver_v1(tmp_path, [UPSERT, LLMReply("改好了", [], {}), UPSERT, BUILD], runner=runner)
+    turn = agent.handle_user("把底座改一下")
+    assert turn.kind == "delivered" and turn.repairs == 1
+
+
+def test_no_build_before_reply_without_edits(tmp_path):
+    agent, ws, llm, runner, session = deliver_v1(tmp_path, [LLMReply("好的", [], {})])
+    turn = agent.handle_user("谢谢")
+    assert turn.kind == "reply" and turn.llm_calls == 1 and [v.name for v in session.versions()] == ["v1"]
+    assert [r for r in log_rows(session) if r["kind"] == "auto" and r["action"] == "build"] == []
+
+
+def test_no_build_before_reply_when_unconfirmed(tmp_path):
+    ask = scripted_call("update_brief", {"open_questions": ["托唇要多高？"]})
+    agent, ws, llm, runner, session = deliver_v1(tmp_path, [ask, LLMReply("要问一下", [], {})])
+    builds_before = len([r for r in log_rows(session) if r["kind"] == "build"])
+    turn = agent.handle_user("加个托唇")
+    assert turn.kind == "reply" and len([r for r in log_rows(session) if r["kind"] == "build"]) == builds_before
+    assert [r for r in log_rows(session) if r["kind"] == "auto" and r["action"] == "build"] == []
+
+
+def test_param_change_auto_build_logs_reason(tmp_path):
+    agent, ws, llm, runner, session = deliver_v1(tmp_path, [CHANGE])
+    turn = agent.handle_user("支撑角度改成 70 度")
+    assert turn.kind == "delivered" and turn.llm_calls == 1
+    rows = auto_rows(session, "build")
+    assert len(rows) == 1 and rows[0]["reason"] == "param_change"
 
 
 def last_user(call: list[dict]) -> dict:

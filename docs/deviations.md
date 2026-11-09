@@ -57,3 +57,14 @@
 - 实际情况：Task 9 把第 1.1 版系统提示词逐字写进 `system.md` 之后，系统提示词的"当前状态"一节里自己就写了两次"【当前状态】"，所以按 `【当前状态` 数，system 消息和快照各一处，共 2 处，计划里的这条断言和计划要求逐字照抄的系统提示词互相矛盾（Task 5 时 `system.md` 还是第一版，所以当时是对的）。
 - 怎么改：只改这条我在 Task 5 新加的测试，数完整的快照标题 `【当前状态（程序生成，不是用户说的话）】`（系统提示词里没有这个完整标题）。要保证的事没变：旧轮折叠后整个消息列表里恰好只有一张快照；断言没有放松。
 - 影响：无。
+
+## D9（1.2 版 Task 3）新增的"纯文字结束前先 build"规则和两处旧测试/计划字面要求冲突
+
+- 原计划：1.2 计划说旧测试一律不动；`update_brief` 成功后 `unbuilt_edits` 设为 True。
+- 实际情况：
+  1. 1.1 Task 6 的 `test_no_auto_build_when_param_added`（交付后 update_brief 新增一个 user 参数，接着纯文字回复 → reply，llm_calls == 2）正好是新规则要拦的情形：有没 build 的改动、模型用纯文字结束。新规则下程序会先 build 一次（新参数没有检查，不能交付），模型要再回复一次，脚本只有 2 条回复，`ScriptedLLM` 报"脚本已用完"。
+  2. `test_no_auto_build_when_nothing_changed`（update_brief 写入相同的值，接着纯文字回复 → reply，没有 v2）：如果 update_brief 一律设 `unbuilt_edits = True`，这条也会被新规则触发并交付 v2。
+- 怎么改：
+  1. `update_brief` 只在 `changes` 不为空（真的改了东西）时设 `unbuilt_edits = True`；什么都没改的调用不算改动。其余三个工具（upsert_feature、remove_feature、set_checks）成功就设 True，和计划一致。第 2 条旧测试不用改。
+  2. 第 1 条旧测试 `test_no_auto_build_when_param_added` 只改了最小的两处：脚本多加一条纯文字回复（`LLMReply("补上检查后再 build", [], {})`），断言从 `llm_calls == 2` 改成 `== 3`；"没有自动重建"的断言保留强度，改成"自动重建记录只有一条，reason 是 turn_end（没有 param_change）"。测试名不变；"没有 v2、结果是 reply"的断言没动。
+- 影响：只影响 1.2 Task 3；Task 4 评测不受影响。

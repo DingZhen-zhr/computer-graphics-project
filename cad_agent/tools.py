@@ -84,6 +84,7 @@ class ToolBox:
         self.secret_names = tuple(secret_names)
         self.max_build_failures = 3  # 由主循环按配置设置
         self.build_failures = 0      # 本轮用户消息内 build 没通过的次数
+        self.unbuilt_edits = False   # 有没有 build 的改动：update_brief、upsert_feature、remove_feature、set_checks 成功后为真，build 一运行就清掉
         self._handlers: dict[str, Callable[[dict], ToolOutcome]] = {
             "update_brief": self._update_brief, "ask_user": self._ask_user, "request_confirmation": self._request_confirmation,
             "upsert_feature": self._upsert_feature, "remove_feature": self._remove_feature, "set_checks": self._set_checks,
@@ -134,6 +135,8 @@ class ToolBox:
         except BriefError as e:
             return _err(str(e))
         ok, why = self.ws.brief.can_build()
+        if changes:  # 什么都没改的 update_brief 不算改动
+            self.unbuilt_edits = True
         body: dict[str, Any] = {"changes": changes, "can_build": ok}
         if not ok:
             body["why_not"] = why
@@ -169,6 +172,7 @@ class ToolBox:
             self.ws.features.upsert(Feature(slug, role, code), before)
         except NotebookError as e:
             return _err(str(e))
+        self.unbuilt_edits = True
         return ToolOutcome(_json({"ok": True, "features": self._feature_names()}))
 
     def _remove_feature(self, args: dict) -> ToolOutcome:
@@ -176,6 +180,7 @@ class ToolBox:
             self.ws.features.remove(args["slug"])
         except NotebookError as e:
             return _err(str(e))
+        self.unbuilt_edits = True
         return ToolOutcome(_json({"ok": True, "features": self._feature_names()}))
 
     def _set_checks(self, args: dict) -> ToolOutcome:
@@ -185,11 +190,13 @@ class ToolBox:
         except CheckSpecError as e:
             return _err(f"检查项没有通过校验，原有检查项保持不变：{e}")
         self.ws.checks_raw = copy.deepcopy(raw)
+        self.unbuilt_edits = True
         missing = sorted(missing_coverage(checks, self.ws.brief.user_param_names()))
         return ToolOutcome(_json({"ok": True, "count": len(raw), "missing_coverage": missing}))
 
     def _build(self, args: dict) -> ToolOutcome:
         ws = self.ws
+        self.unbuilt_edits = False  # 一运行就算 build 过了，不管通没通过
         names = set(ws.brief.param_values())
         try:
             rendered = render_notebook(ws.brief.params, ws.features.items)
@@ -227,6 +234,7 @@ class ToolBox:
     def _build_without_run(self, err: dict) -> ToolOutcome:
         """渲染 notebook 或解析检查项时就出错了：没有运行，但仍然计一次失败。"""
         run = RunResult(ok=False, error=err)
+        self.unbuilt_edits = False
         self.ws.last_run = run
         self.build_failures += 1
         error = _error_for_model(err)

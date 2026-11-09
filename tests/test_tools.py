@@ -217,6 +217,36 @@ def test_build_records_last_build_content():
     assert ws2.last_build_content == out2.content and "NotebookError" in out2.content
 
 
+def test_toolbox_tracks_unbuilt_edits():
+    tb, ws, stub = make_box(with_feature=False)
+    assert tb.unbuilt_edits is False
+    assert "error" not in j(tb.call("upsert_feature", {"slug": "base", "role": "build", "code": BOX}))
+    assert tb.unbuilt_edits is True
+    tb.call("build", {})
+    assert tb.unbuilt_edits is False
+    tb.call("upsert_feature", {"slug": "bad", "role": "add", "code": "import os\nbad = 1"})   # 出错的调用不改变它
+    assert tb.unbuilt_edits is False
+    assert "error" not in j(tb.call("set_checks", {"checks": [PHONE_W, TILT]}))
+    assert tb.unbuilt_edits is True
+    tb.call("build", {})
+    assert tb.unbuilt_edits is False
+    assert "error" in j(tb.call("set_checks", {"checks": [{"id": "x", "type": "nonsense"}]}))
+    assert tb.unbuilt_edits is False
+    assert "error" not in j(tb.call("update_brief", {"set_params": [{"name": "tilt_deg", "value": 70, "unit": "deg", "source": "user", "note": "角度"}]}))
+    assert tb.unbuilt_edits is True
+    tb.call("build", {})
+    assert "error" not in j(tb.call("remove_feature", {"slug": "base"}))
+    assert tb.unbuilt_edits is True
+    tb.call("build", {})   # 没有特征：不运行（_build_without_run），也算 build 过了
+    assert tb.unbuilt_edits is False
+
+
+def test_update_brief_without_changes_is_not_an_edit():
+    tb, ws, _ = make_box(with_feature=False)
+    out = j(tb.call("update_brief", {"set_params": [{"name": "tilt_deg", "value": 65, "unit": "deg", "source": "user", "note": "支撑角度"}]}))
+    assert out["changes"] == [] and tb.unbuilt_edits is False
+
+
 def test_build_failure_reports_cell():
     result = good_result(ok=False, error={"cell": "base", "type": "NameError", "message": "name 'wd' is not defined"}, checks=[], facts={})
     tb, ws, _ = make_box(result=result, checks=[PHONE_W, TILT])
