@@ -1,0 +1,46 @@
+# 测试任务 2：法兰盘。考查：旋转体、阵列、孔数、分布圆直径、圆角。
+# 验收检查依赖坐标约定：回转体的轴线就是 z 轴，底面贴 z=0，以原点为中心。
+id: flange
+initial: "帮我做一个法兰盘"
+max_user_turns: 12
+
+hidden_spec: |
+  - 外径 100 mm，底盘厚 10 mm。
+  - 中心凸台直径 55 mm，法兰盘总高 30 mm（凸台高到 30）。
+  - 中心通孔直径 30 mm，从上到下全部打通。
+  - 6 个直径 11 mm 的螺栓孔，均匀分布在直径 78 mm 的圆上。
+  - 凸台根部（凸台和底盘相接的地方）圆角 R3。
+
+modifications:
+  - "螺栓孔改成 8 个"
+
+# 螺栓孔圆柱面的侧面积 = π × 直径 11 × 孔深 10 = 345.58，取 ±5%：328.3 ~ 362.9
+# （中心孔 π×30×30 = 2827、凸台外圆 π×55×20 = 3456、底盘外圆 π×100×10 = 3142，都不在这个范围里）
+acceptance:
+  after_initial:
+    - {id: size-x, type: bbox, axis: x, expected: 100, tol: 0.5}
+    - {id: size-y, type: bbox, axis: y, expected: 100, tol: 0.5}
+    - {id: height-z, type: bbox, axis: z, expected: 30, tol: 0.5}
+    # 中心通孔：轴线上、凸台中间高度处不该有材料
+    - {id: bore-open, type: point_outside, point: [0, 0, 15]}
+    - id: bolt-holes
+      type: count
+      kind: faces
+      expected: 6
+      where:
+        - [geom.type, "==", CYLINDER]
+        - [geom.area, ">=", 328.3]
+        - [geom.area, "<=", 362.9]
+  after_mod_1:
+    - {id: size-x, type: bbox, axis: x, expected: 100, tol: 0.5}
+    - {id: size-y, type: bbox, axis: y, expected: 100, tol: 0.5}
+    - {id: height-z, type: bbox, axis: z, expected: 30, tol: 0.5}
+    - {id: bore-open, type: point_outside, point: [0, 0, 15]}
+    - id: bolt-holes
+      type: count
+      kind: faces
+      expected: 8
+      where:
+        - [geom.type, "==", CYLINDER]
+        - [geom.area, ">=", 328.3]
+        - [geom.area, "<=", 362.9]

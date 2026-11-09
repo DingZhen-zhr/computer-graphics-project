@@ -103,3 +103,14 @@
   1. 计划里 `main(argv, input_fn, print_fn)` 没有注入智能体的位置，所以另有模块级函数 `build_agent(config) -> (Agent, Session)`，测试里替换它；没有 key 时 `build_agent` 在创建会话目录**之前**就抛 `ConfigError`。
   2. `/view` 用 `Popen([sca 路径, "edit", 会话目录])`，`sca` 路径取与当前 python 同目录的 `sca.exe`（`shutil.which` 找不到）；已经有编辑器在跑就不再启动第二个；退出时统一关掉。实测：`sca ls`、`sca run` 在中文目录下正常，`sca edit --no-browser` 能启动并返回 200。**没有用浏览器点开 notebook 看编辑器里的实际效果**，留给 Task 13 联调时人工看一眼。
   3. 每轮结束后顺带显示“本轮模型调用 N 次，约 M token”；Ctrl+C、输入结束（EOF）都会正常退出。
+
+## Task 12：测试任务与评测脚本 —— 完成
+
+- 做了什么：`benchmarks/__init__.py`、`benchmarks/tasks/phone_stand.yaml`、`flange.yaml`、`l_bracket.yaml`、`benchmarks/sim_user.py`（提示词由脚本从提示词文档第 5 节提取，逐字一致）、`benchmarks/run.py`（`load_task`、`run_task`、`run_benchmarks`、`render_results_md`、`main`）、`tests/test_benchmarks.py`、`tests/test_benchmark_references.py`；`pyproject.toml` 的 pytest 配置加了 `pythonpath = ["."]`，直接运行 `pytest` 也能 import `benchmarks`。
+- 测试数量：新增 28 个（`test_benchmarks.py` 18 个 + `test_benchmark_references.py` 10 个，后者标记 `sca`），全部测试 309 个全部通过。
+- 说明：
+  1. 三个任务的初始需求、隐藏需求、修改请求和验收数字都按计划写进了 YAML（l_bracket 的手算过程写在注释里，flange 的孔面积范围 328.3~362.9 即 π·11·10 的 ±5%）。
+  2. **额外加的一道保险**：`test_benchmark_references.py` 用真实 SCA 为三个任务各写了一个“标准答案”模型（手机支架：底板+倾斜板+托唇+充电缺口；法兰盘：旋转体+8/6 个螺栓孔+根部圆角；L 形支架：两块板+加强筋+4 个孔+顶面倒角），分别在初始和修改后两个阶段跑人工验收，全部通过（例如手机支架实测夹角 115.0000°，L 形支架体积 26272，在 26316 的 3% 以内）；另有 4 个反例确认验收能恰好卡住“没改参数的旧模型”。这说明验收条件和坐标约定、检查引擎是对得上的，联调时不会冤枉模型。
+  3. `run_task` 在计划的签名后多了两个仅限关键字的可选参数 `run_job`、`acceptance_timeout_s`（测试里用桩替换 `run_job`）；返回的 `acceptance` 条目除计划的 `id/expected/measured/deviation/passed` 外多了 `type`、`detail`，结果里多了 `sim_llm_calls`、`sim_tokens`（模拟用户自己的调用次数和 token）。“最大尺寸偏差”只统计长度类检查（bbox、distance，单位 mm），角度和体积的偏差不算。
+  4. 阶段超过 `max_user_turns` 仍未交付：该阶段记 `delivered: false`，后面的阶段标 `skipped`，继续下一个任务；单个任务意外崩溃只记一条失败，不影响其余任务；每跑完一个任务就写一次 `results.json`/`results.md`。
+  5. **没有做 Task 13**：没有碰 API key，没有联网调用任何大模型。

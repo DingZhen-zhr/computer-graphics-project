@@ -1,0 +1,103 @@
+# 测试任务 1：手机支架（作业示例）。考查：追问、角度检查、缺口检查。
+# 验收检查依赖坐标约定：底面贴 z=0，零件以原点为中心，最长水平方向沿 x，正面（放手机的一面）朝 -y。
+id: phone_stand
+initial: "做一个放在桌上看视频的小支架"
+max_user_turns: 12
+
+# 用户心里的完整需求（助手看不到，只有模拟用户知道）
+hidden_spec: |
+  - 带壳手机尺寸 160×78×12 mm（长×宽×厚）。
+  - 手机横放、竖放都要能用。
+  - 支撑面与桌面的夹角是 65 度。
+  - 整体宽度 90 mm。
+  - 支撑板沿斜面方向长 110 mm，厚 5 mm。
+  - 底部托唇高 15 mm。
+  - 托槽宽 14 mm（手机厚 12 mm 加 2 mm 余量）。
+  - 托唇正中间留一个 20 mm 宽的充电缺口。
+  - 一体式，不要活动件。
+
+modifications:
+  - "支撑角度改成 70 度"
+
+# 人工写的验收检查，和智能体自己写的检查分开，用同一套检查器计算。期望值都写数字。
+acceptance:
+  after_initial:
+    - id: width-x
+      type: bbox
+      axis: x
+      expected: 90
+      tol: 0.5
+    # 支撑面（法向朝上偏前）与底面（法向朝下）的法向夹角 = 180 - 65 = 115 度；修改后 180 - 70 = 110 度
+    - id: tilt-angle
+      type: angle
+      expected: 115
+      tol: 0.5
+      a:
+        - [geom.type, "==", PLANE]
+        - [geom.area, ">=", 5000]
+        - [geom.normal.z, ">=", 0.2]
+        - [geom.normal.z, "<=", 0.8]
+      b:
+        - [geom.type, "==", PLANE]
+        - [geom.normal.z, "<=", -0.99]
+        - [geom.center.z, "<=", 0.1]
+    # 充电缺口宽 20 mm，两侧的墙在 x = ±10 处，墙面朝缺口：左边的墙面朝 +x，右边的墙面朝 -x
+    - id: gap-wall-left
+      type: count
+      kind: faces
+      op: ">="
+      expected: 1
+      where:
+        - [geom.type, "==", PLANE]
+        - [geom.normal.x, ">=", 0.99]
+        - [geom.center.x, ">=", -10.5]
+        - [geom.center.x, "<=", -9.5]
+    - id: gap-wall-right
+      type: count
+      kind: faces
+      op: ">="
+      expected: 1
+      where:
+        - [geom.type, "==", PLANE]
+        - [geom.normal.x, "<=", -0.99]
+        - [geom.center.x, ">=", 9.5]
+        - [geom.center.x, "<=", 10.5]
+  after_mod_1:
+    - id: width-x
+      type: bbox
+      axis: x
+      expected: 90
+      tol: 0.5
+    - id: tilt-angle
+      type: angle
+      expected: 110
+      tol: 0.5
+      a:
+        - [geom.type, "==", PLANE]
+        - [geom.area, ">=", 5000]
+        - [geom.normal.z, ">=", 0.2]
+        - [geom.normal.z, "<=", 0.8]
+      b:
+        - [geom.type, "==", PLANE]
+        - [geom.normal.z, "<=", -0.99]
+        - [geom.center.z, "<=", 0.1]
+    - id: gap-wall-left
+      type: count
+      kind: faces
+      op: ">="
+      expected: 1
+      where:
+        - [geom.type, "==", PLANE]
+        - [geom.normal.x, ">=", 0.99]
+        - [geom.center.x, ">=", -10.5]
+        - [geom.center.x, "<=", -9.5]
+    - id: gap-wall-right
+      type: count
+      kind: faces
+      op: ">="
+      expected: 1
+      where:
+        - [geom.type, "==", PLANE]
+        - [geom.normal.x, "<=", -0.99]
+        - [geom.center.x, ">=", 9.5]
+        - [geom.center.x, "<=", 10.5]

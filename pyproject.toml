@@ -25,6 +25,7 @@ cad_agent = ["agent/prompts/*.md"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+pythonpath = ["."]  # 直接运行 pytest 时也能 import benchmarks
 markers = [
     "sca: 需要 SCA 运行的较慢测试",
 ]

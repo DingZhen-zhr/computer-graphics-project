@@ -1,0 +1,48 @@
+# 测试任务 3：带加强筋的 L 形安装支架。考查：拉伸、多次布尔、安装孔、倒角、孔位置。
+# 验收检查依赖坐标约定：底板沿 x、宽度沿 y、立板向 +z；底面贴 z=0。
+id: l_bracket
+initial: "做一个 L 形的安装支架，要带加强筋"
+max_user_turns: 12
+
+hidden_spec: |
+  - 底板和立板都是 60 mm 长 × 40 mm 宽 × 5 mm 厚。
+  - 立板在底板的一端，两块板垂直相接成 L 形；宽度方向（40 mm）对齐。
+  - 每块板上有 2 个直径 6.6 mm 的通孔，孔中心距板的边缘 12 mm。
+  - 在两块板宽度的正中间有一块厚 5 mm 的三角形加强筋，两条直角边各 40 mm。
+  - 外侧的棱倒角 1 mm。
+
+modifications:
+  - "孔径改成 8.4（M8）"
+
+# 孔圆柱面的侧面积 = π × 孔径 × 板厚 5：
+#   孔径 6.6 → 103.7，取 ±5%：98.5 ~ 108.9；孔径 8.4 → 131.9，取 ±5%：125.3 ~ 138.5
+# 体积手算：两块板 2×(60×40×5) = 24000，减去重叠的 5×40×5 = 1000，加上加强筋 (40×40/2)×5 = 4000，
+#   减去 4 个孔 4×(π×3.3²×5) = 684  →  26316；倒角的影响小于 0.5%，忽略。
+#   孔径改成 8.4 后：4 个孔 4×(π×4.2²×5) = 1108  →  25892。
+acceptance:
+  after_initial:
+    - {id: len-x, type: bbox, axis: x, expected: 60, tol: 0.5}
+    - {id: len-y, type: bbox, axis: y, expected: 40, tol: 0.5}
+    - {id: len-z, type: bbox, axis: z, expected: 60, tol: 0.5}
+    - id: hole-faces
+      type: count
+      kind: faces
+      expected: 4
+      where:
+        - [geom.type, "==", CYLINDER]
+        - [geom.area, ">=", 98.5]
+        - [geom.area, "<=", 108.9]
+    - {id: total-volume, type: volume, expected: 26316, rel_tol: 0.03}
+  after_mod_1:
+    - {id: len-x, type: bbox, axis: x, expected: 60, tol: 0.5}
+    - {id: len-y, type: bbox, axis: y, expected: 40, tol: 0.5}
+    - {id: len-z, type: bbox, axis: z, expected: 60, tol: 0.5}
+    - id: hole-faces
+      type: count
+      kind: faces
+      expected: 4
+      where:
+        - [geom.type, "==", CYLINDER]
+        - [geom.area, ">=", 125.3]
+        - [geom.area, "<=", 138.5]
+    - {id: total-volume, type: volume, expected: 25892, rel_tol: 0.03}
