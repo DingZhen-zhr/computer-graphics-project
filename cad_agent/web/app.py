@@ -1,18 +1,21 @@
-"""网页后端的状态：一条消息放在后台线程里处理，状态快照由后台线程在每次写日志时生成。
+"""网页后端的状态。两种模式，对外的接口完全一样：
 
-线程规则：
-- 同一时间只处理一条消息（submit 在忙时返回 409）。
-- 智能体的数据（需求单、检查、版本）只由处理消息的那个线程读，生成快照后放进有锁保护的变量；
-  /api/state 只读这份快照和几个有锁保护的计数，不会和智能体同时碰同一份数据。
-- 后台线程里的任何异常都接住，写进 error 并显示在对话里，服务不退出。
+- LiveApp：接着真实的智能体。一条消息放在后台线程里处理；智能体每写一条日志，就由后台线程生成一份快照，
+  放进有锁保护的变量里，/api/state 只读这份快照，不会和智能体同时碰同一份数据。
+- ReplayApp：只读回放一个已经保存的会话目录（log.jsonl、brief.json、versions/）。不需要 API key，
+  也不花钱，用来预览界面，演示时断网也能当后备。
+
+两种模式的对话记录都由 events.fold 从日志折叠出来，所以看到的东西一模一样。
 """
 
 from __future__ import annotations
 
 import copy
+import json
 import re
 import sys
 import threading
+import time
 import traceback
 from pathlib import Path
 from typing import Any, Callable
@@ -20,48 +23,10 @@ from typing import Any, Callable
 from cad_agent.agent.loop import Agent
 from cad_agent.brief import Brief
 from cad_agent.session import Session
+from cad_agent.web.events import fold
 
 VERSION_NAME_RE = re.compile(r"^v\d+$")
-MAX_ACTIVITY = 40  # 实时进度最多留这么多条
-
-
-# ---------------------------------------------------------------- 进度文字
-
-
-def describe_event(kind: str, data: dict) -> str | None:
-    """把一条日志变成一句给人看的进度；不需要显示的返回 None。"""
-    if kind == "assistant":
-        names = [c["name"] for c in data.get("tool_calls") or []]
-        return "正在调用：" + "、".join(names) if names else "正在整理回复"
-    if kind == "tool":
-        name, args = data.get("name"), data.get("args") or {}
-        if name == "upsert_feature":
-            return f"写特征 {args.get('slug', '')}".rstrip()
-        if name == "set_checks":
-            return "写检查项"
-        if name == "update_brief":
-            return "更新需求单"
-        return None  # build 由 build 记录负责，其余工具（api_help、inspect……）不显示
-    if kind == "build":
-        if data.get("passed"):
-            return f"运行检查：{data.get('passed_checks', 0)}/{data.get('total_checks', 0)} 通过"
-        return "运行没通过：" + _first_reason(data)
-    if kind == "auto":
-        if data.get("action") == "build":
-            return "程序自动重新 build"
-        if data.get("action") == "request_confirmation":
-            return "程序自动请你确认"
-    return None
-
-
-def _first_reason(build: dict) -> str:
-    if build.get("error"):
-        return str(build["error"].get("message", "运行出错"))
-    if build.get("failed_checks"):
-        return f"检查 {build['failed_checks'][0]} 没通过"
-    if build.get("missing_coverage"):
-        return "缺少检查 " + "、".join(build["missing_coverage"])
-    return "原因不明"
+BUSY, EMPTY, READ_ONLY, OK, ACCEPTED = 409, 400, 403, 200, 202
 
 
 # ---------------------------------------------------------------- 有人在听的会话
@@ -81,138 +46,59 @@ class LiveSession(Session):
                 traceback.print_exc(file=sys.stderr)
 
 
-# ---------------------------------------------------------------- 状态
+# ---------------------------------------------------------------- 两种模式共用的部分
 
 
-class AppState:
-    def __init__(self, make_agent: Callable[[], tuple[Agent, Session]], model_name: str) -> None:
-        self._make_agent = make_agent
+def _read_json(path: Path, default: Any) -> Any:
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return default
+
+
+def version_summary(path: Path) -> dict:
+    """一个版本目录的摘要：有哪些文件、检查通过几条、相对上一版改了什么。"""
+    checks = _read_json(path / "checks.json", [])
+    checks = checks if isinstance(checks, list) else []
+    try:
+        changes = [line[2:] for line in (path / "changes.md").read_text(encoding="utf-8").splitlines() if line.startswith("- ")]
+    except OSError:
+        changes = []
+    brief = _read_json(path / "brief.json", {})
+    return {
+        "name": path.name,
+        "has_stl": (path / "model.stl").is_file(),
+        "has_png": (path / "view.png").is_file(),
+        "passed": sum(1 for c in checks if isinstance(c, dict) and c.get("passed")),
+        "total": len(checks),
+        "changes": [c for c in changes if not c.startswith("（")],
+        "params": brief.get("params", []) if isinstance(brief, dict) else [],
+    }
+
+
+class _Base:
+    mode = "live"
+
+    def __init__(self, model_name: str) -> None:
         self.model_name = model_name
         self._lock = threading.RLock()
-        self._idle = threading.Event()
-        self._idle.set()
-        self.agent: Agent
-        self.session: Session
-        self._start_session()
+        self._version_cache: dict[str, dict] = {}  # 版本一旦生成就不会再变，摘要可以缓存
 
-    # ---- 会话 ----
-    def _start_session(self) -> None:
-        agent, session = self._make_agent()
-        if isinstance(session, LiveSession):
-            session.listener = self._on_event
-        with self._lock:
-            self.agent, self.session = agent, session
-            self._busy = False
-            self._transcript: list[dict] = []
-            self._activity: list[str] = []
-            self._error: str | None = None
-            self._stats = {"cost": 0.0, "cost_known": True, "prompt_tokens": 0, "cached_tokens": 0}
-            self._view: dict = {}
-        self._refresh_view()
-
+    # 子类提供
     def session_dir(self) -> Path:
-        with self._lock:
-            return self.session.dir
+        raise NotImplementedError
 
-    # ---- 智能体线程里调用 ----
-    def _refresh_view(self) -> None:
-        """生成需求单、检查、版本的快照。只在处理消息的线程里（或空闲时）调用。"""
-        ws = self.agent.toolbox.ws
-        run = ws.last_run
-        view = {
-            "brief": copy.deepcopy(ws.brief.to_dict()),
-            "checks": [c.to_dict() for c in run.checks] if run is not None else [],
-            "versions": [
-                {"name": v.name, "has_stl": (v / "model.stl").is_file(), "has_png": (v / "view.png").is_file()}
-                for v in self.session.versions()
-            ],
-        }
-        with self._lock:
-            self._view = view
+    def _versions(self) -> list[dict]:
+        root = self.session_dir() / "versions"
+        names = sorted((p for p in root.iterdir() if p.is_dir() and VERSION_NAME_RE.match(p.name)), key=lambda p: int(p.name[1:])) \
+            if root.is_dir() else []
+        out = []
+        for p in names:
+            if p.name not in self._version_cache:
+                self._version_cache[p.name] = version_summary(p)
+            out.append(self._version_cache[p.name])
+        return out
 
-    def _on_event(self, kind: str, data: dict) -> None:
-        text = describe_event(kind, data)
-        with self._lock:
-            if text is not None:
-                self._activity = [*self._activity, text][-MAX_ACTIVITY:]
-            if kind == "assistant":
-                usage = data.get("usage") or {}
-                self._stats["prompt_tokens"] += int(usage.get("prompt_tokens", 0) or 0)
-                self._stats["cached_tokens"] += int(usage.get("cached_tokens", 0) or 0)
-                if data.get("cost") is None:
-                    self._stats["cost_known"] = False
-                else:
-                    self._stats["cost"] += data["cost"]
-        self._refresh_view()
-
-    def _work(self, text: str) -> None:
-        try:
-            turn = self.agent.handle_user(text)
-            entry = {"role": "assistant", "kind": turn.kind, "text": turn.text,
-                     "version": turn.version_dir.name if turn.version_dir else None, "llm_calls": turn.llm_calls, "cost": turn.cost}
-            with self._lock:
-                self._transcript.append(entry)
-        except Exception as e:  # noqa: BLE001 - 演示时出任何错，页面都不能卡死，服务也不能退出
-            traceback.print_exc(file=sys.stderr)
-            message = f"处理这条消息时出了意外错误（{type(e).__name__}）：{e}。可以再发一次，或者点重置开始新会话。"
-            with self._lock:
-                self._error = message
-                self._transcript.append({"role": "assistant", "kind": "error", "text": message, "version": None, "llm_calls": 0, "cost": None})
-        finally:
-            try:
-                self._refresh_view()
-            except Exception:  # noqa: BLE001
-                traceback.print_exc(file=sys.stderr)
-            with self._lock:
-                self._activity = []
-                self._busy = False
-            self._idle.set()
-
-    # ---- 接口用 ----
-    def snapshot(self) -> dict:
-        """/api/state 的内容（加锁拷贝）。"""
-        with self._lock:
-            stats = self._stats
-            return {
-                "busy": self._busy,
-                "model": self.model_name,
-                "transcript": copy.deepcopy(self._transcript),
-                "activity": list(self._activity),
-                "brief": copy.deepcopy(self._view.get("brief", Brief().to_dict())),
-                "checks": copy.deepcopy(self._view.get("checks", [])),
-                "versions": copy.deepcopy(self._view.get("versions", [])),
-                "stats": {"cost": stats["cost"] if stats["cost_known"] else None,
-                          "prompt_tokens": stats["prompt_tokens"], "cached_tokens": stats["cached_tokens"]},
-                "error": self._error,
-            }
-
-    def submit(self, text: str) -> int:
-        """202 开始处理；400 空消息；409 正在处理上一条。"""
-        if not isinstance(text, str) or not text.strip():
-            return 400
-        with self._lock:
-            if self._busy:
-                return 409
-            self._busy = True
-            self._error = None
-            self._activity = ["正在思考…"]
-            self._transcript.append({"role": "user", "kind": "user", "text": text.strip(), "version": None, "llm_calls": 0, "cost": None})
-            self._idle.clear()
-        threading.Thread(target=self._work, args=(text.strip(),), daemon=True, name="agent-turn").start()
-        return 202
-
-    def reset(self) -> int:
-        """200 开了新会话；409 正在处理消息。"""
-        with self._lock:
-            if self._busy:
-                return 409
-        self._start_session()
-        return 200
-
-    def wait_idle(self, timeout: float) -> bool:
-        return self._idle.wait(timeout)
-
-    # ---- 文件和版本对比 ----
     def version_dir(self, name: str) -> Path | None:
         if not VERSION_NAME_RE.match(name):
             return None
@@ -227,3 +113,163 @@ class AppState:
         if va is None or vb is None:
             return None
         return diff_briefs(_load_brief(va), _load_brief(vb))
+
+    def _compose(self, events: list[tuple[str, dict]], brief: dict, checks: list[dict], facts: dict | None,
+                 busy: bool, busy_since: float | None, error: str | None) -> dict:
+        folded = fold(events, confirmed=bool(brief.get("confirmed")) and not brief.get("open_questions"), busy=busy)
+        part = brief.get("part") or {}
+        return {
+            "mode": self.mode, "model": self.model_name, "busy": busy,
+            "busy_seconds": round(time.monotonic() - busy_since, 1) if busy and busy_since else None,
+            "part": {"name": part.get("name", ""), "purpose": part.get("purpose", "")},
+            "stage": folded["stage"], "transcript": folded["transcript"], "activity": folded["activity"],
+            "stats": folded["stats"], "brief": brief, "checks": checks, "facts": facts,
+            "versions": self._versions(), "current_version": folded["last_version"], "error": error,
+        }
+
+
+# ---------------------------------------------------------------- 实时模式
+
+
+class LiveApp(_Base):
+    mode = "live"
+
+    def __init__(self, make_agent: Callable[[], tuple[Agent, Session]], model_name: str) -> None:
+        super().__init__(model_name)
+        self._make_agent = make_agent
+        self._idle = threading.Event()
+        self._idle.set()
+        self._start_session()
+
+    def _start_session(self) -> None:
+        agent, session = self._make_agent()
+        if isinstance(session, LiveSession):
+            session.listener = self._on_event
+        with self._lock:
+            self.agent, self.session = agent, session
+            self._events: list[tuple[str, dict]] = []
+            self._busy, self._busy_since, self._error = False, None, None
+            self._view: dict = {"brief": Brief().to_dict(), "checks": [], "facts": None}
+            self._version_cache = {}
+        self._refresh_view()
+
+    def session_dir(self) -> Path:
+        with self._lock:
+            return self.session.dir
+
+    # ---- 只在处理消息的线程里（或空闲时）调用 ----
+    def _refresh_view(self) -> None:
+        ws = self.agent.toolbox.ws
+        run = ws.last_run
+        view = {
+            "brief": copy.deepcopy(ws.brief.to_dict()),
+            "checks": [c.to_dict() for c in run.checks] if run is not None else [],
+            "facts": copy.deepcopy({k: run.facts[k] for k in ("size", "volume") if k in run.facts}) if run is not None and run.facts else None,
+        }
+        with self._lock:
+            self._view = view
+
+    def _on_event(self, kind: str, data: dict) -> None:
+        if kind == "startup":
+            return
+        with self._lock:
+            self._events.append((kind, copy.deepcopy(data)))
+        self._refresh_view()
+
+    def _work(self, text: str) -> None:
+        try:
+            self.agent.handle_user(text)
+        except Exception as e:  # noqa: BLE001 - 演示时出任何错，页面都不能卡死，服务也不能退出
+            traceback.print_exc(file=sys.stderr)
+            message = f"处理这条消息时出了意外错误（{type(e).__name__}）：{e}。需求单和模型都还在，可以再发一次，或者开一个新会话。"
+            with self._lock:
+                self._error = message
+                self._events.append(("error", {"text": message}))
+        finally:
+            try:
+                self._refresh_view()
+            except Exception:  # noqa: BLE001
+                traceback.print_exc(file=sys.stderr)
+            with self._lock:
+                self._busy, self._busy_since = False, None
+            self._idle.set()
+
+    # ---- 接口用 ----
+    def snapshot(self) -> dict:
+        with self._lock:
+            events, view = list(self._events), copy.deepcopy(self._view)
+            busy, since, error = self._busy, self._busy_since, self._error
+        return self._compose(events, view["brief"], view["checks"], view["facts"], busy, since, error)
+
+    def submit(self, text: str) -> int:
+        """202 开始处理；400 空消息；409 正在处理上一条。"""
+        if not isinstance(text, str) or not text.strip():
+            return EMPTY
+        with self._lock:
+            if self._busy:
+                return BUSY
+            self._busy, self._busy_since, self._error = True, time.monotonic(), None
+            self._idle.clear()
+        threading.Thread(target=self._work, args=(text.strip(),), daemon=True, name="agent-turn").start()
+        return ACCEPTED
+
+    def reset(self) -> int:
+        with self._lock:
+            if self._busy:
+                return BUSY
+        self._start_session()
+        return OK
+
+    def wait_idle(self, timeout: float) -> bool:
+        return self._idle.wait(timeout)
+
+
+AppState = LiveApp  # 旧名字，保持兼容
+
+
+# ---------------------------------------------------------------- 回放模式
+
+
+class ReplayApp(_Base):
+    mode = "replay"
+
+    def __init__(self, session_dir: Path) -> None:
+        self._dir = Path(session_dir)
+        if not (self._dir / "log.jsonl").is_file():
+            raise FileNotFoundError(f"{self._dir} 不是会话目录（里面没有 log.jsonl）")
+        self._events = self._load_events()
+        startup = next((d for k, d in self._events if k == "startup"), {})
+        super().__init__(str(startup.get("model") or "回放"))
+        self._events = [(k, d) for k, d in self._events if k != "startup"]
+
+    def _load_events(self) -> list[tuple[str, dict]]:
+        events = []
+        for line in (self._dir / "log.jsonl").read_text(encoding="utf-8").splitlines():
+            try:
+                row = json.loads(line)
+            except ValueError:
+                continue  # 坏掉的一行跳过，不影响其余内容
+            if isinstance(row, dict) and isinstance(row.get("kind"), str):
+                events.append((row.pop("kind"), row))
+        return events
+
+    def session_dir(self) -> Path:
+        return self._dir
+
+    def snapshot(self) -> dict:
+        brief = _read_json(self._dir / "brief.json", Brief().to_dict())
+        versions = self._versions()
+        checks = _read_json(self._dir / "versions" / versions[-1]["name"] / "checks.json", []) if versions else []
+        snap = self._compose(self._events, brief if isinstance(brief, dict) else Brief().to_dict(),
+                             checks if isinstance(checks, list) else [], None, False, None, None)
+        snap["replay_of"] = self._dir.name
+        return snap
+
+    def submit(self, text: str) -> int:
+        return READ_ONLY
+
+    def reset(self) -> int:
+        return READ_ONLY
+
+    def wait_idle(self, timeout: float) -> bool:
+        return True

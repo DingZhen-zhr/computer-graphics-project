@@ -1,0 +1,22 @@
+[
+ {
+  "slug": "base-plate",
+  "role": "build",
+  "code": "base_plate = scad.make_box_rsolid(width=base_w, height=base_d, depth=plate_t, bottom_face_center=(0, 0, 0))"
+ },
+ {
+  "slug": "back-plate",
+  "role": "add",
+  "code": "_c = math.cos(math.radians(tilt_deg))\n_s = math.sin(math.radians(tilt_deg))\n# 斜支撑板前表面在插槽底线处（z = plate_t）的 y 坐标：顶端正好落在底板后边沿附近\n_y0 = base_d / 2 - back_h * _c\n# 板底向底板内延伸一点，保证与底板重叠相接\n_d = (plate_t / 2) / _s\n_p1 = (_y0 - _d * _c, plate_t - _d * _s)\n_p2 = (_y0 + back_h * _c, plate_t + back_h * _s)\n_p3 = (_p2[0] + plate_t * _s, _p2[1] - plate_t * _c)\n_p4 = (_p1[0] + plate_t * _s, _p1[1] - plate_t * _c)\n_wire = scad.make_polyline_rwire(points=[(0, _p1[0], _p1[1]), (0, _p2[0], _p2[1]), (0, _p3[0], _p3[1]), (0, _p4[0], _p4[1])], closed=True)\n_face = scad.make_face_from_wire_rface(wire=_wire, normal=(-1, 0, 0))\n_slab = scad.extrude_rsolid(profile=_face, direction=(1, 0, 0), distance=base_w)\n_slab = scad.translate_shape(shape=_slab, vector=(-base_w / 2, 0, 0))\nback_plate = scad.union_rsolid(base_plate, _slab)"
+ },
+ {
+  "slug": "lip-left",
+  "role": "add",
+  "code": "_c = math.cos(math.radians(tilt_deg))\n_s = math.sin(math.radians(tilt_deg))\n_y0 = base_d / 2 - back_h * _c\n# 托唇后表面：与斜板前表面平行，垂直间距 = 槽宽 device_t + slot_gap\n_yb = _y0 - (device_t + slot_gap) / _s\n_d = (plate_t / 2) / _s\n# 底边伸进底板，保证相接；顶边沿斜面长 lip_h\n_bb = (_yb - _d * _c, plate_t - _d * _s)\n_bf = (_bb[0] - plate_t * _s, _bb[1] + plate_t * _c)\n_tb = (_yb + lip_h * _c, plate_t + lip_h * _s)\n_tf = (_tb[0] - plate_t * _s, _tb[1] + plate_t * _c)\n_wire = scad.make_polyline_rwire(points=[(0, _bf[0], _bf[1]), (0, _tf[0], _tf[1]), (0, _tb[0], _tb[1]), (0, _bb[0], _bb[1])], closed=True)\n_face = scad.make_face_from_wire_rface(wire=_wire, normal=(-1, 0, 0))\n_lip = scad.extrude_rsolid(profile=_face, direction=(1, 0, 0), distance=(base_w - notch_w) / 2)\n_lip = scad.translate_shape(shape=_lip, vector=(-base_w / 2, 0, 0))\nlip_left = scad.union_rsolid(back_plate, _lip)"
+ },
+ {
+  "slug": "lip-right",
+  "role": "add",
+  "code": "_c = math.cos(math.radians(tilt_deg))\n_s = math.sin(math.radians(tilt_deg))\n_y0 = base_d / 2 - back_h * _c\n_yb = _y0 - (device_t + slot_gap) / _s\n_d = (plate_t / 2) / _s\n_bb = (_yb - _d * _c, plate_t - _d * _s)\n_bf = (_bb[0] - plate_t * _s, _bb[1] + plate_t * _c)\n_tb = (_yb + lip_h * _c, plate_t + lip_h * _s)\n_tf = (_tb[0] - plate_t * _s, _tb[1] + plate_t * _c)\n_wire = scad.make_polyline_rwire(points=[(0, _bf[0], _bf[1]), (0, _tf[0], _tf[1]), (0, _tb[0], _tb[1]), (0, _bb[0], _bb[1])], closed=True)\n_face = scad.make_face_from_wire_rface(wire=_wire, normal=(-1, 0, 0))\n_lip = scad.extrude_rsolid(profile=_face, direction=(1, 0, 0), distance=(base_w - notch_w) / 2)\n_lip = scad.translate_shape(shape=_lip, vector=(notch_w / 2, 0, 0))\nlip_right = scad.union_rsolid(lip_left, _lip)"
+ }
+]

@@ -1,0 +1,206 @@
+[
+ {
+  "axis": "x",
+  "expected": "base_w",
+  "id": "size-x",
+  "type": "bbox"
+ },
+ {
+  "a": {
+   "kind": "faces",
+   "where": [
+    [
+     "geom.type",
+     "==",
+     "PLANE"
+    ],
+    [
+     "geom.normal.z",
+     ">=",
+     0.99
+    ]
+   ]
+  },
+  "b": {
+   "kind": "faces",
+   "where": [
+    [
+     "geom.type",
+     "==",
+     "PLANE"
+    ],
+    [
+     "geom.normal.z",
+     "<=",
+     -0.99
+    ]
+   ]
+  },
+  "expected": "plate_t",
+  "id": "plate-thickness",
+  "type": "distance"
+ },
+ {
+  "a": [
+   [
+    "geom.type",
+    "==",
+    "PLANE"
+   ],
+   [
+    "geom.normal.y",
+    "<=",
+    -0.8
+   ],
+   [
+    "geom.normal.z",
+    ">=",
+    0.3
+   ],
+   [
+    "geom.center.z",
+    ">=",
+    30
+   ]
+  ],
+  "b": [
+   [
+    "geom.type",
+    "==",
+    "PLANE"
+   ],
+   [
+    "geom.normal.z",
+    "<=",
+    -0.99
+   ]
+  ],
+  "expected": "180 - tilt_deg",
+  "id": "tilt-angle",
+  "type": "angle"
+ },
+ {
+  "axis": "z",
+  "expected": "plate_t + back_h * sin(radians(tilt_deg))",
+  "id": "total-height",
+  "type": "bbox"
+ },
+ {
+  "a": {
+   "kind": "faces",
+   "where": [
+    [
+     "geom.type",
+     "==",
+     "PLANE"
+    ],
+    [
+     "geom.normal.y",
+     "<=",
+     -0.8
+    ],
+    [
+     "geom.normal.z",
+     ">=",
+     0.3
+    ],
+    [
+     "geom.center.z",
+     ">=",
+     30
+    ]
+   ]
+  },
+  "b": {
+   "kind": "faces",
+   "where": [
+    [
+     "geom.type",
+     "==",
+     "PLANE"
+    ],
+    [
+     "geom.normal.y",
+     ">=",
+     0.8
+    ],
+    [
+     "geom.normal.z",
+     "<=",
+     -0.3
+    ],
+    [
+     "geom.center.z",
+     "<=",
+     20
+    ]
+   ]
+  },
+  "expected": "device_t + slot_gap",
+  "id": "slot-width",
+  "type": "distance"
+ },
+ {
+  "id": "slot-back-solid",
+  "point": [
+   20,
+   "base_d / 2 - back_h * cos(radians(tilt_deg)) - (-0.5 - cos(radians(tilt_deg)) * 5) / sin(radians(tilt_deg))",
+   "plate_t + 5"
+  ],
+  "type": "point_inside"
+ },
+ {
+  "id": "slot-front-empty",
+  "point": [
+   20,
+   "base_d / 2 - back_h * cos(radians(tilt_deg)) - (device_t + slot_gap - 0.5 - cos(radians(tilt_deg)) * 5) / sin(radians(tilt_deg))",
+   "plate_t + 5"
+  ],
+  "type": "point_outside"
+ },
+ {
+  "id": "slot-wall-solid",
+  "point": [
+   20,
+   "base_d / 2 - back_h * cos(radians(tilt_deg)) - (device_t + slot_gap + 0.5 - cos(radians(tilt_deg)) * 5) / sin(radians(tilt_deg))",
+   "plate_t + 5"
+  ],
+  "type": "point_inside"
+ },
+ {
+  "id": "notch-empty",
+  "point": [
+   "notch_w / 2 - 0.5",
+   "base_d / 2 - back_h * cos(radians(tilt_deg)) - (device_t + slot_gap + plate_t / 2 - cos(radians(tilt_deg)) * 5) / sin(radians(tilt_deg))",
+   "plate_t + 5"
+  ],
+  "type": "point_outside"
+ },
+ {
+  "id": "notch-wall-solid",
+  "point": [
+   "notch_w / 2 + 0.5",
+   "base_d / 2 - back_h * cos(radians(tilt_deg)) - (device_t + slot_gap + plate_t / 2 - cos(radians(tilt_deg)) * 5) / sin(radians(tilt_deg))",
+   "plate_t + 5"
+  ],
+  "type": "point_inside"
+ },
+ {
+  "id": "phone-width-fits",
+  "point": [
+   "device_w / 2",
+   "base_d / 2 - back_h * cos(radians(tilt_deg)) - ((device_t + slot_gap) / 2 + cos(radians(tilt_deg)) * plate_t / 2) / sin(radians(tilt_deg))",
+   "plate_t / 2"
+  ],
+  "type": "point_inside"
+ },
+ {
+  "id": "phone-overhangs-stand",
+  "point": [
+   "phone_h / 2",
+   0,
+   "plate_t / 2"
+  ],
+  "type": "point_outside"
+ }
+]

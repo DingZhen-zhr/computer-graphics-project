@@ -10,7 +10,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, unquote, urlsplit
 
-from cad_agent.web.app import VERSION_NAME_RE, AppState
+from cad_agent.web.app import READ_ONLY, VERSION_NAME_RE, LiveApp, ReplayApp
 
 STATIC_DIR = Path(__file__).parent / "static"
 FILE_WHITELIST = ("view.png", "model.step", "model.stl", "model.py", "checks.json")
@@ -24,7 +24,7 @@ def _content_type(path: Path) -> str:
     return CONTENT_TYPES.get(path.suffix.lower()) or mimetypes.guess_type(path.name)[0] or "application/octet-stream"
 
 
-def make_server(state: AppState, host: str = "127.0.0.1", port: int = 8765) -> ThreadingHTTPServer:
+def make_server(state: LiveApp | ReplayApp, host: str = "127.0.0.1", port: int = 8765) -> ThreadingHTTPServer:
     class Handler(BaseHTTPRequestHandler):
         protocol_version = "HTTP/1.1"
         server_version = "CadAgentWeb"
@@ -126,7 +126,9 @@ def make_server(state: AppState, host: str = "127.0.0.1", port: int = 8765) -> T
             if path == "/api/reset":
                 self._read_body()
                 status = state.reset()
-                return self._json(status, {"ok": status == 200}) if status == 200 else self._error(status, "正在处理消息，现在不能重置")
+                if status == 200:
+                    return self._json(200, {"ok": True})
+                return self._error(status, "回放模式只能看，不能开新会话" if status == READ_ONLY else "正在处理消息，现在不能重置")
             self._read_body()
             self._error(404, "没有这个接口")
 
@@ -153,7 +155,8 @@ def make_server(state: AppState, host: str = "127.0.0.1", port: int = 8765) -> T
             status = state.submit(text)
             if status == 202:
                 return self._json(202, {"ok": True})
-            self._error(status, "消息不能为空" if status == 400 else "正在处理上一条消息，请稍等")
+            messages = {400: "消息不能为空", READ_ONLY: "回放模式只能看，不能发消息"}
+            self._error(status, messages.get(status, "正在处理上一条消息，请稍等"))
 
     class Server(ThreadingHTTPServer):
         daemon_threads = True

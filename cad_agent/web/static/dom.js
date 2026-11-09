@@ -1,4 +1,4 @@
-// 小工具：用 DOM 方法建节点（一律 textContent，不拼 HTML，模型说的话里有什么都不会被当成代码执行）。
+// 小工具：造 DOM、格式化数字。文字一律用 textContent 放进去，不拼 HTML，模型说什么都不会被当成标签。
 
 export function h(tag, attrs = {}, ...children) {
   const el = document.createElement(tag);
@@ -10,39 +10,36 @@ export function h(tag, attrs = {}, ...children) {
     else if (value === true) el.setAttribute(key, "");
     else el.setAttribute(key, String(value));
   }
-  append(el, children);
-  return el;
-}
-
-// 和 el.append 的区别：null、undefined、false 会被跳过（原生 append(null) 会写出文字 "null"）
-export function add(el, ...children) {
-  append(el, children);
-  return el;
-}
-
-function append(el, children) {
-  for (const child of children) {
-    if (child === null || child === undefined || child === false) continue;
-    if (Array.isArray(child)) append(el, child);
-    else el.append(child instanceof Node ? child : document.createTextNode(String(child)));
+  for (const child of children.flat(Infinity)) {
+    if (child === null || child === undefined || child === false || child === "") continue;
+    el.append(child instanceof Node ? child : document.createTextNode(String(child)));
   }
-}
-
-export function clear(el) {
-  el.replaceChildren();
   return el;
 }
 
-// 数字：最多 4 位小数，去掉多余的 0；没有就是 "—"
-export function num(v) {
-  if (v === null || v === undefined || Number.isNaN(Number(v))) return "—";
-  return String(Number(Number(v).toFixed(4)));
+export function clear(el, ...children) {
+  el.replaceChildren(...children.flat(Infinity).filter((c) => c !== null && c !== undefined && c !== false));
 }
 
-export function yuan(v) {
-  return v === null || v === undefined ? null : `¥${Number(v).toFixed(2)}`;
+export function fmtNum(value, digits = 4) {
+  if (value === null || value === undefined || Number.isNaN(value)) return "-";
+  const n = Number(value);
+  if (Number.isInteger(n)) return String(n);
+  return n.toFixed(digits).replace(/0+$/, "").replace(/\.$/, "");
 }
 
-export function fileUrl(version, name) {
-  return `/files/${encodeURIComponent(version)}/${name}`;
+export function fmtCost(value) {
+  if (value === null || value === undefined) return null;
+  return value < 0.01 ? `¥${value.toFixed(4)}` : `¥${value.toFixed(3)}`;
 }
+
+export function fmtPercent(ratio) {
+  return ratio === null || ratio === undefined ? null : `${Math.round(ratio * 100)}%`;
+}
+
+export function fmtTokens(n) {
+  if (!n) return "0";
+  return n >= 10000 ? `${(n / 10000).toFixed(1)} 万` : String(n);
+}
+
+export const fileUrl = (version, name) => `/files/${encodeURIComponent(version)}/${name}`;

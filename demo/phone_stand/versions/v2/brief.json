@@ -1,0 +1,95 @@
+{
+ "part": {
+  "name": "桌面看视频小支架",
+  "purpose": "放在桌面上把手机斜撑起来看视频，横放竖放都能用"
+ },
+ "params": [
+  {
+   "name": "device_w",
+   "value": 78,
+   "unit": "mm",
+   "source": "user",
+   "note": "手机带壳后的宽度（原话 78mm）"
+  },
+  {
+   "name": "device_t",
+   "value": 12,
+   "unit": "mm",
+   "source": "user",
+   "note": "手机带壳后的厚度（原话 12mm）"
+  },
+  {
+   "name": "tilt_deg",
+   "value": 70,
+   "unit": "deg",
+   "source": "user",
+   "note": "手机/屏幕面相对桌面的倾角（原话改为 70 度）"
+  },
+  {
+   "name": "base_w",
+   "value": 90,
+   "unit": "mm",
+   "source": "user",
+   "note": "整体宽度（原话 90mm 就够）；竖放时手机两端悬出槽外，允许"
+  },
+  {
+   "name": "base_d",
+   "value": 80,
+   "unit": "mm",
+   "source": "suggested",
+   "note": "底板前后进深，让重心落在底板内；自定合理值"
+  },
+  {
+   "name": "lip_h",
+   "value": 15,
+   "unit": "mm",
+   "source": "suggested",
+   "note": "底部托唇高度，防止手机滑落；自定合理值"
+  },
+  {
+   "name": "back_h",
+   "value": 110,
+   "unit": "mm",
+   "source": "user",
+   "note": "背面斜支撑板沿斜面的长度（原话 110mm）"
+  },
+  {
+   "name": "slot_gap",
+   "value": 2,
+   "unit": "mm",
+   "source": "user",
+   "note": "插槽比手机厚度多留的余量（原话 2mm），槽宽 = device_t + slot_gap = 14mm"
+  },
+  {
+   "name": "plate_t",
+   "value": 5,
+   "unit": "mm",
+   "source": "user",
+   "note": "支撑板、托唇的壁厚，同时也决定插槽深度（原话 5mm）"
+  },
+  {
+   "name": "notch_w",
+   "value": 20,
+   "unit": "mm",
+   "source": "user",
+   "note": "托唇中间充电线缺口宽度（原话 20mm）"
+  },
+  {
+   "name": "phone_h",
+   "value": 160,
+   "unit": "mm",
+   "source": "user",
+   "note": "手机高度，竖放时搁在槽里的那条边长（原话 160mm）"
+  }
+ ],
+ "features": [
+  "底部底板，平放桌面，宽 base_w、深 base_d、厚 plate_t",
+  "背面斜支撑板，前表面相对桌面倾斜 tilt_deg 度，沿斜面长 back_h",
+  "底部托唇，高 lip_h，与斜板平行、夹出插槽",
+  "托唇与斜板之间的插槽，槽宽 device_t + slot_gap",
+  "托唇正中间贯通上下的充电线缺口，宽 notch_w",
+  "一体式固定角度，无活动件"
+ ],
+ "open_questions": [],
+ "confirmed": true
+}

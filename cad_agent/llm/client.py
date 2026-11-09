@@ -94,7 +94,7 @@ class OpenAICompatLLM:
         model: str,
         api_key: str,
         temperature: float = 0.2,
-        timeout: float = 120,
+        timeout: float = 600,  # 会思考的模型一次调用可能要好几分钟；超时就重试会把已经计费的思考白白扔掉
         max_retries: int = 2,
         client: Any = None,
         extra_body: dict | None = None,

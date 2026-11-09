@@ -8,3 +8,4 @@ benchmarks/results/
 .simplecad/
 
 config-*.toml
+.worktrees/

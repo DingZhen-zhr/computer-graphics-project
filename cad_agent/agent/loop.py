@@ -181,7 +181,7 @@ class Agent:
             if not has_error(outcome.content):
                 self.session.log("auto", action="request_confirmation")
                 lead = reply.content.strip() + "\n\n" if reply.content.strip() else ""
-                return self._end("confirm", lead + self.ws.brief.render_text(), c)
+                return self._end("confirm", lead + self.ws.brief.render_text(), c, extra=self._confirm_extra(reply))
         elif should_auto_build(self.ws, calls, before):
             return self._auto_build(reply, c, "param_change")
         return None
@@ -217,8 +217,9 @@ class Agent:
             lead = reply.content.strip() + "\n\n" if reply.content.strip() else ""
             if outcome.kind == "question":
                 questions = tc.arguments["questions"]
-                return self._end("question", lead + "\n".join(f"{i}. {q}" for i, q in enumerate(questions, 1)), c)
-            return self._end("confirm", lead + self.ws.brief.render_text(), c)
+                return self._end("question", lead + "\n".join(f"{i}. {q}" for i, q in enumerate(questions, 1)), c,
+                                 extra={"lead": reply.content.strip(), "questions": list(questions)})
+            return self._end("confirm", lead + self.ws.brief.render_text(), c, extra=self._confirm_extra(reply))
         if c.tool_calls >= self.config.max_tool_calls:
             return self._end(
                 "failed",
@@ -245,7 +246,8 @@ class Agent:
         version, checks = exported
         changes, self._pending_changes = self._pending_changes, []
         text = delivery_text(version, checks, changes, self.toolbox.build_failures)
-        return self._end("delivered", text, c, version_dir=version)
+        extra = {"passed": sum(1 for r in checks if r.passed), "total": len(checks), "changes": changes}
+        return self._end("delivered", text, c, version_dir=version, extra=extra)
 
     # ---------------------------------------------------------------- 结束一轮
     def _save(self) -> None:
@@ -256,14 +258,18 @@ class Agent:
             text = f"# 当前的特征还不能拼成 notebook：{e}\n"
         self.session.save_state(ws.brief, ws.features.to_list(), ws.checks_raw, text)
 
-    def _end(self, kind: Kind, text: str, c: _Counters, version_dir: Path | None = None) -> AgentTurn:
+    def _confirm_extra(self, reply: LLMReply) -> dict:
+        return {"lead": reply.content.strip(), "brief": self.ws.brief.to_dict()}
+
+    def _end(self, kind: Kind, text: str, c: _Counters, version_dir: Path | None = None, extra: dict | None = None) -> AgentTurn:
+        """结束一轮。extra 是给网页和回放用的结构化内容（问题列表、需求单、检查通过数），一起写进日志。"""
         self._save()
         self.context.end_turn(kind, text)
         repairs = self.toolbox.build_failures
         self.session.log(kind, text=text, llm_calls=c.llm_calls, tool_calls=c.tool_calls, tokens=c.tokens, repairs=repairs,
                          version=version_dir.name if version_dir else None, prompt_tokens=c.prompt_tokens,
                          completion_tokens=c.completion_tokens, cached_tokens=c.cached_tokens,
-                         reasoning_tokens=c.reasoning_tokens, cost=c.cost)
+                         reasoning_tokens=c.reasoning_tokens, cost=c.cost, **(extra or {}))
         return AgentTurn(kind, text, version_dir, repairs=repairs, llm_calls=c.llm_calls, tokens=c.tokens,
                          prompt_tokens=c.prompt_tokens, completion_tokens=c.completion_tokens, cached_tokens=c.cached_tokens,
                          reasoning_tokens=c.reasoning_tokens, cost=c.cost)
