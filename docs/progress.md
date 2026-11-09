@@ -11,3 +11,9 @@
   3. 出错特征不能用行号对照 `cell_lines`：traceback 里的帧是 marimo 的临时 cell 文件，行号是 cell 内部行号。改用 `linecache` 读 cell 源码里的特征注释（笔记第 9 节）。Task 6 按这个做，`cell_lines` 仅作兜底。
   4. `sca` 命令不在 PATH 上，用 `Path(sys.executable).parent / "sca.exe"`。
   5. 圆柱面也有 `geom.normal.*`，按法向选面必须同时限定 `PLANE`；没有 `geom.radius`。
+
+## Task 2：需求单 —— 完成
+
+- 做了什么：`cad_agent/brief.py`（`Param`、`Brief`、`BriefError`）、`tests/test_brief.py`。
+- 测试数量：新增 25 个（计划列出的 10 个，加上未改动的建议值不清零、非法来源/数值、未知字段、失败的 patch 不改任何东西、保留名、to_dict 格式等），全部测试 26 个全部通过。
+- 说明：`apply_patch` 先在副本上做完全部检查再一次性生效，所以失败时需求单保持原样。参数名除了“小写合法标识符”，还拒绝 Python 关键字和 `scad/ql/math/model/sin/pi` 等会与 notebook 或检查表达式冲突的保留名（计划之外的输入校验，没有改任何接口）。
