@@ -36,3 +36,10 @@
 - 实际情况：build 返回里的 `failures_left` 需要“本轮已失败几次”和“上限”，而 `ToolBox` 的构造参数里没有这两个；`tools.py` 加上九个工具的说明会超过 300 行。
 - 怎么改：`ToolBox` 增加公开成员 `max_build_failures`（默认 3，主循环按配置设置）、`build_failures`（本轮 build 没通过的次数）、`begin_turn()`（每条新的用户消息前清零）、`available()`（当前可用的工具名）。构造函数签名和 `schemas()`、`call()` 不变。九个工具说明放进新文件 `cad_agent/tool_specs.py`：由脚本直接从提示词文档第 3 节的 json 块生成，保证逐字一致，`tests/test_tools.py::test_schemas_are_verbatim_copy_of_prompts_doc` 会逐项比对。
 - 影响：Task 10 的主循环要在每条用户消息开始时调用 `toolbox.begin_turn()`，并在启动时设置 `toolbox.max_build_failures = config.max_build_failures`。
+
+## D6（1.1 版 Task 1）程序补的 build 调用被服务端拒绝，Task 6 改用 `user_message` 备用写法
+
+- 原计划：Task 6 的 C2 自动重建，在历史里追加一条 `assistant` 消息（`tool_calls` 里只有一个 id 为 `auto-build-<n>` 的 `build`）和对应的 `tool` 消息，和模型自己调用 `build` 完全一样处理。
+- 实际情况：Task 1 探测（`docs/llm-api-notes.md` 第 5 节）发现，开着思考时，服务端对这种没有 `reasoning_content` 的程序补的调用返回 400：`The reasoning_content in the thinking mode must be passed back to the API.`（5a、5b 都被拒）。追加 `user` 消息的写法（5e）被接受。补 `reasoning_content` 能绕过（5d），但那是厂商专用的字段，Global Constraints 不许代码里出现。
+- 怎么改：Task 6 采用设计文档第 6 节 C2、提示词文档第 5 节的备用写法：直接调用 `build`，往历史里追加一条 `user` 消息，内容是 `"【程序自动运行了 build，结果如下】\n" + build 返回的 JSON`，之后交付、计失败、到上限停下都和模型自己调用 `build` 一样。`automation.py` 另加常量 `AUTO_BUILD_NOTE = "【程序自动运行了 build，结果如下】"`（只增不改 Interfaces 里已有的名字）；日志里仍记 `{"kind": "auto", "action": "build", "id": "auto-build-<n>"}`，所以 `AUTO_BUILD_PREFIX` 仍然用得上。
+- 影响：Task 6 的主循环 C2 一条，以及测试 `test_auto_build_failure_lets_model_repair`（原来断言 `llm.calls[4]` 里有 `tool_call_id == "auto-build-1"` 的 tool 消息，改为断言里面有一条以 `AUTO_BUILD_NOTE + "\n"` 开头的 user 消息）。计划文档里这两处已同步修改。用量字段名（`prompt_cache_hit_tokens`、`reasoning_tokens`）和设计文档第 4 节一致，Task 2 不受影响。

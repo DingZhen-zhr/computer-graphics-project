@@ -119,3 +119,13 @@
 
 - 用户在对话里提供了 key 并要求先用它测试；key 现在存在用户的 Windows 用户环境变量 `DEEPSEEK_API_KEY` 里，没有写进任何文件、配置、日志或提交。模型名按账号可用列表（`deepseek-flash`、`deepseek-v4-pro`）选了 `deepseek-flash`；`config.toml` 在 `.gitignore` 里。
 - 评测一次跑通，3 个任务全部成功，详见 `docs/results-v1.md`。提示词和速查表没有改动。
+
+## 1.1 版 Task 1：模型接口探测 —— 完成
+
+- 做了什么：`scripts/probe_llm.py`（6 个实验，外加 3d、5c~5e、6b 三组计划之外的补充）、`docs/llm-probe-output.txt`（原始输出）、`docs/llm-api-notes.md`（7 节，结论 (a)~(e) 逐条回答）。
+- 测试数量：没有新增（本任务是探测），全部测试保持 309 个。
+- 结论摘要：(a) 缓存命中取 `prompt_cache_hit_tokens`，与 `prompt_tokens_details.cached_tokens` 相等；(b) 思考取 `completion_tokens_details.reasoning_tokens`，关思考时整个 details 是 `null`；(c) 只有 `{"thinking": {"type": "disabled"}}` 能关思考（输出约为默认思考量的 17%），E2 要跑；(d) 程序补的 `build` 调用开着思考时被服务端 400 拒绝，只能用 `user_message` 写法，记为偏离 D6，计划里 Task 6 的相关描述已同步；(e) 3b、3c 都只命中系统提示词（4608），补充的 3d 证明追加约 300 token、间隔 10 秒以上后会被缓存。
+- 遇到的问题和处理：
+  1. 应用进程的环境里读不到 `DEEPSEEK_API_KEY`（应用启动时变量还没设），但用户级环境变量里有。探测命令里只在该命令的进程内把它从用户级环境变量读进 `$env:DEEPSEEK_API_KEY`，不打印、不写文件；探测脚本输出前会把 key 替换成 `<已隐藏>`。
+  2. 3a~3c 追加内容太少、间隔太短，回答不了"追加的历史能不能被缓存"；6 里思考只有十几个 token，分不清思考有没有计入输入。所以补了 3d（全新前缀、追加约 300 token、间隔 10/30 秒）和 6b（让模型想久一点，并对比放回 `reasoning_content` 与否），第一次运行的输出被带补充实验的第二次完整运行覆盖，提交的输出文件和提交的脚本一致。
+  3. 同一轮里思考会计入下一次输入，且放不放回 `reasoning_content` 数字一样（下一次 prompt 比上一次多出"上一次全部输出 + 16"），写进了笔记第 6 节。
