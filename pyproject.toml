@@ -1,0 +1,30 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "cad-agent"
+version = "0.1.0"
+description = "基于 SimpleCADAPI 的命令行 CAD 建模智能体（AICG Project 3）"
+requires-python = ">=3.10,<3.14"
+dependencies = [
+    "simplecadapi[editor,verify]==2.2.7",
+    "openai>=1.40",
+    "pyyaml>=6",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8"]
+
+[tool.setuptools.packages.find]
+include = ["cad_agent*"]
+exclude = ["tests*", "benchmarks*", "scripts*"]
+
+[tool.setuptools.package-data]
+cad_agent = ["agent/prompts/*.md"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = [
+    "sca: 需要 SCA 运行的较慢测试",
+]

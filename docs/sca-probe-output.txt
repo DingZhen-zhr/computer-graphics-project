@@ -1,0 +1,123 @@
+[环境] python=3.13.7 simplecadapi=?
+[1 运行] product=Part cells=['ran', 'ran', 'ran', 'ran', 'ran']
+[2 参数] type(w)=Var float(w)=60.0 float(a)=30.0 a.default=30.0
+[2 参数] scad.var 的 unit 写法: unit='deg' 可用；a.evaluate()=30.0
+[2 参数] unit='degree' 可用, evaluate()=1.0
+[2 参数] unit='degrees' 可用, evaluate()=1.0
+[2 参数] unit='rad' 可用, evaluate()=57.29577951308232
+[2 参数] unit='°' 可用, evaluate()=1.0
+[3 体积] body.get_volume()=16651.6815 期望=16651.6815
+[4 包围盒] inspect_shape_rbrepinspection.bounding_box=[-30.0, -18.0, 0.0, 30.0, 18.0, 8.0] (xmin,ymin,zmin,xmax,ymax,zmax)
+[4 包围盒] OCP Bnd_Box.Get()=(-30.0, -18.0, -0.0, 30.0, 18.0, 8.0) (带 1e-7 的缝隙)
+[4 包围盒] Solid 上有 bbox 方法吗: []
+[5 QL] CYLINDER 面数量=1
+[5 QL] 面: get_center()=(1.7763568394002505e-15, -2.1503773612885153e-16, 4.0) get_area()=251.3274 get_normal_at()=(1.0, -1.2246467991473532e-16, -0.0)
+[5 QL] 顶面(normal.z>=0.99) 1 个, center.z=8.000, normal=(0.0, 0.0, 1.0)
+[5 QL] 底面(normal.z<=-0.99) 1 个, center.z=0.000, normal=(-0.0, -0.0, -1.0)
+[5 QL] 全部面 7 个; geom.normal.z>=-1e9 命中 7 个（圆柱面也有 normal，所以按法向选面必须同时限定 PLANE）
+[5 QL] 边: 共 15 条 {'LINE': 13, 'CIRCLE': 2, 'ELLIPSE': 0, 'BSPLINE': 0}; get_length()=8.0000 get_center()=(-30.0, -18.0, 4.0)
+[5 QL] 圆边长度=[31.4159, 31.4159] (2*pi*5=31.4159)
+[6 属性] geom.radius: 命中 0 个面（0 表示这个属性不存在，查询不报错只是选不到）
+[6 属性] geom.diameter: 命中 0 个面（0 表示这个属性不存在，查询不报错只是选不到）
+[6 属性] geom.axis.z: 命中 0 个面（0 表示这个属性不存在，查询不报错只是选不到）
+[6 属性] geom.area: 命中 7 个面
+[6 属性] geom.center.x: 命中 7 个面
+[6 属性] geom.normal.x: 命中 7 个面
+[6 属性] geom.length (边): 命中 15 条边
+[7 有效性] 字段 valid=True counts={'solid': 1, 'shell': 1, 'face_occurrences': 7, 'edge_occurrences': 30, 'vertex_occurrences': 60, 'unique_faces': 7, 'unique_edges': 15, 'unique_vertices': 10, 'open_shell': 0, 'closed_shell': 1}
+[7 有效性] volume=16651.6815 surface_area=5950.2478 center_of_mass=[-8.39763904057053e-16, -1.2876679824219261e-16, 4.0]
+[7 有效性] surface_type_counts={'Plane': 6, 'Cylinder': 1} edge_type_counts={'Line': 13, 'Circle': 2}
+[7 有效性] 实体个数取 counts['solid']；面数取 counts['unique_faces']；边数取 counts['unique_edges']
+[附 点分类] (0,0,4) 孔中心 -> OUT；(20,0,4) 板内 -> IN；(100,0,4) -> OUT；(30,0,4) 侧面上 -> ON
+[附 距离] 圆柱面到 +x 侧面: IsDone=True Value()=25.000000 (期望 25)
+[附 夹角] 顶面与 +x 侧面法向夹角 = 90.0000° (期望 90)
+[8 截图] view='iso' 成功, 返回值是路径字符串, 文件大小=85251
+[8 截图] view=(30, 45) 成功, 返回值是路径字符串, 文件大小=62238
+[8 截图] view='auto' 成功, 返回值是路径字符串, 文件大小=74117
+[8 截图] 用 view='iso' 输出 view.png 大小=85251
+[9 STEP] capture(run.definition, pkg) + export_product_package_to_step(cap.package, step): 成功, STEP 大小=19630, 报告类型=ProductSTEPExportReport
+[10 报错定位] 异常 ZeroDivisionError: division by zero
+[10 报错定位] 帧: 文件=probe_sca.py 行号=181 函数=item10_traceback
+[10 报错定位] 帧: 文件=probe_common.py 行号=99 函数=run_nb
+[10 报错定位] 帧: 文件=runner.py 行号=178 函数=run_notebook
+[10 报错定位] 帧: 文件=runner.py 行号=386 函数=_with_timeout
+[10 报错定位] 帧: 文件=runner.py 行号=373 函数=work
+[10 报错定位] 帧: 文件=runner.py 行号=170 函数=run
+[10 报错定位] 帧: 文件=runner.py 行号=268 函数=_run
+[10 报错定位] 帧: 文件=runner.py 行号=406 函数=_execute
+[10 报错定位] 帧: 文件=script_runner.py 行号=266 函数=run
+[10 报错定位] 帧: 文件=__marimo__cell_11edcfd8-vblA_.py 行号=2 函数=<module>
+[10 报错定位] 按 __marimo__cell_ 帧 + linecache 找到的特征 slug='boom' 位置=__marimo__cell_11edcfd8-vblA_.py:2（期望 'boom'）
+[10 报错定位] 结论：帧文件不是 notebook 本身，行号是 cell 内部行号，不能用 cell_lines 对照；要用 linecache 读 cell 源码里的特征注释
+[11 文档位置] API 文档目录=C:\Users\18258\Desktop\计算机图形学\.venv\Lib\site-packages\simplecadapi\skill\resources\docs\skill\references\docs\api 存在=True md 文件数=358
+[11 文档位置] make_box_rsolid.md 存在=True；其他目录: ['api', 'core', 'guides', 'stdlib']
+[11 文档位置] ql 速查: C:\Users\18258\Desktop\计算机图形学\.venv\Lib\site-packages\simplecadapi\skill\resources\docs\skill\references\ql-playbook.md 存在=True
+[12 sca 命令] shutil.which('sca')=None
+[12 sca 命令] 与 python 同目录的 sca: C:\Users\18258\Desktop\计算机图形学\.venv\Scripts\sca.exe 存在=True
+[13 中文路径] 目录=C:\Users\18258\AppData\Local\Temp\cad-probe-h5xaixa9\中文目录
+[8 截图(中文目录)] view='iso' 成功, 返回值是路径字符串, 文件大小=85251
+[8 截图(中文目录)] view=(30, 45) 成功, 返回值是路径字符串, 文件大小=62238
+[8 截图(中文目录)] view='auto' 成功, 返回值是路径字符串, 文件大小=74117
+[8 截图(中文目录)] 用 view='iso' 输出 view.png 大小=85251
+[9 STEP(中文目录)] capture(run.definition, pkg) + export_product_package_to_step(cap.package, step): 成功, STEP 大小=19630, 报告类型=ProductSTEPExportReport
+[13 中文路径/运行 notebook 英文目录+中文文件名] 异常 ArtifactValidationError: path_invalid at /source_file/display_path: artifact paths must be ASCII
+[13 中文路径/运行 notebook 中文目录+英文文件名] run_notebook 成功
+
+==== basics ====
+[14 基本体/长方体(底面中心在原点)] bbox=[-30.0, -20.0, 0.0, 30.0, 20.0, 8.0] 与期望一致 体积=19200.0 面型={'Plane': 6} valid=True 实体数=1
+[14 基本体/长方体(角点在原点)] bbox=[0.0, 0.0, 0.0, 60.0, 40.0, 8.0] 与期望一致 体积=19200.0 面型={'Plane': 6} valid=True 实体数=1
+[14 基本体/圆柱(竖直)] bbox=[-5.0, -5.0, 0.0, 5.0, 5.0, 8.0] 与期望一致 体积=628.3185 面型={'Cylinder': 1, 'Plane': 2} valid=True 实体数=1
+[14 基本体/圆柱(沿x横放)] bbox=[0.0, -5.0, 0.0, 20.0, 5.0, 10.0] 与期望一致 体积=1570.7963 面型={'Cylinder': 1, 'Plane': 2} valid=True 实体数=1
+
+==== sketches ====
+[14 草图轮廓与拉伸/矩形] bbox=[-30.0, -20.0, 0.0, 30.0, 20.0, 8.0] 与期望一致 体积=19200.0 面型={'Plane': 6} valid=True 实体数=1
+[14 草图轮廓与拉伸/圆形] bbox=[-5.0, -5.0, 0.0, 5.0, 5.0, 8.0] 与期望一致 体积=628.3185 面型={'Cylinder': 1, 'Plane': 2} valid=True 实体数=1
+[14 多边形截面拉伸/XZ平面三角形,沿+y] bbox=[0.0, 0.0, 0.0, 40.0, 5.0, 30.0] 与期望一致 体积=3000.0 面型={'Plane': 5} valid=True 实体数=1
+[14 多边形截面拉伸/故意写成 normal=(0,1,0)(会有告警)] bbox=[0.0, 0.0, 0.0, 40.0, 5.0, 30.0] 与期望一致 体积=3000.0 面型={'Plane': 5} valid=True 实体数=1
+[14 多边形截面拉伸/用角度算顶点(math.tan)] bbox=[0.0, 0.0, 0.0, 40.0, 5.0, 85.780277] 体积=8578.0277 面型={'Plane': 5} valid=True 实体数=1
+[14 多边形截面拉伸/用float()包住Var再算] bbox=[0.0, 0.0, 0.0, 40.0, 5.0, 85.780277] 体积=8578.0277 面型={'Plane': 5} valid=True 实体数=1
+
+==== revolve ====
+[14 旋转体/截面在XZ平面绕z轴] bbox=[-50.0, -50.0, 0.0, 50.0, 50.0, 30.0] 与期望一致 体积=104850.6548 面型={'Plane': 3, 'Cylinder': 3} valid=True 实体数=1
+
+==== booleans_and_transforms ====
+[14 布尔/union_rsolid] bbox=[-30.0, -20.0, 0.0, 30.0, 20.0, 28.0] 与期望一致 体积=20770.7963 面型={'Plane': 7, 'Cylinder': 1} valid=True 实体数=1
+[14 布尔/cut_rsolid 一次减两个工具体] bbox=[-30.0, -20.0, 0.0, 30.0, 20.0, 8.0] 与期望一致 体积=17943.3629 面型={'Plane': 6, 'Cylinder': 2} valid=True 实体数=1
+[14 布尔/cut_rsolid 一次减两个工具体] 圆柱面个数=2（期望 2）
+[14 布尔/intersect_rsolid] bbox=[-10.0, -20.0, 0.0, 10.0, 20.0, 8.0] 与期望一致 体积=6400.0 面型={'Plane': 6} valid=True 实体数=1
+[14 移动/translate_shape] bbox=[-20.0, -20.0, 5.0, 40.0, 20.0, 13.0] 与期望一致 体积=19200.0 面型={'Plane': 6} valid=True 实体数=1
+[14 旋转/rotate_shape(angle 用普通数)] bbox=[-20.0, -30.0, 0.0, 20.0, 30.0, 8.0] 与期望一致 体积=19200.0 面型={'Plane': 6} valid=True 实体数=1
+[14 旋转/rotate_shape(angle 直接传 Var)] bbox=[-30.804704, -35.641599, 0.0, 30.804704, 35.641599, 8.0] 体积=19200.0 面型={'Plane': 6} valid=True 实体数=1
+
+==== patterns ====
+[14 阵列/radial_pattern_rsolidlist 后一次 cut] bbox=[-30.0, -20.0, 0.0, 30.0, 20.0, 8.0] 与期望一致 体积=15872.309 面型={'Plane': 10, 'Cylinder': 6} valid=True 实体数=1
+[14 阵列/radial] 圆柱面个数=6（期望 n_holes=6，说明阵列包含原件、总共 6 个）
+[14 阵列/linear_pattern_rsolidlist] bbox=[-30.0, -20.0, 0.0, 30.0, 20.0, 8.0] 与期望一致 体积=17315.0444 面型={'Plane': 6, 'Cylinder': 3} valid=True 实体数=1
+[14 阵列/linear] 圆柱面个数=3 中心 x=[-15.0, 0.0, 15.0]（期望 -15, 0, 15）
+[14 阵列/用循环生成工具体后一次 cut(range 用整数参数)] bbox=[-30.0, -20.0, 0.0, 30.0, 20.0, 8.0] 与期望一致 体积=16787.2568 面型={'Plane': 6, 'Cylinder': 6} valid=True 实体数=1
+[14 阵列/循环] 圆柱面个数=6（期望 6）
+
+==== fillet_chamfer_and_ql ====
+[14 圆角/fillet_rsolid(选顶面4条边)] bbox=[-30.0, -20.0, 0.0, 30.0, 20.0, 8.0] 体积=19031.3864 面型={'Plane': 6, 'Cylinder': 4} valid=True 实体数=1
+[14 圆角] 圆角后圆柱面个数=4（期望 0，圆角在平顶面四边上是柱面？见面型）
+[14 圆角/ql.prop 里的值直接用 Var 表达式 base_t - 0.1] bbox=[-30.0, -20.0, 0.0, 30.0, 20.0, 8.0] 体积=19031.3864 面型={'Plane': 6, 'Cylinder': 4} valid=True 实体数=1
+[14 圆角/ql.prop 里的值用 float(base_t) - 0.1] bbox=[-30.0, -20.0, 0.0, 30.0, 20.0, 8.0] 体积=19031.3864 面型={'Plane': 6, 'Cylinder': 4} valid=True 实体数=1
+[14 圆角/先 resolve 成列表再传入] bbox=[-30.0, -20.0, 0.0, 30.0, 20.0, 8.0] 体积=19031.3864 面型={'Plane': 6, 'Cylinder': 4} valid=True 实体数=1
+[14 倒角/chamfer_rsolid(选顶面4条边)] bbox=[-30.0, -20.0, 0.0, 30.0, 20.0, 8.0] 体积=19101.3333 面型={'Plane': 10} valid=True 实体数=1
+[14 圆角/竖直4条棱(LINE 且 center.z 在 4 附近)] bbox=[-30.0, -20.0, 0.0, 30.0, 20.0, 8.0] 体积=19138.1947 面型={'Plane': 6, 'Cylinder': 4} valid=True 实体数=1
+[14 QL/faces()/edges()/resolve] 长方体: ql.faces().resolve(b) -> 6 个, ql.edges().resolve(b) -> 12 条（resolve 返回 Python 列表）
+[14 QL/where/and_/prop] 顶面选择器 resolve -> 1 个；.exactly(1).resolve -> 1 个
+[14 QL/exactly 不满足时] SimpleCADError: "Operation: ql.face.resolve\nDocumentation: For full usage details, run help(ql.face.resolve).\nWhat happened: QL selector expected exactly 1 face(s), got 0\nMeasurements:\n- matched_count: 0\n- candidate_count: 6\n- expected_count: 1\nEvidence:\n- render view 'default': C:\\Users\\18258\\AppData\\Local\\Temp\\cad"
+[14 QL/order_by+take] 面积最大的平面: area=320.0
+[14 QL/or_] 顶面或底面 2 个
+[14 QL/not_] 非顶面 5 个
+
+==== errors ====
+[15 报错/选中0条边] 异常类型=simplecadapi.errors.SimpleCADError 信息原文="Operation: ql.edge.resolve\nDocumentation: For full usage details, run help(ql.edge.resolve).\nWhat happened: QL selector expected exactly 4 edge(s), got 0\nMeasurements:\n- matched_count: 0\n- candidate_count: 12\n- expected_count: 4\nEvidence:\n- render view 'default': C:\\Users\\18258\\AppData\\Local\\Temp\\cad-probe-cwd-7n71_yj3\\.simplecad\\diagnostics\\ql_edge_resolve-20261109-133139-944823.png (orange lines = matched entities; see inventory)\nPossible causes:\n- The predicate does not match the actual geometry values.\n- OCCT split one logical face into several at a seam after a boolean.\n- The selector was resolved against an older shape state.\nHow to fix:\n- No entity satisfies the full predicate; the near-miss inventory above lists what actually exists — align predicate values with those measured geometries.\n- Booleans and fillets re-split topology; re-derive the selector from the newest shape instead of reusing one resolved earlier.\n- Read the inventory: hit = matched, near_miss = what exists instead.\n- Re-derive selectors from the newest shape after topology-changing ops.\nInventory:\n- E1 [near_miss] line, length 8 mm\n- E2 [near_miss] line, length 40 mm\n- E3 [near_miss] line, length 8 mm\n- E4 [near_miss] line, length 40 mm\n- E5 [near_miss] line, length 8 mm\n- E6 [near_miss] line, length 40 mm\n- E7 [near_miss] line, length 8 mm\n- E8 [near_miss] line, length 40 mm"
+[15 报错/圆角半径过大(半径50 比板厚8大)] 异常类型=simplecadapi.errors.SimpleCADError 信息原文="Operation: fillet_rsolid\nSignature: fillet_rsolid(solid, edges, radius, *, result_tag=None, generated_faces_tag=None)\nDocumentation: For full usage details, run help(simplecadapi.fillet_rsolid).\nWhat happened: radius 50 mm meets or exceeds the 8 mm of face room between the failing edge and the opposite boundary of an adjacent face\nMeasurements:\n- radius: 50 mm\n- available_face_room: 8 mm\n- edge_start: (-30, 20, 8) mm\n- edge_end: (-30, -20, 8) mm\nEvidence:\n- render view 'default': C:\\Users\\18258\\AppData\\Local\\Temp\\cad-probe-cwd-7n71_yj3\\.simplecad\\diagnostics\\fillet_rsolid-20261109-133140-011761.png (orange line marks the failing edge; see measurements for its endpoints and the available face room)\nPossible causes:\n- The fillet radius is larger than the adjacent face can carry.\n- The selected edge runs along a narrow face.\nHow to fix:\n- Reduce the radius to below 8 mm (e.g. 7.6) and retry.\n- Or select a different edge with more room on its adjacent faces.\n- Use a positive fillet radius.\n- Select at least one valid edge or use a selector that resolves to edges.\n- If the kernel rejects the fillet, try a smaller radius or a simpler edge set.\nTechnical details: ValueError: Fillet failed: OCC build did not complete"
+[15 报错/cut 的工具体离主体很远(默认参数)] 没有报错, 结果 bbox=[-30.0, -20.0, 0.0, 30.0, 20.0, 8.0] 体积=19200.0 实体数=1
+[15 报错/cut 的工具体离主体很远(skip_non_intersecting=False)] 异常类型=simplecadapi.errors.SimpleCADError 信息原文="Operation: cut_rsolid\nSignature: cut_rsolid(*solids, skip_non_intersecting=True, tracking_policy='full')\nDocumentation: For full usage details, run help(simplecadapi.cut_rsolid).\nWhat happened: separated solids: operand 1 and operand 2 never touch; nearest detected gap is 668.8 mm (tolerance 0)\nMeasurements:\n- min_gap: 668.8 mm\n- closest_point_a: (30, 20, 0) mm\n- closest_point_b: (497.9, 497.9, 0) mm\n- closure_vector_a_to_b: (467.9, 477.9, 0) mm\nEvidence:\n- render view 'default': C:\\Users\\18258\\AppData\\Local\\Temp\\cad-probe-cwd-7n71_yj3\\.simplecad\\diagnostics\\cut_rsolid-20261109-133140-122742.png (operand 1 and operand 2; nearest gap 668.8 mm between the two closest points (see measurements))\nPossible causes:\n- The tool never reaches the base solid, so the cut removes nothing.\n- A placement/translation moved the tool away from the base solid.\nHow to fix:\n- Move the tool operand 2 by (467.9, 477.9, 0) (≥ 668.8 mm) so it reaches inside the base solid, or extend the tool across the gap.\n- Check the intended removal region: with this gap the cut is a no-op on the base solid.\n- Pass a valid base solid followed by valid tool solids.\n- Check whether the tool geometry actually intersects the base solid.\n- If the cut depends on earlier union results, verify those results first.\nTechnical details: ValueError: The cut tool solid does not intersect the current solid."
+[15 报错/union 两个不相连的实体] 异常类型=simplecadapi.errors.SimpleCADError 信息原文="Operation: union_rsolid\nSignature: union_rsolid(*solids, clean=True, glue=False, tol=None, tracking_policy='full')\nDocumentation: For full usage details, run help(simplecadapi.union_rsolid).\nWhat happened: separated solids: operand 1 and operand 2 never touch; nearest detected gap is 668.8 mm (tolerance 1e-05)\nMeasurements:\n- min_gap: 668.8 mm\n- closest_point_a: (30, 20, 0) mm\n- closest_point_b: (497.9, 497.9, 0) mm\n- closure_vector_a_to_b: (467.9, 477.9, 0) mm\nEvidence:\n- render view 'default': C:\\Users\\18258\\AppData\\Local\\Temp\\cad-probe-cwd-7n71_yj3\\.simplecad\\diagnostics\\union_rsolid-20261109-133140-241397.png (operand 1 and operand 2; nearest gap 668.8 mm between the two closest points (see measurements))\nPossible causes:\n- The operands are separated in space, so the union cannot produce exactly one solid.\n- A placement/translation moved one operand away from the other.\nHow to fix:\n- Move operand 2 by (467.9, 477.9, 0) (≥ 668.8 mm) so the operands touch, or extend one operand across the gap.\n- If the pieces are meant to stay separate, build an assembly (make_assembly_rassembly) instead of a single-solid union.\n- Pass only valid Solid objects or sequences of Solid objects.\n- For intended face contact, make the solids share a finite-area face and retry; no artificial overlap is required.\n- For a real small gap, pass an explicit tol only when approximating that gap is acceptable.\n- Do not expect glue or tol to turn point-, edge-, or tangent-only contact into a valid single s"
+[15 报错/参数名写错(base_wd)] 异常类型=builtins.NameError 信息原文="name 'base_wd' is not defined"
+[15 报错/关键字参数名写错(w= 而不是 width=)] 异常类型=builtins.TypeError 信息原文='make_box_rsolid(): incompatible function arguments. The following argument types are supported:\n    1. (width: float | Expr, height: float | Expr, depth: float | Expr, bottom_face_center: typing.Annotated[collections.abc.Sequence[float | Expr], "FixedSize(3)"] = (0, 0, 0), *, tag_prefix: str | None = None, result_tag: str | None = None, bottom_face_tag: str | None = None, top_face_tag: str | None = None, front_face_tag: str | None = None, back_face_tag: str | None = None, left_face_tag: str | None = None, right_face_tag: str | None = None) -> simplecadapi._cpp._native.Solid\n\nInvoked with: kwargs: w=Var(name=\'base_w\', default=60.0, comment=None, expr_id=\'var_9a7eb803dc4c8b1e\', tolerance=None, unit=Unit(symbol=\'mm\', dimension=Dimension(length=1, angle=0), scale_to_canonical=1.0), tolerance_unit=None), height=Var(name=\'base_d\', default=40.0, comment=None, expr_id=\'var_cef21c18b7525ab0\', tolerance=None, unit=Unit(symbol=\'mm\', dimension=Dimension(length=1, angle=0), scale_to_canonical=1.0), tolerance_unit=None), depth=Var(name=\'base_t\', default=8.0, comment=None, expr_id=\'var_7fd8db2c6b7ddf2f\', tolerance=None, unit=Unit(symbol=\'mm\', dimension=Dimension(length=1, angle=0), scale_to_canonical=1.0), tolerance_unit=None)'
+[15 报错/函数名写错] 异常类型=builtins.AttributeError 信息原文="module 'simplecadapi' has no attribute 'make_box'"
