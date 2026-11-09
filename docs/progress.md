@@ -27,3 +27,12 @@
   2. 除计划列出的检查外，还拦了：特征变量名与参数名/前面特征重名、slug 对应的变量名是保留名或 Python 关键字（`model`、`scad`、`if` 等）、语法错误（带行号和 slug）、顶层循环变量没有下划线。
   3. 输入推断用 `ast`，函数、lambda、推导式里的局部名字不算最外层赋值；没有参数时不生成参数 cell。
   4. notebook 末尾带标准的 `if __name__ == "__main__": app.run()`，方便直接 `python model.py`；`cell_lines` 的范围是从 `@app.cell` 到该 cell 的 `return` 行。
+
+## Task 4：检查项格式 —— 完成
+
+- 做了什么：`cad_agent/checks/__init__.py`、`cad_agent/checks/spec.py`（`CHECK_TYPES`、`Check`、`CheckResult`、`parse_checks`、`eval_expr`、`missing_coverage`、`CheckSpecError`，另有 `expr_names`）、`tests/test_check_spec.py`。
+- 测试数量：新增 37 个，全部测试 95 个全部通过。
+- 说明：
+  1. `Check.args` 里放各类型自己的字段（bbox: `axis`；count: `kind`、`where`；angle: `a`、`b`；点: `point`；distance: `a`、`b`），`expected`/`tol`/`op` 在 `Check` 自己的字段里。`volume` 的 `tol` 存的是相对容差（默认 0.01）。必做检查的 `type` 等于它自己的 id（`valid`、`single_solid`、`positive_volume`）。
+  2. 校验比计划更严的地方（都是为了让模型少走弯路）：`where` 的属性必须在已实测存在的 9 个里（`geom.radius` 这类不存在的属性在 SCA 里不会报错只是选不到，见笔记第 5 节）；出现不认识的字段会报错并列出可用字段；`bbox/angle/volume` 写了非 `==` 的 `op` 会报错。共用 schema 里有、但对该类型无关的字段（如 bbox 上的 `kind`）直接忽略。
+  3. 表达式乘方次数超过 100 会拒绝，防止 `9**9**9` 卡死。
