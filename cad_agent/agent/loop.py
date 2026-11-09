@@ -2,21 +2,24 @@
 
 一条用户消息 = 一轮：反复调用模型和工具，直到模型不再调用工具、遇到要等用户的工具（提问、确认）、
 build 全部通过（程序自动交付）、或者触发失败上限。
+确定的步骤由程序代模型去做（automation.py 里是判定）：需求单整理完自动请确认、只改参数数值时自动重建、
+同一次回复里前面出错就跳过后面的 build。
 """
 
 from __future__ import annotations
 
 import json
 import re
-import tempfile
 import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
 
+from cad_agent.agent.automation import (AUTO_BUILD_NOTE, AUTO_BUILD_PREFIX, SKIPPED_BUILD_MESSAGE, brief_shape, has_error,
+                                        should_auto_build, should_auto_confirm)
 from cad_agent.agent.context import Context, with_warning
+from cad_agent.agent.delivery import delivery_text, export_version, failure_text
 from cad_agent.agent.state import load_system_prompt, render_snapshot
-from cad_agent.checks.spec import CheckResult
 from cad_agent.config import Config
 from cad_agent.llm.client import LLM, LLMError, LLMReply, ToolCall
 from cad_agent.notebook import NotebookError, render_notebook
@@ -86,10 +89,6 @@ def _raw_arguments(tc: ToolCall) -> str:
     return json.dumps(tc.arguments, ensure_ascii=False)
 
 
-def _fmt(v: float | None) -> str:
-    return "-" if v is None else f"{v:.4f}".rstrip("0").rstrip(".")
-
-
 class Agent:
     def __init__(self, llm: LLM, toolbox: ToolBox, session: Session, config: Config) -> None:
         self.llm, self.toolbox, self.session, self.config = llm, toolbox, session, config
@@ -97,6 +96,7 @@ class Agent:
         self.system_prompt = load_system_prompt()
         self.context = Context(self.system_prompt)  # 发给模型的消息：旧轮折叠，本轮开头一张快照，轮内只追加
         self._pending_changes: list[str] = []  # 上次交付以来需求单的变化行
+        self._auto_builds = 0                  # 程序自动重建的次数，给日志里的 id 编号
 
     @property
     def ws(self) -> Workspace:
@@ -142,18 +142,53 @@ class Agent:
 
     # ---------------------------------------------------------------- 工具
     def _run_tools(self, reply: LLMReply, c: _Counters) -> AgentTurn | None:
+        before = brief_shape(self.ws.brief)
+        calls: list[tuple[str, bool]] = []
+        errored = False
         for tc in reply.tool_calls:
             c.tool_calls += 1
             started = time.monotonic()
-            outcome = self.toolbox.call(tc.name, tc.arguments)
+            skipped = tc.name == "build" and errored  # C3：同一次回复里前面的调用出错了，这个 build 不运行
+            outcome = ToolOutcome(SKIPPED_BUILD_MESSAGE) if skipped else self.toolbox.call(tc.name, tc.arguments)
+            ok = not has_error(outcome.content)
+            errored = errored or not ok
+            calls.append((tc.name, ok))
             sent = with_warning(outcome.content, self.config.max_tool_calls - c.tool_calls)
             self.context.append({"role": "tool", "tool_call_id": tc.id, "content": sent})
+            extra = {"skipped": True} if skipped else {}
             self.session.log("tool", name=tc.name, args=tc.arguments, content=sent, end_turn=outcome.end_turn,
-                             deliverable=outcome.deliverable, duration_s=round(time.monotonic() - started, 3))
+                             deliverable=outcome.deliverable, duration_s=round(time.monotonic() - started, 3), **extra)
             ended = self._after_tool(tc, outcome, reply, c)
             if ended is not None:
                 return ended  # 本轮结束时整轮都折叠掉，本次回复里后面没执行的调用不会再发给模型
+        return self._after_reply(reply, calls, before, c)
+
+    def _after_reply(self, reply: LLMReply, calls: list[tuple[str, bool]], before, c: _Counters) -> AgentTurn | None:
+        """一次回复里的工具全部执行完、本轮还没结束时：程序代模型按按钮（C1 自动请确认、C2 自动重建）。"""
+        if should_auto_confirm(self.ws, calls):
+            outcome = self.toolbox.call("request_confirmation", {})
+            if not has_error(outcome.content):
+                self.session.log("auto", action="request_confirmation")
+                lead = reply.content.strip() + "\n\n" if reply.content.strip() else ""
+                return self._end("confirm", lead + self.ws.brief.render_text(), c)
+        elif should_auto_build(self.ws, calls, before):
+            return self._auto_build(reply, c)
         return None
+
+    def _auto_build(self, reply: LLMReply, c: _Counters) -> AgentTurn | None:
+        """C2：只改了已有参数的数值，程序替模型 build 一次；之后和模型自己调用 build 完全一样处理。"""
+        self._auto_builds += 1
+        call_id = f"{AUTO_BUILD_PREFIX}{self._auto_builds}"
+        self.session.log("auto", action="build", id=call_id)
+        c.tool_calls += 1
+        started = time.monotonic()
+        outcome = self.toolbox.call("build", {})
+        sent = with_warning(outcome.content, self.config.max_tool_calls - c.tool_calls)
+        # 服务端不接受程序补的 tool_call（偏离 D6），所以结果用一条 user 消息交给模型
+        self.context.append({"role": "user", "content": AUTO_BUILD_NOTE + "\n" + sent})
+        self.session.log("tool", name="build", args={}, content=sent, end_turn=False, deliverable=outcome.deliverable,
+                         duration_s=round(time.monotonic() - started, 3), auto=True)
+        return self._after_tool(ToolCall(call_id, "build", {}), outcome, reply, c)
 
     def _after_tool(self, tc: ToolCall, outcome: ToolOutcome, reply: LLMReply, c: _Counters) -> AgentTurn | None:
         if tc.name == "update_brief":  # 工具返回的 content 一定是 JSON；出错时是 {"error": ...}，没有 changes
@@ -163,7 +198,7 @@ class Agent:
             if outcome.deliverable:
                 return self._deliver(c)
             if self.toolbox.build_failures >= self.config.max_build_failures:
-                return self._end("failed", self._failure_text(outcome), c)
+                return self._end("failed", failure_text(self.toolbox, outcome), c)
         if outcome.end_turn:
             lead = reply.content.strip() + "\n\n" if reply.content.strip() else ""
             if outcome.kind == "question":
@@ -187,51 +222,15 @@ class Agent:
             duration_s=round(outcome.build.duration_s, 3),
         )
 
-    # ---------------------------------------------------------------- 失败与交付
-    def _failure_text(self, outcome: ToolOutcome) -> str:
-        run = outcome.build
-        lines = [f"建模已经连续没通过 {self.toolbox.build_failures} 次，我先停下来，免得越改越乱。最后一次的问题："]
-        if run.error:
-            where = f"特征 {run.error['cell']}" if run.error.get("cell") else "不在某个具体特征里"
-            lines.append(f"- {where}（{run.error['type']}）：{run.error['message']}")
-        failed = [r for r in run.checks if not r.passed]
-        lines += [f"- 检查 {r.id} 没通过：{r.detail}" for r in failed[:3]]
-        missing = json.loads(outcome.content)["missing_coverage"]
-        if missing:
-            lines.append(f"- 这些你给的参数还没有对应的检查：{'、'.join(missing)}")
-        lines.append("你可以告诉我怎么调整（比如换个做法、放宽某个要求），或者说「继续」让我再试。")
-        return "\n".join(lines)
-
+    # ---------------------------------------------------------------- 交付
     def _deliver(self, c: _Counters) -> AgentTurn:
-        ws = self.ws
-        rendered = render_notebook(ws.brief.params, ws.features.items)
-        with tempfile.TemporaryDirectory(prefix="cad-agent-out-") as tmp:
-            out = Path(tmp)
-            result = self.toolbox.run_job(
-                rendered, ws.checks_raw, set(ws.brief.param_values()), mode="build",
-                export_step=out / "model.step", render_png=out / "view.png",
-                timeout_s=self.toolbox.timeout_s, secret_names=self.toolbox.secret_names,
-            )
-            if not result.ok or result.step_path is None or result.png_path is None:
-                why = result.error["message"] if result.error else "检查没有全部通过或没有生成导出文件"
-                return self._end("failed", f"检查已经通过，但交付时导出出了问题：{why}", c)
-            version = self.session.new_version(
-                notebook_text=rendered.text, brief=ws.brief, check_results=result.checks, changes=self._pending_changes,
-                step_src=result.step_path, png_src=result.png_path,
-            )
+        exported = export_version(self.toolbox, self.session, self._pending_changes)
+        if isinstance(exported, str):
+            return self._end("failed", exported, c)
+        version, checks = exported
         changes, self._pending_changes = self._pending_changes, []
-        return self._end("delivered", self._delivery_text(version, result.checks, changes), c, version_dir=version)
-
-    def _delivery_text(self, version: Path, checks: list[CheckResult], changes: list[str]) -> str:
-        repairs = self.toolbox.build_failures
-        head = f"已交付 {version.name}" + (f"（建模中自动修复了 {repairs} 次）" if repairs else "") + "。"
-        rows = ["| 检查 | 结果 | 实测 | 期望 |", "|---|---|---|---|"]
-        rows += [f"| {r.id} | {'通过' if r.passed else '没通过'} | {_fmt(r.measured)} | {_fmt(r.expected)} |" for r in checks]
-        lines = [head, f"检查结果（共 {len(checks)} 项，全部通过）：", *rows]
-        if changes:
-            lines.append("本版变化：" + "；".join(changes))
-        lines += [f"截图：{version / 'view.png'}", f"STEP：{version / 'model.step'}"]
-        return "\n".join(lines)
+        text = delivery_text(version, checks, changes, self.toolbox.build_failures)
+        return self._end("delivered", text, c, version_dir=version)
 
     # ---------------------------------------------------------------- 结束一轮
     def _save(self) -> None:

@@ -202,7 +202,7 @@ class ToolBox:
         ws.last_run = run
         missing = sorted(missing_coverage(checks, ws.brief.user_param_names()))
         deliverable = run.ok and not missing
-        if not deliverable:
+        if not run.ok:  # C4：几何没出错、检查都通过、只是缺检查，不算失败（hint 里提醒补检查）
             self.build_failures += 1
         error = _error_for_model(run.error) if run.error else None
         failed = [

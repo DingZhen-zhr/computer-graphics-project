@@ -260,8 +260,16 @@ def test_failures_counted_and_reset():
     assert tb.build_failures == 0
 
 
-def test_coverage_gap_counts_as_failure():
-    tb, *_ = make_box(checks=[PHONE_W])
+def test_coverage_gap_does_not_count_as_failure():
+    tb, ws, stub = make_box(checks=[PHONE_W])
+    out = tb.call("build", {})
+    body = j(out)
+    assert not out.deliverable and body["passed"] is False and body["missing_coverage"] == ["tilt_deg"]
+    assert tb.build_failures == 0 and body["failures_left"] == 3
+
+
+def test_real_failures_still_count_when_coverage_is_also_missing():
+    tb, ws, _ = make_box(result=good_result(ok=False, error={"cell": "base", "type": "E", "message": "m"}), checks=[PHONE_W])
     tb.call("build", {})
     assert tb.build_failures == 1
 

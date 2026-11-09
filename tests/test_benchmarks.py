@@ -179,12 +179,10 @@ DEMO = {
 CHANGE = scripted_call("update_brief", {"set_params": [{"name": "tilt_deg", "value": 70, "unit": "deg", "source": "user", "note": "角度"}]})
 FULL_SCRIPT = [
     scripted_call("update_brief", {"part": {"name": "板"}, "set_params": USER_PARAMS, "features": ["板"]}),
-    scripted_call("request_confirmation", {}),
     scripted_call("upsert_feature", {"slug": "base", "role": "build", "code": BOX}),
     scripted_call("set_checks", {"checks": [PHONE_W, TILT]}),
     scripted_call("build", {}),
     CHANGE,
-    scripted_call("build", {}),
 ]
 
 
@@ -206,7 +204,7 @@ def test_run_task_with_fakes(tmp_path):
     assert set(result) >= {"task", "success", "stages", "repairs", "duration_s", "llm_calls", "tokens", "user_turns"}
     assert result["task"] == "demo" and result["success"] is True
     assert [s["stage"] for s in result["stages"]] == ["after_initial", "after_mod_1"] and all(s["delivered"] for s in result["stages"])
-    assert result["user_turns"] == 3 and result["llm_calls"] == 7 and result["repairs"] == 0
+    assert result["user_turns"] == 3 and result["llm_calls"] == 5 and result["repairs"] == 0
     assert result["sim_llm_calls"] == 1 and result["sim_tokens"] == 3 and result["duration_s"] >= 0
     first = result["stages"][0]["acceptance"][0]
     assert first["id"] == "w" and first["expected"] == 78 and first["measured"] == 78 and first["deviation"] == 0 and first["passed"] is True
@@ -259,7 +257,7 @@ def test_run_task_counts_repairs(tmp_path):
             return super().__call__(rendered, checks_raw, param_names, **kw)
 
     runner = Flaky()
-    script = [*FULL_SCRIPT[:5], scripted_call("build", {}), *FULL_SCRIPT[5:]]
+    script = [*FULL_SCRIPT[:4], scripted_call("build", {}), *FULL_SCRIPT[4:]]
     result = run_task(DEMO, agent_factory(script, runner), sim("确认"), tmp_path / "t", run_job=runner)
     assert result["success"] is True and result["repairs"] == 1
 

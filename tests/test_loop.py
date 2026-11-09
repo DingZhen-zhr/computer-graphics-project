@@ -3,6 +3,7 @@ from pathlib import Path
 
 import pytest
 
+from cad_agent.agent.automation import AUTO_BUILD_NOTE, SKIPPED_BUILD_MESSAGE
 from cad_agent.agent.loop import AFFIRMATIVE, Agent, AgentTurn, is_affirmative
 from cad_agent.brief import Brief
 from cad_agent.config import Config
@@ -67,10 +68,10 @@ def test_plain_reply(tmp_path):
 
 
 def test_confirmation_then_delivery(tmp_path):
-    agent, ws, llm, runner, session = make_agent(tmp_path, [FIRST_REQUEST, scripted_call("request_confirmation", {}), UPSERT, SET_CHECKS, BUILD],
-                                                 confirmed=False)
+    agent, ws, llm, runner, session = make_agent(tmp_path, [FIRST_REQUEST, UPSERT, SET_CHECKS, BUILD], confirmed=False)
     turn1 = agent.handle_user("做一个支架")
     assert turn1.kind == "confirm" and "【需求单】" in turn1.text and "phone_w" in turn1.text
+    assert turn1.llm_calls == 1
     assert ws.awaiting_confirmation and not ws.brief.confirmed
     turn2 = agent.handle_user("确认")
     assert turn2.kind == "delivered" and turn2.repairs == 0 and turn2.llm_calls == 3
@@ -80,14 +81,14 @@ def test_confirmation_then_delivery(tmp_path):
     assert sorted(p.name for p in v1.iterdir()) == ["brief.json", "changes.md", "checks.json", "model.py", "model.step", "view.png"]
     assert str(v1 / "view.png") in turn2.text and "width" in turn2.text and "通过" in turn2.text and "v1" in turn2.text
     assert (session.dir / "brief.json").exists() and (session.dir / "model.py").exists()
-    assert llm.calls[2][-1]["content"].endswith("【用户说】\n（用户已确认需求单）")
+    assert llm.calls[1][-1]["content"].endswith("【用户说】\n（用户已确认需求单）")
     export_call = [c for c in runner.calls if c.get("export_step") is not None]
     assert len(export_call) == 1 and export_call[0]["render_png"] is not None
 
 
 def test_mixed_confirmation_not_accepted(tmp_path):
     reply = LLMReply("好，角度改成 70。", [], {})
-    agent, ws, llm, *_ = make_agent(tmp_path, [FIRST_REQUEST, scripted_call("request_confirmation", {}), reply], confirmed=False)
+    agent, ws, llm, *_ = make_agent(tmp_path, [FIRST_REQUEST, reply], confirmed=False)
     agent.handle_user("做一个支架")
     turn = agent.handle_user("可以，但角度改成70")
     assert not ws.brief.confirmed and not ws.awaiting_confirmation
@@ -96,7 +97,7 @@ def test_mixed_confirmation_not_accepted(tmp_path):
 
 
 def test_non_affirmative_answer_still_clears_waiting_flag(tmp_path):
-    agent, ws, *_ = make_agent(tmp_path, [FIRST_REQUEST, scripted_call("request_confirmation", {}), LLMReply("好", [], {})], confirmed=False)
+    agent, ws, *_ = make_agent(tmp_path, [FIRST_REQUEST, LLMReply("好", [], {})], confirmed=False)
     agent.handle_user("做一个支架")
     assert ws.awaiting_confirmation
     agent.handle_user("等等")
@@ -211,10 +212,10 @@ def deliver_v1(tmp_path, extra_replies, runner=None):
 
 def test_modification_keeps_old_checks(tmp_path):
     change = scripted_call("update_brief", {"set_params": [{"name": "tilt_deg", "value": 70, "unit": "deg", "source": "user", "note": "支撑角度"}]})
-    agent, ws, llm, runner, session = deliver_v1(tmp_path, [change, BUILD])
+    agent, ws, llm, runner, session = deliver_v1(tmp_path, [change])
     checks_before = list(ws.checks_raw)
     turn = agent.handle_user("支撑角度改成 70 度")
-    assert turn.kind == "delivered" and turn.version_dir.name == "v2"
+    assert turn.kind == "delivered" and turn.version_dir.name == "v2" and turn.llm_calls == 1
     assert ws.checks_raw == checks_before == [PHONE_W, TILT]
     changes = (turn.version_dir / "changes.md").read_text(encoding="utf-8")
     assert "→" in changes and "65 → 70" in changes
@@ -224,11 +225,127 @@ def test_modification_keeps_old_checks(tmp_path):
 
 def test_suggested_change_after_delivery_requires_reconfirmation(tmp_path):
     change = scripted_call("update_brief", {"set_params": [{"name": "lip_h", "value": 15, "unit": "mm", "source": "suggested", "note": "托唇"}]})
-    blocked = scripted_call("build", {})
-    agent, ws, llm, runner, session = deliver_v1(tmp_path, [change, blocked, LLMReply("需要你确认新增的托唇", [], {})])
+    agent, ws, llm, runner, session = deliver_v1(tmp_path, [change])
     turn = agent.handle_user("加个托唇")
-    assert turn.kind == "reply" and not ws.brief.confirmed
-    assert "需求单" in llm.calls[-1][-1]["content"]  # build 被挡住，模型看到的是“需求单未确认”
+    assert turn.kind == "confirm" and not ws.brief.confirmed and ws.awaiting_confirmation and turn.llm_calls == 1
+
+
+CHANGE = scripted_call("update_brief", {"set_params": [{"name": "tilt_deg", "value": 70, "unit": "deg", "source": "user", "note": "支撑角度"}]})
+
+
+def auto_rows(session: Session, action: str) -> list[dict]:
+    return [r for r in log_rows(session) if r["kind"] == "auto" and r["action"] == action]
+
+
+def test_auto_confirm_after_update_brief(tmp_path):
+    agent, ws, llm, runner, session = make_agent(tmp_path, [FIRST_REQUEST], confirmed=False)
+    turn = agent.handle_user("做一个支架")
+    assert turn.kind == "confirm" and turn.llm_calls == 1 and ws.awaiting_confirmation and "【需求单】" in turn.text
+    assert len(auto_rows(session, "request_confirmation")) == 1
+    assert [r["kind"] for r in log_rows(session)][-1] == "confirm"
+
+
+def test_auto_confirm_keeps_the_models_lead_text(tmp_path):
+    first = scripted_call("update_brief", {"set_params": USER_PARAMS, "features": ["底座"]}, "我先整理了一份需求单")
+    agent, *_ = make_agent(tmp_path, [first], confirmed=False)
+    turn = agent.handle_user("做一个支架")
+    assert turn.text.startswith("我先整理了一份需求单\n\n") and "【需求单】" in turn.text
+
+
+def test_no_auto_confirm_with_open_questions(tmp_path):
+    first = scripted_call("update_brief", {"set_params": USER_PARAMS, "open_questions": ["手机多厚？"]})
+    agent, ws, llm, runner, session = make_agent(tmp_path, [first, LLMReply("我想先问你手机多厚", [], {})], confirmed=False)
+    turn = agent.handle_user("做一个支架")
+    assert turn.kind == "reply" and turn.llm_calls == 2 and not ws.awaiting_confirmation
+    assert auto_rows(session, "request_confirmation") == []
+
+
+def test_update_and_ask_in_one_reply_asks(tmp_path):
+    both = scripted_call("update_brief", {"set_params": USER_PARAMS, "open_questions": ["手机多厚？"]}, "", ("ask_user", {"questions": ["手机多厚？"]}))
+    agent, ws, llm, runner, session = make_agent(tmp_path, [both], confirmed=False)
+    turn = agent.handle_user("做一个支架")
+    assert turn.kind == "question" and turn.llm_calls == 1 and auto_rows(session, "request_confirmation") == []
+
+
+def test_auto_build_after_param_value_change(tmp_path):
+    agent, ws, llm, runner, session = deliver_v1(tmp_path, [CHANGE])
+    turn = agent.handle_user("支撑角度改成 70 度")
+    assert turn.kind == "delivered" and turn.version_dir.name == "v2" and turn.llm_calls == 1
+    rows = auto_rows(session, "build")
+    assert len(rows) == 1 and rows[0]["id"] == "auto-build-1"
+
+
+def test_auto_build_failure_lets_model_repair(tmp_path):
+    runner = Runner(good_result(), bad_result("e"), good_result())
+    agent, ws, llm, runner, session = deliver_v1(tmp_path, [CHANGE, UPSERT, BUILD], runner=runner)
+    turn = agent.handle_user("改成 70 度")
+    assert turn.kind == "delivered" and turn.repairs == 1
+    # 服务端不接受程序补的 tool_call（偏离 D6），所以自动 build 的结果用一条 user 消息交给模型
+    notes = [m for m in llm.calls[4] if m["role"] == "user" and m["content"].startswith(AUTO_BUILD_NOTE + "\n")]
+    assert len(notes) == 1 and '"passed": false' in notes[0]["content"] and "e" in notes[0]["content"]
+    assert llm.calls[4][-1] == notes[0]
+    assert not any(m["role"] == "tool" and m.get("tool_call_id", "").startswith("auto-build-") for m in llm.calls[4])
+
+
+def test_auto_build_numbers_increase_within_one_agent(tmp_path):
+    agent, ws, llm, runner, session = deliver_v1(tmp_path, [CHANGE])
+    agent.handle_user("改成 70 度")
+    later = scripted_call("update_brief", {"set_params": [{"name": "tilt_deg", "value": 60, "unit": "deg", "source": "user", "note": "支撑角度"}]})
+    llm.replies.append(later)
+    assert agent.handle_user("再改成 60 度").kind == "delivered"
+    assert [r["id"] for r in auto_rows(session, "build")] == ["auto-build-1", "auto-build-2"]
+
+
+def test_no_auto_build_when_param_added(tmp_path):
+    extra = scripted_call("update_brief", {"set_params": [{"name": "wall", "value": 3, "unit": "mm", "source": "user", "note": "壁厚"}]})
+    agent, ws, llm, runner, session = deliver_v1(tmp_path, [extra, LLMReply("还需要补一条壁厚的检查", [], {})])
+    turn = agent.handle_user("加一个壁厚 3 mm")
+    assert turn.kind == "reply" and turn.llm_calls == 2 and [v.name for v in session.versions()] == ["v1"]
+    assert auto_rows(session, "build") == []
+
+
+def test_no_auto_build_when_nothing_changed(tmp_path):
+    same = scripted_call("update_brief", {"set_params": [{"name": "tilt_deg", "value": 65, "unit": "deg", "source": "user", "note": "支撑角度"}]})
+    agent, ws, llm, runner, session = deliver_v1(tmp_path, [same, LLMReply("角度本来就是 65 度", [], {})])
+    turn = agent.handle_user("角度是 65 度")
+    assert turn.kind == "reply" and [v.name for v in session.versions()] == ["v1"] and auto_rows(session, "build") == []
+
+
+def test_build_skipped_after_error_in_same_reply(tmp_path):
+    bad_then_build = scripted_call("upsert_feature", {"slug": "base", "role": "build", "code": "import os\nbase = 1"}, "", ("build", {}))
+    agent, ws, llm, runner, session = make_agent(tmp_path, [bad_then_build, LLMReply("我改一下", [], {})])
+    turn = agent.handle_user("开始建模")
+    assert turn.kind == "reply" and runner.calls == [] and agent.toolbox.build_failures == 0
+    tools = [m for m in llm.calls[1] if m["role"] == "tool"]
+    assert [m["tool_call_id"] for m in tools] == ["call_1", "call_2"]
+    skipped = json.loads(tools[1]["content"])
+    skipped.pop("warning", None)
+    assert skipped == json.loads(SKIPPED_BUILD_MESSAGE)
+    assert [r.get("skipped") for r in log_rows(session) if r["kind"] == "tool"] == [None, True]
+    assert [r for r in log_rows(session) if r["kind"] == "build"] == []
+
+
+def test_skipped_build_still_counts_as_a_tool_call(tmp_path):
+    bad_then_build = scripted_call("upsert_feature", {"slug": "base", "role": "build", "code": "import os\nbase = 1"}, "", ("build", {}))
+    agent, ws, llm, runner, session = make_agent(tmp_path, [bad_then_build], max_tool_calls=2)
+    turn = agent.handle_user("开始建模")
+    assert turn.kind == "failed" and "上限" in turn.text
+
+
+def test_build_in_same_reply_blocked_then_auto_confirm(tmp_path):
+    change = scripted_call("update_brief", {"set_params": [{"name": "lip_h", "value": 15, "unit": "mm", "source": "suggested", "note": "托唇"}]},
+                           "", ("build", {}))
+    agent, ws, llm, runner, session = deliver_v1(tmp_path, [change])
+    turn = agent.handle_user("加个托唇")
+    assert turn.kind == "confirm" and turn.llm_calls == 1 and ws.awaiting_confirmation and not ws.brief.confirmed
+
+
+def test_coverage_gap_build_does_not_end_the_turn(tmp_path):
+    only_width = scripted_call("set_checks", {"checks": [PHONE_W]})
+    runner = Runner(good_result())
+    agent, ws, llm, runner, session = make_agent(tmp_path, [UPSERT, only_width, BUILD, SET_CHECKS, BUILD], runner=runner)
+    turn = agent.handle_user("开始建模")
+    assert turn.kind == "delivered" and turn.repairs == 0   # 缺检查不算失败
 
 
 def last_user(call: list[dict]) -> dict:
@@ -373,7 +490,7 @@ def test_real_build_end_to_end(tmp_path):
         {"id": "bore-empty", "type": "point_outside", "point": [0, 0, "t / 2"]},
     ]})
     ws = Workspace(Brief(), FeatureList(), [])
-    llm = ScriptedLLM([brief, scripted_call("request_confirmation", {}), plate, hole, checks, BUILD])
+    llm = ScriptedLLM([brief, plate, hole, checks, BUILD])
     agent = Agent(llm, ToolBox(ws, run_job=run_job, timeout_s=60), Session(tmp_path / "sessions"), CONFIG)
     assert agent.handle_user("做一块带孔的板").kind == "confirm"
     turn = agent.handle_user("确认")
