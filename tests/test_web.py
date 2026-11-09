@@ -357,3 +357,93 @@ def test_build_live_agent_uses_a_live_session(monkeypatch, tmp_path):
     assert isinstance(session, LiveSession) and agent.session is session and agent.modeling_llm is not None
     first = (session.dir / "log.jsonl").read_text(encoding="utf-8").splitlines()[0]
     assert json.loads(first)["kind"] == "startup" and "test-key-not-real" not in first
+
+
+# ---------------------------------------------------------------- 页面
+
+STATIC = Path(__file__).resolve().parent.parent / "cad_agent" / "web" / "static"
+VENDOR = STATIC / "vendor" / "three"
+ROOT = Path(__file__).resolve().parent.parent
+
+
+def test_static_files_offline_ready():
+    for name in ("three.module.js", "OrbitControls.js", "STLLoader.js", "LICENSE"):
+        assert (VENDOR / name).is_file() and (VENDOR / name).stat().st_size > 0, name
+    assert "REVISION = '160'" in (VENDOR / "three.module.js").read_text(encoding="utf-8")   # 固定的版本
+    assert "MIT License" in (VENDOR / "LICENSE").read_text(encoding="utf-8")
+    files = [p for p in STATIC.rglob("*") if p.is_file()]
+    assert {p.name for p in files} >= {"index.html", "style.css", "app.js", "viewer.js"}
+    for path in files:
+        text = path.read_text(encoding="utf-8")
+        for bad in ("fonts.googleapis", "fonts.gstatic", "cdn.jsdelivr", "unpkg"):
+            assert bad not in text, (path.name, bad)
+    html = (STATIC / "index.html").read_text(encoding="utf-8")
+    assert '<script type="importmap">' in html and "/static/vendor/three/three.module.js" in html
+    for title in ("01 模型", "02 检查", "03 需求单", "04 版本"):
+        assert title in html, title
+    assert 'lang="zh-CN"' in html and "viewport" in html
+
+
+def test_stylesheet_follows_the_visual_spec():
+    css = (STATIC / "style.css").read_text(encoding="utf-8")
+    for token in ("--bg: #FFFFFF", "--surface: #F5F5F7", "--ink: #1D1D1F", "--ink-2: #6E6E73", "--hairline: #D2D2D7", "--accent: #0071E3",
+                  "--pass: #188038", "--fail: #D70015", "--warn: #B25000", "--mark: #E5322D"):
+        assert token in css, token
+    for needle in ("-apple-system", "PingFang SC", "Microsoft YaHei", "Cascadia Mono", "tabular-nums", "prefers-reduced-motion", "max-width: 1440px",
+                   "1100px", "700px", "focus-visible"):
+        assert needle in css, needle
+    assert "box-shadow" not in css.replace("inset", "")   # 不用阴影
+
+
+def test_index_served(tmp_path, serve):
+    server = serve(make_state(tmp_path, ScriptedLLM([])))
+    status, data = call(server, "GET", "/")
+    assert status == 200 and data.lstrip().lower().startswith(b"<!doctype html>") and "CAD 建模助手".encode() in data
+    conn = http.client.HTTPConnection("127.0.0.1", server.server_address[1], timeout=10)
+    conn.request("GET", "/")
+    resp = conn.getresponse()
+    resp.read()
+    assert resp.getheader("Content-Type").startswith("text/html")
+    conn.close()
+
+
+def test_static_files_are_served_with_the_right_types(tmp_path, serve):
+    server = serve(make_state(tmp_path, ScriptedLLM([])))
+    for path, kind in (("/static/style.css", "text/css"), ("/static/app.js", "text/javascript"), ("/static/viewer.js", "text/javascript"),
+                       ("/static/vendor/three/three.module.js", "text/javascript"), ("/static/vendor/three/OrbitControls.js", "text/javascript")):
+        conn = http.client.HTTPConnection("127.0.0.1", server.server_address[1], timeout=10)
+        conn.request("GET", path)
+        resp = conn.getresponse()
+        body = resp.read()
+        conn.close()
+        assert resp.status == 200 and resp.getheader("Content-Type").startswith(kind) and body, path
+
+
+def test_page_scripts_are_valid_modules():
+    import shutil
+    import subprocess
+
+    node = shutil.which("node")
+    if node is None:
+        pytest.skip("没有 node，不检查脚本语法")
+    scripts = sorted(STATIC.glob("*.js"))
+    assert {p.name for p in scripts} >= {"app.js", "viewer.js", "dom.js", "chat.js", "panels.js"}
+    for path in scripts:
+        result = subprocess.run([node, "--check", "--input-type=module"], input=path.read_text(encoding="utf-8"), capture_output=True, text=True,
+                                encoding="utf-8")
+        assert result.returncode == 0, (path.name, result.stderr[:500])
+
+
+def test_dom_helper_skips_empty_children():
+    # 目测时发现过：原生 el.append(null) 会写出文字 "null"，所以页面里往节点里加可能为空的东西，要用 dom.js 的 h/add
+    dom = (STATIC / "dom.js").read_text(encoding="utf-8")
+    assert "export function add(" in dom and "child === null" in dom and "child === undefined" in dom
+    chat = (STATIC / "chat.js").read_text(encoding="utf-8")
+    assert "add(body, meta(entry))" in chat
+
+
+def test_start_script_and_readme():
+    bat = (ROOT / "start_web.bat").read_text(encoding="utf-8")
+    assert "cd /d" in bat and "%~dp0" in bat and r".venv\Scripts\python -m cad_agent.web --config config.toml" in bat and "pause" in bat
+    readme = (ROOT / "README.md").read_text(encoding="utf-8")
+    assert "## 网页演示" in readme and "start_web.bat" in readme and "python -m cad_agent.web" in readme
