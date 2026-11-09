@@ -62,3 +62,13 @@
 - 做了什么：`cad_agent/session.py`（`Session`：`dir`、`log`、`save_state`、`new_version`、`versions`）、`tests/test_session.py`。
 - 测试数量：新增 8 个，全部测试 159 个全部通过。
 - 说明：目录名同一秒内重名时加 `-2`、`-3`（测试里用可替换的 `_now()` 固定时间来验证）；`log` 的中文不转义，路径等非 JSON 类型转成字符串；`new_version` 的编号取现有最大编号加 1（有 v10 时下一个是 v11）；没有参数变化时 `changes.md` 写“（需求单参数没有变化）”。
+
+## Task 8：配置与模型接口 —— 完成
+
+- 做了什么：`cad_agent/config.py`（`Config`、`ConfigError`、`load_config`）、`cad_agent/llm/__init__.py`、`llm/client.py`（`ToolCall`、`LLMReply`、`LLM`、`LLMError`、`OpenAICompatLLM`）、`llm/fake.py`（`ScriptedLLM`，另有测试辅助函数 `scripted_call`）、`config.example.toml`、`tests/test_config.py`、`tests/test_llm.py`。
+- 测试数量：新增 29 个，全部测试 188 个全部通过。
+- 说明：
+  1. 本机装到的是 openai 3.46.0，它底层用 `httpx2`（不是 `httpx`），所以测试里造请求/响应对象时优先导入 `httpx2`；生产代码只用 `openai` 自己的异常类，两种版本都能用。
+  2. 重试由 `OpenAICompatLLM` 自己做（SDK 自带的重试关掉）：网络断开、超时、429、5xx 重试，间隔 1 秒、2 秒，共 3 次调用；401/403 和其他 4xx 不重试，直接报错，信息里不含 API key。重试用完抛 `LLMError`，信息不带“模型调用失败”前缀（由 Task 10 的主循环加）。
+  3. `ScriptedLLM` 的脚本里除了回复，也可以放异常对象（轮到时抛出），Task 10 测试 `LLMError` 时要用；`calls` 记录的是 messages 的拷贝。
+  4. `load_config` 对未知的段、未知的项、类型错误、缺少 `base_url`/`model` 都给出中文信息；配置文件读写显式用 utf-8。

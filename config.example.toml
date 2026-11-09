@@ -1,0 +1,14 @@
+# 复制成 config.toml 再改（config.toml 已在 .gitignore 里，不会被提交）。
+# API key 不写在这里：只在环境变量里设置，变量名由 api_key_env 决定。
+
+[llm]
+base_url = "https://api.deepseek.com"   # OpenAI 兼容接口地址；换成 GLM、通义、Kimi 等只改这里和下面两项
+model = "deepseek-chat"
+api_key_env = "DEEPSEEK_API_KEY"        # 存放 key 的环境变量名
+temperature = 0.2
+
+[agent]
+run_timeout_s = 60        # 运行一次模型的超时（秒）
+max_build_failures = 3    # 每轮用户消息内建模失败的次数上限
+max_tool_calls = 40       # 每轮用户消息内工具调用的次数上限
+sessions_dir = "sessions" # 会话目录放哪里；路径含中文导致问题时改成纯英文路径
