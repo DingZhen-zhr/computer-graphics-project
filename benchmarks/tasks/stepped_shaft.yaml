@@ -1,0 +1,51 @@
+# 留出任务 2：阶梯轴。考查：旋转体（或圆柱叠加）、横向通孔的方向和位置、修改其中一段的直径。
+# 留出任务只用来测，不许为它们调提示词。
+# 验收检查依赖坐标约定：回转体的轴线就是 z 轴，底面贴 z=0，以原点为中心。
+id: stepped_shaft
+initial: "做一根阶梯轴"
+max_user_turns: 12
+
+hidden_spec: |
+  - 竖直放，轴线沿 z，从下往上三段：第一段直径 20、长 30；第二段直径 30、长 20；第三段直径 16、长 40；总长 90。
+  - 第二段正中（离底面 40 mm）有一个直径 6 的横向通孔，沿 y 方向穿透。
+  - 不要倒角、圆角、键槽。
+
+modifications:
+  - "最上面那段直径改成 18"
+
+# 三段在 z 方向：0~30（半径 10）、30~50（半径 15）、50~90（半径 8，改后半径 9）。
+# 横向通孔：轴线沿 y，中心在 z=40，半径 3，所以 x 在 -3~3、z 在 37~43 的范围里没有材料。
+# 点检查都落在离表面 0.5 mm 的地方，第三段改成直径 18 以后，只有第三段的两个点变了。
+acceptance:
+  after_initial:
+    - {id: size-x, type: bbox, axis: x, expected: 30, tol: 0.5}
+    - {id: size-y, type: bbox, axis: y, expected: 30, tol: 0.5}
+    - {id: size-z, type: bbox, axis: z, expected: 90, tol: 0.5}
+    # 在材料里：第一段、第二段、第三段、横孔旁边（x 方向）、横孔上方（离孔边 0.5 mm）
+    - {id: in-1, type: point_inside, point: [9.5, 0, 15]}
+    - {id: in-2, type: point_inside, point: [14.5, 0, 35]}
+    - {id: in-3, type: point_inside, point: [7.5, 0, 70]}
+    - {id: in-4, type: point_inside, point: [12, 0, 40]}
+    - {id: in-5, type: point_inside, point: [0, 0, 43.5]}
+    # 不在材料里：三段的外侧 0.5 mm、横孔里（轴线上）、横孔里靠 +y 一侧（说明孔是沿 y 穿透的）、横孔上沿内 0.5 mm
+    - {id: out-1, type: point_outside, point: [10.5, 0, 15]}
+    - {id: out-2, type: point_outside, point: [15.5, 0, 35]}
+    - {id: out-3, type: point_outside, point: [8.5, 0, 70]}
+    - {id: out-4, type: point_outside, point: [0, 0, 40]}
+    - {id: out-5, type: point_outside, point: [0, 14, 40]}
+    - {id: out-6, type: point_outside, point: [0, 0, 42.5]}
+  after_mod_1:
+    - {id: size-x, type: bbox, axis: x, expected: 30, tol: 0.5}
+    - {id: size-y, type: bbox, axis: y, expected: 30, tol: 0.5}
+    - {id: size-z, type: bbox, axis: z, expected: 90, tol: 0.5}
+    - {id: in-1, type: point_inside, point: [9.5, 0, 15]}
+    - {id: in-2, type: point_inside, point: [14.5, 0, 35]}
+    - {id: in-3, type: point_inside, point: [8.5, 0, 70]}
+    - {id: in-4, type: point_inside, point: [12, 0, 40]}
+    - {id: in-5, type: point_inside, point: [0, 0, 43.5]}
+    - {id: out-1, type: point_outside, point: [10.5, 0, 15]}
+    - {id: out-2, type: point_outside, point: [15.5, 0, 35]}
+    - {id: out-3, type: point_outside, point: [9.5, 0, 70]}
+    - {id: out-4, type: point_outside, point: [0, 0, 40]}
+    - {id: out-5, type: point_outside, point: [0, 14, 40]}
+    - {id: out-6, type: point_outside, point: [0, 0, 42.5]}

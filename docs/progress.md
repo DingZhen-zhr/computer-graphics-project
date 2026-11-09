@@ -191,3 +191,10 @@
 - 测试数量：没有新增，全部测试 434 个全部通过。
 - 偏离：新记 D8——系统提示词里自己写了两次"【当前状态】"，Task 5 新加的 `test_old_turns_are_compacted` 里"只有一处含 `【当前状态`"变成了 2 处；只改了这条自己新加的测试，改成数完整的快照标题，断言没放松。
 - 说明：这一版的系统提示词 + 速查表约 1.2 万字符。
+
+## 1.1 版 Task 10：两个留出任务 —— 完成
+
+- 做了什么：`benchmarks/tasks/enclosure.yaml`（电路板小盒：外形 80×50×30、壁厚/底厚 2、正面 USB 口；修改"壁厚改成 3 mm，底厚不变"）、`benchmarks/tasks/stepped_shaft.yaml`（阶梯轴：三段直径 20/30/16、第二段横向通孔 φ6；修改"最上面那段直径改成 18"）；验收数字逐个照设计文档第 8.2 节，bbox 三条 `size-x/y/z`（tol 0.5）、体积 `volume`（rel_tol 0.02，只有 enclosure 有）、点检查 `in-1…`/`out-1…`；YAML 注释里写了体积的手算过程（21968、28616）。`benchmarks/run.py` 的 `HOLDOUT_TASKS = ["enclosure", "stepped_shaft"]`。
+- 测试数量：新增 9 个（`test_benchmarks.py` 3 个：`test_holdout_tasks_load`、`test_enclosure_acceptance_numbers`、`test_stepped_shaft_acceptance_numbers`；`test_benchmark_references.py` 的两个参数化测试各加 4 + 2 项），全部测试 443 个全部通过。标准答案模型：enclosure 用外壳 + 内腔 + 穿过前墙的 USB 口三个特征，stepped_shaft 用三个圆柱叠加 + 沿 y 的横向通孔（`make_cylinder_rsolid` 的 `axis=(0, 1, 0)`），两个任务在初始和修改后两个阶段的验收都通过。
+- 旧模型（壁厚还是 2 / 顶段直径还是 16）对修改后的验收：enclosure 恰好卡在 `volume`、`in-2`、`in-3` 三项，stepped_shaft 恰好卡在 `in-3`，测试里按这个集合断言。
+- 说明：留出任务的 `max_user_turns` 是 12。先写测试再写 YAML：为了让数字测试真的先失败，写完 YAML 后临时把它们挪走跑了一遍红灯（3 个 benchmarks 测试 + 6 个 references 测试失败），再挪回来补上 `HOLDOUT_TASKS`。没有偏离。

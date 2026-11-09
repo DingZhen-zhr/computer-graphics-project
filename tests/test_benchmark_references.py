@@ -89,7 +89,45 @@ def l_bracket(hole_d: float):
     return render_notebook(params, features)
 
 
+def enclosure(wall: float):
+    params = [P("box_l", 80), P("box_w", 50), P("box_h", 30), P("wall", wall), P("floor_t", 2), P("usb_w", 12), P("usb_h", 6), P("usb_z", 8)]
+    features = [
+        Feature("shell", "build",
+                "shell = scad.make_box_rsolid(width=box_l, height=box_w, depth=box_h, bottom_face_center=(0, 0, 0))"),
+        Feature("cavity", "subtract",
+                "_tool = scad.make_box_rsolid(width=box_l - 2 * wall, height=box_w - 2 * wall, depth=box_h, bottom_face_center=(0, 0, floor_t))\n"
+                "cavity = scad.cut_rsolid(shell, _tool, skip_non_intersecting=False)"),
+        # USB 口：穿过前墙（朝 -y 的那面墙，y 从 -box_w/2 到 -box_w/2+wall），两头各多出 1 mm
+        Feature("usb-port", "subtract",
+                "_tool = scad.make_box_rsolid(width=usb_w, height=wall + 2, depth=usb_h, bottom_face_center=(0, -box_w / 2 + wall / 2, usb_z))\n"
+                "usb_port = scad.cut_rsolid(cavity, _tool, skip_non_intersecting=False)"),
+    ]
+    return render_notebook(params, features)
+
+
+def stepped_shaft(top_d: float):
+    params = [P("d1", 20), P("l1", 30), P("d2", 30), P("l2", 20), P("d3", top_d), P("l3", 40), P("cross_d", 6), P("cross_z", 40)]
+    features = [
+        Feature("seg-1", "build", "seg_1 = scad.make_cylinder_rsolid(radius=d1 / 2, height=l1, bottom_face_center=(0, 0, 0))"),
+        Feature("seg-2", "add",
+                "_c = scad.make_cylinder_rsolid(radius=d2 / 2, height=l2, bottom_face_center=(0, 0, l1))\n"
+                "seg_2 = scad.union_rsolid(seg_1, _c)"),
+        Feature("seg-3", "add",
+                "_c = scad.make_cylinder_rsolid(radius=d3 / 2, height=l3, bottom_face_center=(0, 0, l1 + l2))\n"
+                "seg_3 = scad.union_rsolid(seg_2, _c)"),
+        # 横向通孔：轴线沿 y，从 y=-20 穿到 y=20（比第二段的半径 15 长）
+        Feature("cross-hole", "subtract",
+                "_tool = scad.make_cylinder_rsolid(radius=cross_d / 2, height=40, bottom_face_center=(0, -20, cross_z), axis=(0, 1, 0))\n"
+                "cross_hole = scad.cut_rsolid(seg_3, _tool, skip_non_intersecting=False)"),
+    ]
+    return render_notebook(params, features)
+
+
 CASES = [
+    ("enclosure", "after_initial", lambda: enclosure(2)),
+    ("enclosure", "after_mod_1", lambda: enclosure(3)),
+    ("stepped_shaft", "after_initial", lambda: stepped_shaft(16)),
+    ("stepped_shaft", "after_mod_1", lambda: stepped_shaft(18)),
     ("phone_stand", "after_initial", lambda: phone_stand(65)),
     ("phone_stand", "after_mod_1", lambda: phone_stand(70)),
     ("flange", "after_initial", lambda: flange(6)),
@@ -115,6 +153,9 @@ WRONG = [
     ("flange", "after_mod_1", lambda: flange(6), {"bolt-holes"}),
     ("l_bracket", "after_mod_1", lambda: l_bracket(6.6), {"hole-faces"}),
     ("l_bracket", "after_initial", lambda: l_bracket(8.4), {"hole-faces"}),
+    # 留出任务：壁厚还是 2、顶段直径还是 16 的旧模型，过不了修改后的验收
+    ("enclosure", "after_mod_1", lambda: enclosure(2), {"volume", "in-2", "in-3"}),
+    ("stepped_shaft", "after_mod_1", lambda: stepped_shaft(16), {"in-3"}),
 ]
 
 

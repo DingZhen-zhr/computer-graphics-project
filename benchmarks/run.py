@@ -27,7 +27,7 @@ from cad_agent.sandbox import execute
 
 TASKS_DIR = Path(__file__).parent / "tasks"
 ALL_TASKS = ["phone_stand", "flange", "l_bracket"]
-HOLDOUT_TASKS: list[str] = []  # 留出任务：只用来测，不许为它们调提示词（Task 10 填上）
+HOLDOUT_TASKS: list[str] = ["enclosure", "stepped_shaft"]  # 留出任务：只用来测，不许为它们调提示词
 TASK_SETS: dict[str, list[str]] = {"dev": ALL_TASKS, "holdout": HOLDOUT_TASKS, "all": ALL_TASKS + HOLDOUT_TASKS}
 DEFAULT_MAX_USER_TURNS = 12
 LENGTH_TYPES = ("bbox", "distance")  # “尺寸偏差”只统计以 mm 为单位的长度类检查

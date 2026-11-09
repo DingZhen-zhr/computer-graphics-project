@@ -97,6 +97,61 @@ def test_l_bracket_acceptance_numbers():
     assert "24000" in text and "26316" in text and "25892" in text
 
 
+def test_holdout_tasks_load():
+    assert bench.HOLDOUT_TASKS == ["enclosure", "stepped_shaft"]
+    assert ALL_TASKS == ["phone_stand", "flange", "l_bracket"]   # 开发任务不变
+    for name in bench.HOLDOUT_TASKS:
+        task = load_task(name)
+        assert task["id"] == name and task["max_user_turns"] == 12 and len(task["modifications"]) == 1
+        assert list(task["acceptance"]) == stage_names(task) == ["after_initial", "after_mod_1"]
+        for stage, raw in task["acceptance"].items():
+            assert len(parse_checks(raw, set())) == 3 + len(raw), (name, stage)
+    assert bench.TASK_SETS["all"] == ALL_TASKS + bench.HOLDOUT_TASKS and bench.TASK_SETS["holdout"] == ["enclosure", "stepped_shaft"]
+    assert load_task("enclosure")["initial"] == "做一个装电路板的小盒子"
+    assert load_task("enclosure")["modifications"] == ["四面侧壁的壁厚改成 3 mm，底厚不变"]
+    assert load_task("stepped_shaft")["initial"] == "做一根阶梯轴"
+    assert load_task("stepped_shaft")["modifications"] == ["最上面那段直径改成 18"]
+
+
+def points(task, stage, kind):
+    """按 id 编号（in-1、in-2……或 out-1……）的点检查，返回点坐标列表。"""
+    prefix = "in-" if kind == "inside" else "out-"
+    return [c["point"] for c in task["acceptance"][stage] if c["id"].startswith(prefix)]
+
+
+def test_enclosure_acceptance_numbers():
+    task = load_task("enclosure")
+    assert "21968" in (TASKS_DIR / "enclosure.yaml").read_text(encoding="utf-8") and "28616" in (TASKS_DIR / "enclosure.yaml").read_text(encoding="utf-8")
+    first, second = by_id(task, "after_initial"), by_id(task, "after_mod_1")
+    for stage in (first, second):
+        assert [stage[k]["expected"] for k in ("size-x", "size-y", "size-z")] == [80, 50, 30]
+        assert all(stage[k]["tol"] == 0.5 and stage[k]["axis"] == a for k, a in (("size-x", "x"), ("size-y", "y"), ("size-z", "z")))
+        assert stage["volume"]["rel_tol"] == 0.02
+    assert first["volume"]["expected"] == 21968 == 120000 - 76 * 46 * 28 - 12 * 6 * 2
+    assert second["volume"]["expected"] == 28616 == 120000 - 74 * 44 * 28 - 12 * 6 * 3
+    assert points(task, "after_initial", "inside") == [[0, 0, 1.5], [38.5, 0, 15], [20, -24, 15], [0, -24, 7], [0, -24, 15], [7, -24, 11]]
+    assert points(task, "after_initial", "outside") == [[0, 0, 2.5], [0, 0, 15], [37.5, 0, 15], [20, -22.5, 15], [0, -24, 11], [5, -24, 11]]
+    assert points(task, "after_mod_1", "inside") == [[0, 0, 1.5], [37.5, 0, 15], [20, -22.5, 15], [0, -23.5, 7], [7, -23.5, 11]]
+    assert points(task, "after_mod_1", "outside") == [[0, 0, 2.5], [36.5, 0, 15], [20, -21.5, 15], [0, -23.5, 11], [5, -23.5, 11]]
+    assert all(first[k]["type"] == "point_inside" for k in first if k.startswith("in-"))
+    assert all(first[k]["type"] == "point_outside" for k in first if k.startswith("out-"))
+
+
+def test_stepped_shaft_acceptance_numbers():
+    task = load_task("stepped_shaft")
+    first, second = by_id(task, "after_initial"), by_id(task, "after_mod_1")
+    for stage in (first, second):
+        assert [stage[k]["expected"] for k in ("size-x", "size-y", "size-z")] == [30, 30, 90]
+        assert all(stage[k]["tol"] == 0.5 for k in ("size-x", "size-y", "size-z"))
+        assert "volume" not in stage
+    assert points(task, "after_initial", "inside") == [[9.5, 0, 15], [14.5, 0, 35], [7.5, 0, 70], [12, 0, 40], [0, 0, 43.5]]
+    assert points(task, "after_initial", "outside") == [[10.5, 0, 15], [15.5, 0, 35], [8.5, 0, 70], [0, 0, 40], [0, 14, 40], [0, 0, 42.5]]
+    # 修改后只有第三段的两个点变了，其余和初始相同
+    inside, outside = points(task, "after_initial", "inside"), points(task, "after_initial", "outside")
+    assert points(task, "after_mod_1", "inside") == [*inside[:2], [8.5, 0, 70], *inside[3:]]
+    assert points(task, "after_mod_1", "outside") == [*outside[:2], [9.5, 0, 70], *outside[3:]]
+
+
 def test_load_task_rejects_bad_files(tmp_path):
     def write(text):
         p = tmp_path / "bad.yaml"

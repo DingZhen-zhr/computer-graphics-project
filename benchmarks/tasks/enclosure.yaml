@@ -1,0 +1,57 @@
+# 留出任务 1：电路板小盒。考查：抽壳式的减料、壁厚、开口（USB 口）的位置和大小。
+# 留出任务只用来测，不许为它们调提示词。
+# 验收检查依赖坐标约定：底面贴 z=0，xy 以原点为中心，最长的水平方向沿 x，正面（朝 -y 的那面墙）有 USB 口。
+id: enclosure
+initial: "做一个装电路板的小盒子"
+max_user_turns: 12
+
+hidden_spec: |
+  - 外形 80×50×30 mm（长×宽×高），上面敞口，这次不做盖子。
+  - 四面侧壁厚 2 mm，底厚 2 mm。
+  - 正面（朝 -y 的那面墙）正中开一个 USB 口：宽 12 mm、高 6 mm，下沿离盒底 8 mm。
+  - 不要圆角，不要安装孔，盒子里面没有别的结构。
+
+modifications:
+  - "四面侧壁的壁厚改成 3 mm，底厚不变"
+
+# 体积手算（xy 以原点为中心：x 在 ±40，y 在 ±25，z 在 0~30）：
+#   初始：外形 80×50×30 = 120000；内腔 (80-2×2)×(50-2×2)×(30-2) = 76×46×28 = 97888；
+#         USB 口穿过 2 mm 厚的前墙，12×6×2 = 144  →  120000 - 97888 - 144 = 21968。
+#   壁厚改成 3 mm（底厚不变）：内腔 74×44×28 = 91168；USB 口穿过 3 mm 厚的前墙，12×6×3 = 216
+#         →  120000 - 91168 - 216 = 28616。
+# 点检查：USB 口在 x 方向 -6~6、z 方向 8~14；前墙在 y = -25 ~ -25+壁厚。
+acceptance:
+  after_initial:
+    - {id: size-x, type: bbox, axis: x, expected: 80, tol: 0.5}
+    - {id: size-y, type: bbox, axis: y, expected: 50, tol: 0.5}
+    - {id: size-z, type: bbox, axis: z, expected: 30, tol: 0.5}
+    - {id: volume, type: volume, expected: 21968, rel_tol: 0.02}
+    # 在材料里：底板、右侧墙、前墙（USB 口外侧）、USB 口下方、USB 口上方、USB 口左右的墙
+    - {id: in-1, type: point_inside, point: [0, 0, 1.5]}
+    - {id: in-2, type: point_inside, point: [38.5, 0, 15]}
+    - {id: in-3, type: point_inside, point: [20, -24, 15]}
+    - {id: in-4, type: point_inside, point: [0, -24, 7]}
+    - {id: in-5, type: point_inside, point: [0, -24, 15]}
+    - {id: in-6, type: point_inside, point: [7, -24, 11]}
+    # 不在材料里：盒内（底板上方、右侧墙内、前墙内）、USB 口里
+    - {id: out-1, type: point_outside, point: [0, 0, 2.5]}
+    - {id: out-2, type: point_outside, point: [0, 0, 15]}
+    - {id: out-3, type: point_outside, point: [37.5, 0, 15]}
+    - {id: out-4, type: point_outside, point: [20, -22.5, 15]}
+    - {id: out-5, type: point_outside, point: [0, -24, 11]}
+    - {id: out-6, type: point_outside, point: [5, -24, 11]}
+  after_mod_1:
+    - {id: size-x, type: bbox, axis: x, expected: 80, tol: 0.5}
+    - {id: size-y, type: bbox, axis: y, expected: 50, tol: 0.5}
+    - {id: size-z, type: bbox, axis: z, expected: 30, tol: 0.5}
+    - {id: volume, type: volume, expected: 28616, rel_tol: 0.02}
+    - {id: in-1, type: point_inside, point: [0, 0, 1.5]}
+    - {id: in-2, type: point_inside, point: [37.5, 0, 15]}
+    - {id: in-3, type: point_inside, point: [20, -22.5, 15]}
+    - {id: in-4, type: point_inside, point: [0, -23.5, 7]}
+    - {id: in-5, type: point_inside, point: [7, -23.5, 11]}
+    - {id: out-1, type: point_outside, point: [0, 0, 2.5]}
+    - {id: out-2, type: point_outside, point: [36.5, 0, 15]}
+    - {id: out-3, type: point_outside, point: [20, -21.5, 15]}
+    - {id: out-4, type: point_outside, point: [0, -23.5, 11]}
+    - {id: out-5, type: point_outside, point: [5, -23.5, 11]}
