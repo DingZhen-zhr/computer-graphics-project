@@ -153,7 +153,9 @@ def main(argv: list[str] | None = None, input_fn: Callable[[str], str] = input, 
             if turn.kind == "confirm":
                 print_fn(f"\n{CONFIRM_HINT}")
             if turn.llm_calls:
-                print_fn(f"（本轮模型调用 {turn.llm_calls} 次，约 {turn.tokens} token）")
+                line = (f"（本轮模型调用 {turn.llm_calls} 次，共 {turn.tokens} token：输入 {turn.prompt_tokens}"
+                        f"（命中缓存 {turn.cached_tokens}），输出 {turn.completion_tokens}（其中思考 {turn.reasoning_tokens}）")
+                print_fn(line + (f"，约 ¥{turn.cost:.4f}）" if turn.cost is not None else "）"))
     except KeyboardInterrupt:
         print_fn("\n已退出。")
     finally:

@@ -261,6 +261,45 @@ def test_tools_offered_depend_on_phase(tmp_path):
     assert [t["function"]["name"] for t in llm.tool_lists[0]] == ["update_brief", "ask_user", "request_confirmation", "api_help"]
 
 
+def usage_of(prompt: int, completion: int, cached: int, reasoning: int) -> dict:
+    return {"prompt_tokens": prompt, "completion_tokens": completion, "total_tokens": prompt + completion,
+            "cached_tokens": cached, "reasoning_tokens": reasoning}
+
+
+def test_turn_sums_usage_and_cost(tmp_path):
+    lookup = scripted_call("api_help", {"name": "make_box_rsolid"})
+    first = LLMReply("", lookup.tool_calls, usage_of(100, 10, 60, 4), cost=0.01)
+    second = LLMReply("好的", [], usage_of(120, 20, 100, 8), cost=0.02)
+    agent, ws, llm, runner, session = make_agent(tmp_path, [first, second], confirmed=False)
+    turn = agent.handle_user("你好")
+    assert turn.kind == "reply" and turn.llm_calls == 2
+    assert (turn.prompt_tokens, turn.completion_tokens, turn.cached_tokens, turn.reasoning_tokens) == (220, 30, 160, 12)
+    assert turn.tokens == 250 and turn.cost == pytest.approx(0.03)
+    rows = log_rows(session)
+    end = [r for r in rows if r["kind"] == "reply"][0]
+    assert (end["prompt_tokens"], end["completion_tokens"], end["cached_tokens"], end["reasoning_tokens"]) == (220, 30, 160, 12)
+    assert end["cost"] == pytest.approx(0.03)
+    first_row = [r for r in rows if r["kind"] == "assistant"][0]   # 每次调用也记完整的用量和本次费用
+    assert first_row["usage"] == usage_of(100, 10, 60, 4) and first_row["cost"] == pytest.approx(0.01)
+
+
+def test_turn_cost_none_when_any_call_lacks_cost(tmp_path):
+    lookup = scripted_call("api_help", {"name": "make_box_rsolid"})
+    first = LLMReply("", lookup.tool_calls, usage_of(100, 10, 60, 4), cost=0.01)
+    second = LLMReply("好的", [], usage_of(120, 20, 100, 8))   # 没有价目表时 cost 是 None
+    agent, *_ = make_agent(tmp_path, [first, second], confirmed=False)
+    turn = agent.handle_user("你好")
+    assert turn.cost is None and turn.prompt_tokens == 220
+
+
+def test_turn_cost_none_without_successful_call(tmp_path):
+    agent, ws, llm, runner, session = make_agent(tmp_path, [LLMError("断网")], confirmed=False)
+    turn = agent.handle_user("你好")
+    assert turn.kind == "failed" and turn.llm_calls == 0 and turn.cost is None and turn.prompt_tokens == 0
+    end = [r for r in log_rows(session) if r["kind"] == "failed"][0]
+    assert end["cost"] is None and end["cached_tokens"] == 0
+
+
 def test_log_records_everything(tmp_path):
     agent, ws, llm, runner, session = deliver_v1(tmp_path, [])
     kinds = [r["kind"] for r in log_rows(session)]

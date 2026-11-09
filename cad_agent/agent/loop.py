@@ -42,6 +42,11 @@ class AgentTurn:
     repairs: int = 0
     llm_calls: int = 0
     tokens: int = 0
+    prompt_tokens: int = 0
+    completion_tokens: int = 0
+    cached_tokens: int = 0
+    reasoning_tokens: int = 0
+    cost: float | None = None   # 本轮每次调用都有 cost 时才是总和，否则 None（本轮没有成功的调用也是 None）
 
 
 @dataclass
@@ -49,6 +54,29 @@ class _Counters:
     llm_calls: int = 0
     tokens: int = 0
     tool_calls: int = 0
+    prompt_tokens: int = 0
+    completion_tokens: int = 0
+    cached_tokens: int = 0
+    reasoning_tokens: int = 0
+    cost_sum: float = 0.0
+    costed_calls: int = 0
+
+    def add(self, reply: LLMReply) -> None:
+        """记下一次成功调用的用量和费用。"""
+        self.llm_calls += 1
+        u = reply.usage
+        self.tokens += int(u.get("total_tokens", 0) or 0)
+        self.prompt_tokens += int(u.get("prompt_tokens", 0) or 0)
+        self.completion_tokens += int(u.get("completion_tokens", 0) or 0)
+        self.cached_tokens += int(u.get("cached_tokens", 0) or 0)
+        self.reasoning_tokens += int(u.get("reasoning_tokens", 0) or 0)
+        if reply.cost is not None:
+            self.cost_sum += reply.cost
+            self.costed_calls += 1
+
+    @property
+    def cost(self) -> float | None:
+        return self.cost_sum if self.llm_calls and self.costed_calls == self.llm_calls else None
 
 
 def _raw_arguments(tc: ToolCall) -> str:
@@ -92,10 +120,9 @@ class Agent:
                 reply = self.llm.chat(self._llm_messages(c), self.toolbox.schemas())
             except LLMError as e:
                 return self._end("failed", f"模型调用失败：{e}。需求单和已经写好的特征都还在，可以稍后再发一次。", c)
-            c.llm_calls += 1
-            c.tokens += int(reply.usage.get("total_tokens", 0) or 0)
+            c.add(reply)
             self.messages.append(self._assistant_message(reply))
-            self.session.log("assistant", content=reply.content, usage=reply.usage,
+            self.session.log("assistant", content=reply.content, usage=reply.usage, cost=reply.cost,
                              tool_calls=[{"name": tc.name, "args": tc.arguments} for tc in reply.tool_calls])
             if not reply.tool_calls:
                 return self._end("reply", reply.content.strip() or "（模型没有给出回复，可以换个说法再试一次）", c)
@@ -228,5 +255,9 @@ class Agent:
         self._save()
         repairs = self.toolbox.build_failures
         self.session.log(kind, text=text, llm_calls=c.llm_calls, tool_calls=c.tool_calls, tokens=c.tokens, repairs=repairs,
-                         version=version_dir.name if version_dir else None)
-        return AgentTurn(kind, text, version_dir, repairs=repairs, llm_calls=c.llm_calls, tokens=c.tokens)
+                         version=version_dir.name if version_dir else None, prompt_tokens=c.prompt_tokens,
+                         completion_tokens=c.completion_tokens, cached_tokens=c.cached_tokens,
+                         reasoning_tokens=c.reasoning_tokens, cost=c.cost)
+        return AgentTurn(kind, text, version_dir, repairs=repairs, llm_calls=c.llm_calls, tokens=c.tokens,
+                         prompt_tokens=c.prompt_tokens, completion_tokens=c.completion_tokens, cached_tokens=c.cached_tokens,
+                         reasoning_tokens=c.reasoning_tokens, cost=c.cost)

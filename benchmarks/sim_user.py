@@ -36,6 +36,12 @@ class SimUser:
         self.system = SYSTEM_TEMPLATE.replace("<hidden_spec>", hidden_spec.strip())
         self.calls = 0
         self.tokens = 0
+        self._costs: list[float | None] = []
+
+    @property
+    def cost(self) -> float | None:
+        """累计所有回复的费用；有一次回复没有 cost（或还没有回复）就是 None。"""
+        return sum(self._costs) if self._costs and all(c is not None for c in self._costs) else None
 
     def reply(self, agent_text: str, kind: str) -> str:
         user = USER_TEMPLATE.replace("<agent_text>", agent_text)
@@ -44,4 +50,5 @@ class SimUser:
         reply = self.llm.chat([{"role": "system", "content": self.system}, {"role": "user", "content": user}], [])
         self.calls += 1
         self.tokens += int(reply.usage.get("total_tokens", 0) or 0)
+        self._costs.append(getattr(reply, "cost", None))
         return reply.content.strip() or FALLBACK_REPLY

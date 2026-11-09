@@ -139,3 +139,14 @@
   2. 计划之外加的小保护：命中数大于输入数时，没命中的部分按 0 算（不会变成负费用），有测试。
   3. 配置里 `[llm.clarify.pricing]`、`[llm.modeling.pricing]` 也支持（设计文档第 7 节说覆盖段可以覆盖 pricing），规则和 `[llm.pricing]` 相同，报错里写明段名。
   4. 第一次用 Python heredoc 往测试文件里写 `\n` 时被转成了真换行，测试文件语法错误；用 `git checkout` 还原这两个文件（只有我自己没提交的改动）后，改用 Edit 工具重写。
+
+## 1.1 版 Task 3：计量接入主循环、命令行和评测 —— 完成
+
+- 做了什么：`cad_agent/agent/loop.py`（`AgentTurn` 加 5 项：`prompt_tokens`、`completion_tokens`、`cached_tokens`、`reasoning_tokens`、`cost`；每次调用的日志记完整用量和本次费用，每轮结束的日志记这 5 项）、`cad_agent/cli.py`（每轮结束显示提示词文档第 6 节的格式，没有费用时不带"约 ¥"）、`benchmarks/sim_user.py`（`SimUser.cost`）、`benchmarks/run.py`（`HOLDOUT_TASKS`、`TASK_SETS`、`--set`、`--repeat`、`render_summary_md`、结果里多出 5 项用量和 `cost`、`sim_cost`、重复运行的 `run` 和 `<任务名>-<r>` 目录）、新文件 `benchmarks/compare.py`（`task_means`、`render_compare_md`、`main`）。
+- 测试数量：新增 25 个，全部测试 359 个全部通过。`test_question_failed_and_delivered_turns_are_printed` 没改（新格式里仍有总 token 数）。
+- 说明：
+  1. `compare.py` 里放了表格数字格式（`COST_FMT` 等）和 `fmt`、`success_text`、`total_row`，`run.py` 的汇总表复用它们，两张表的格式一致。"合计"行 = 各任务平均值相加（有任务缺某项就是 `-`），成功列合计 = 总成功次数 / 总遍数。
+  2. 费用比（新/旧）和对比表之间空了一行，免得 Markdown 把它当成表的一行。
+  3. 没有成功调用的轮（模型调用失败）不计入评测的费用；一个任务里只要有一轮有调用却缺 `cost`，整个任务的 `cost` 就是 `None`。
+  4. 计划里 `test_main_rejects_bad_repeat_and_empty_set` 依赖 `HOLDOUT_TASKS` 现在是空的；为了 Task 10 填上留出任务后它不会变红，测试里用 monkeypatch 把 `TASK_SETS["holdout"]` 固定成空表，断言没有放松。
+  5. 往 `benchmarks/run.py` 里用 heredoc 脚本改文件时 `\n` 又被转成真换行（和 Task 2 同样的问题），发现后用 Edit 工具改回；以后改文件一律用 Edit/Write 工具。

@@ -120,6 +120,25 @@ def test_question_failed_and_delivered_turns_are_printed(monkeypatch, tmp_path):
     assert HINT not in out and "1234" in out  # 交付后顺带显示模型调用次数和 token 数
 
 
+def test_turn_line_with_cost(monkeypatch, tmp_path):
+    turn = AgentTurn("reply", "好", llm_calls=2, tokens=300, prompt_tokens=250, cached_tokens=200, completion_tokens=50,
+                     reasoning_tokens=40, cost=0.0123)
+    _, out, *_ = drive(monkeypatch, tmp_path, ["a", "/quit"], turn)
+    assert "（本轮模型调用 2 次，共 300 token：输入 250（命中缓存 200），输出 50（其中思考 40），约 ¥0.0123）" in out
+
+
+def test_turn_line_without_cost(monkeypatch, tmp_path):
+    turn = AgentTurn("reply", "好", llm_calls=1, tokens=300, prompt_tokens=250, cached_tokens=0, completion_tokens=50, reasoning_tokens=0)
+    _, out, *_ = drive(monkeypatch, tmp_path, ["a", "/quit"], turn)
+    assert "（本轮模型调用 1 次，共 300 token：输入 250（命中缓存 0），输出 50（其中思考 0））" in out
+    assert "¥" not in out
+
+
+def test_no_turn_line_without_model_calls(monkeypatch, tmp_path):
+    _, out, *_ = drive(monkeypatch, tmp_path, ["a", "/quit"], AgentTurn("reply", "好"))
+    assert "本轮模型调用" not in out
+
+
 def test_diff_needs_two_versions(monkeypatch, tmp_path):
     session_inputs = ["/diff", "/quit"]
     _, out, *_ = drive(monkeypatch, tmp_path, session_inputs)
