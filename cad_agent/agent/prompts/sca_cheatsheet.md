@@ -74,3 +74,25 @@
 - 参数名写错：`NameError: name 'base_wd' is not defined`。→ 对照需求单里的参数名（小写加下划线），以及前面特征的变量名（slug 里的短横线换成下划线）。
 - 关键字参数名写错：`TypeError: make_box_rsolid(): incompatible function arguments`，后面会列出正确的参数签名。→ 照签名改（例如 `w=` 要写成 `width=`）。
 - 函数名写错：`AttributeError: module 'simplecadapi' has no attribute 'make_box'`。→ 用 api_help 查真实的函数名，SCA 的函数名常带 `_rsolid`、`_rface`、`_rwire` 之类的后缀。
+
+## 检查写法
+- **总体尺寸**：用 bbox 测整体在某个方向上的长度，axis 写 x、y 或 z。
+  例：`{"id": "size-x", "type": "bbox", "axis": "x", "expected": "plate_w"}`
+- **板厚**：用 distance 测顶面（PLANE，法向朝上）到底面（PLANE，法向朝下）的最短距离。不要按 z 坐标去选面，板放在别处也能用。
+  例：`{"id": "thickness", "type": "distance", "a": {"kind": "faces", "where": [["geom.type", "==", "PLANE"], ["geom.normal.z", ">=", 0.99]]}, "b": {"kind": "faces", "where": [["geom.type", "==", "PLANE"], ["geom.normal.z", "<=", -0.99]]}, "expected": "plate_t"}`
+- **孔径**：圆柱面没有半径属性，所以用面积间接测：通孔的侧面积 = π × 孔径 × 板厚。用 count 数出 CYLINDER 面里面积在这个值 ±5% 内的，应当恰好 1 个；孔径偏 20%，面积就超出 ±5%，检查不通过。
+  例：`{"id": "hole-dia", "type": "count", "kind": "faces", "expected": 1, "where": [["geom.type", "==", "CYLINDER"], ["geom.area", ">=", "pi * hole_d * plate_t * 0.95"], ["geom.area", "<=", "pi * hole_d * plate_t * 1.05"]]}`
+- **孔数**：选择条件同孔径（CYLINDER 面，面积在单个孔的 ±5% 内；圆角的圆柱面面积不一样，一般不会混进来），expected 直接写孔数参数。
+  例：`{"id": "hole-count", "type": "count", "kind": "faces", "expected": "hole_n", "where": [["geom.type", "==", "CYLINDER"], ["geom.area", ">=", "pi * hole_d * plate_t * 0.95"], ["geom.area", "<=", "pi * hole_d * plate_t * 1.05"]]}`
+- **孔位**：用两个点：孔心处 point_outside（应当没有材料），孔边外 0.5 mm 处 point_inside（应当有材料）。点的坐标可以写参数表达式，z 取板厚的一半。
+  例：`{"id": "hole-center-empty", "type": "point_outside", "point": ["hole_x", 0, "plate_t / 2"]}`
+  例：`{"id": "hole-edge-solid", "type": "point_inside", "point": ["hole_x + hole_d / 2 + 0.5", 0, "plate_t / 2"]}`
+- **槽或缺口宽度**：同样用两个点：缺口一侧的墙内 0.5 mm 处 point_outside，墙外 0.5 mm 处 point_inside。缺口左右对称时测一侧就够；点的另一个坐标要落在缺口的长度范围内。宽度差 1 mm 左右就会被抓到。
+  例：`{"id": "slot-empty", "type": "point_outside", "point": ["slot_w / 2 - 0.5", 12, "plate_t / 2"]}`
+  例：`{"id": "slot-wall", "type": "point_inside", "point": ["slot_w / 2 + 0.5", 12, "plate_t / 2"]}`
+- **圆角半径**：圆角面是 CYLINDER，直棱上 90° 圆角的侧面积 = π ÷ 2 × 半径 × 棱长。用 count 数出面积在这个值 ±5% 内的 CYLINDER 面，应当恰好 1 个。
+  例：`{"id": "fillet-r", "type": "count", "kind": "faces", "expected": 1, "where": [["geom.type", "==", "CYLINDER"], ["geom.area", ">=", "pi / 2 * fillet_r * plate_h * 0.95"], ["geom.area", "<=", "pi / 2 * fillet_r * plate_h * 1.05"]]}`
+- **倒角尺寸**：倒角面是 PLANE，法向和相邻两面都成 45°（例子里法向 x、y 分量在 0.6 到 0.8 之间，因为 cos45° ≈ 0.707），面积 = √2 × 倒角距离 × 棱长。例子是 +x +y 角上竖直棱的倒角，换位置时改法向条件。
+  例：`{"id": "chamfer-c", "type": "count", "kind": "faces", "expected": 1, "where": [["geom.type", "==", "PLANE"], ["geom.normal.x", ">=", 0.6], ["geom.normal.x", "<=", 0.8], ["geom.normal.y", ">=", 0.6], ["geom.normal.y", "<=", 0.8], ["geom.area", ">=", "sqrt(2) * chamfer_c * plate_h * 0.95"], ["geom.area", "<=", "sqrt(2) * chamfer_c * plate_h * 1.05"]]}`
+- **两面夹角**：angle 测的是两个平面法向（朝材料外）的夹角，不是两面之间的开口角。例子里斜面（法向朝上偏 +x）和底面（法向朝下）的夹角 = 180° − 斜面倾角；用法向分量的范围把两个面分开。
+  例：`{"id": "slope-angle", "type": "angle", "expected": "180 - slope_deg", "a": [["geom.type", "==", "PLANE"], ["geom.normal.x", ">=", 0.1], ["geom.normal.z", ">=", 0.1]], "b": [["geom.type", "==", "PLANE"], ["geom.normal.z", "<=", -0.99]]}`

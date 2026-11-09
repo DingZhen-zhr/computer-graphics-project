@@ -12,7 +12,9 @@ from cad_agent.tools import Workspace
 from helpers import PHONE_W, TILT, make_brief
 
 PROMPTS_DOC = Path(__file__).resolve().parent.parent / "docs" / "superpowers" / "plans" / "2026-11-09-cad-agent-v1-prompts.md"
-SECTIONS = ["基本体", "草图轮廓与拉伸", "多边形截面拉伸", "旋转体", "布尔运算", "移动与旋转", "阵列", "圆角与倒角", "选面选边（QL）", "常见报错与改法"]
+PROMPTS_DOC_V11 = Path(__file__).resolve().parent.parent / "docs" / "superpowers" / "plans" / "2026-11-09-cad-agent-v1.1-prompts.md"
+SECTIONS = ["基本体", "草图轮廓与拉伸", "多边形截面拉伸", "旋转体", "布尔运算", "移动与旋转", "阵列", "圆角与倒角", "选面选边（QL）", "常见报错与改法",
+            "检查写法"]
 
 
 def read(name: str) -> str:
@@ -37,7 +39,9 @@ def test_cheatsheet_sections_follow_the_prompts_doc():
     assert re.findall(r"^## (.+)$", text, flags=re.M) == SECTIONS
     doc = PROMPTS_DOC.read_text(encoding="utf-8")
     template = re.findall(r"```text\n(# SCA 常用写法速查.*?)\n```", doc, flags=re.S)[0]
-    assert re.findall(r"^## (.+)$", template, flags=re.M) == SECTIONS
+    assert re.findall(r"^## (.+)$", template, flags=re.M) == SECTIONS[:-1]   # 第一版的模板没有"检查写法"
+    doc11 = PROMPTS_DOC_V11.read_text(encoding="utf-8")   # 第 1.1 版文档第 8 节新增这一节
+    assert "## 检查写法" in doc11.split("## 8. 速查表新增一节：检查写法")[1]
 
 
 def sections() -> dict[str, str]:
@@ -61,6 +65,33 @@ def test_cheatsheet_has_required_entries():
     for name, words in must.items():
         for w in words:
             assert w in s[name], (name, w)
+
+
+def recipe_kinds_in_doc() -> list[str]:
+    section8 = PROMPTS_DOC_V11.read_text(encoding="utf-8").split("## 8. 速查表新增一节：检查写法")[1]
+    line = re.search(r"顺序也照这个：(.+)", section8).group(1)
+    return line.strip().rstrip("。").split("、")
+
+
+def test_cheatsheet_has_check_recipes():
+    kinds = recipe_kinds_in_doc()
+    assert len(kinds) == 9 and kinds[0] == "总体尺寸" and kinds[-1] == "两面夹角"
+    section = sections()["检查写法"]
+    assert re.findall(r"^- \*\*(.+?)\*\*：", section, flags=re.M) == kinds   # 9 个条目，顺序和文档一致
+    for entry in re.split(r"^- ", section, flags=re.M)[1:]:
+        assert "例：`" in entry, entry[:20]   # 每条至少一个例子
+
+
+def test_check_recipe_examples_match_tests():
+    from test_check_recipes import RECIPES
+
+    section = sections()["检查写法"]
+    found: dict[str, list[dict]] = {}
+    for entry in re.split(r"^- ", section, flags=re.M)[1:]:
+        kind = re.match(r"\*\*(.+?)\*\*：", entry).group(1)
+        found[kind] = [json.loads(text) for text in re.findall(r"例：`([^`]+)`", entry)]
+    assert found == {r.kind: list(r.checks) for r in RECIPES}
+    assert list(found) == [r.kind for r in RECIPES]
 
 
 def test_cheatsheet_has_at_least_four_common_errors():

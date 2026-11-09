@@ -177,3 +177,10 @@
 - 做了什么：`Agent.__init__` 多一个参数 `modeling_llm: LLM | None = None`；一轮开始、处理完确认之后按 `ws.brief.can_build()[0]` 决定本轮用哪个模型（建模阶段且有 `modeling_llm` 才用它），这一轮里不再换；日志的 `user` 记录多了 `phase`（`clarify` 或 `modeling`）。`cli.build_agent` 现在用 `make_llm(config, "clarify", key)` 和 `modeling_llm=make_llm(config, "modeling", key)`。README"配置模型"一节补了 `extra_body`、`[llm.pricing]`、`[llm.clarify]`、`[llm.modeling]` 的说明，例子用笔记里实测可行的 `{thinking = {type = "disabled"}}`。
 - 测试数量：新增 5 个（`test_phase_picks_llm`、`test_without_modeling_llm_everything_uses_the_default`、`test_llm_fixed_within_turn`、`test_user_log_has_phase`、`test_build_agent_uses_phase_settings`），全部测试 404 个全部通过。测试里的 `make_agent` 多了一个可选参数 `modeling_replies`。
 - 说明：模拟用户仍然只用 `[llm]`（评测里用 `make_llm(config, "base", key)`）。没有偏离。
+
+## 1.1 版 Task 8：检查写法速查 —— 完成
+
+- 做了什么：`tests/test_check_recipes.py`（`RECIPES` 表驱动，9 种参数各一项：参数、特征代码模板、检查 JSON；标记 `sca`）；`cad_agent/agent/prompts/sca_cheatsheet.md` 末尾新增 `## 检查写法`（9 个 `**<参数种类>**` 条目，顺序和提示词文档第 8 节一致，每个检查一行"例："，JSON 由 `RECIPES` 生成，所以和测试逐项相等）；`docs/sca-api-notes.md` 新增第 15 节"检查写法实测"（每条的小模型、检查类型、正确和偏 20% 时的实测数）。
+- 测试数量：新增 31 个（`test_check_recipes.py` 29 个：1 个覆盖顺序 + 9 个正确 + 18 个偏大/偏小；`test_prompts.py` 2 个：`test_cheatsheet_has_check_recipes`、`test_check_recipe_examples_match_tests`），全部测试 434 个全部通过。按清单改了 `test_prompts.py` 的 `SECTIONS`（末尾加 `"检查写法"`）和 `test_cheatsheet_sections_follow_the_prompts_doc`（第一版模板 `== SECTIONS[:-1]`，并断言第 1.1 版文档第 8 节含 `## 检查写法`）。
+- 结果：9 条写法全部做到了"偏 20% 就不通过"，没有降级成"只能粗略检查"的条目，所以没有偏离记录。孔位偏小时只有孔心那条检查能抓住，槽宽偏大和偏小各由一条检查抓住（两条互补，所以例子里各写了两个"例："）。第一版的 `test_cheatsheet_examples_use_real_functions_and_pass_the_guard` 对新加的 JSON 例子也通过了（JSON 对象本身是合法的单行 Python 表达式），没有改动。
+- 说明：做错的写法要求"模型能建出来，是检查把它挡住"（测试里断言 `error is None`，且不通过的只能是这条写法自己的检查）。系统提示词变长了约 3500 字（速查表是系统提示词的一部分），费用上只多一次缓存。
