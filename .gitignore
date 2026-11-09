@@ -6,3 +6,5 @@ config.toml
 benchmarks/results/
 *.egg-info/
 .simplecad/
+
+config-*.toml
