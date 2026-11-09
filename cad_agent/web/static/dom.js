@@ -42,4 +42,5 @@ export function fmtTokens(n) {
   return n >= 10000 ? `${(n / 10000).toFixed(1)} 万` : String(n);
 }
 
-export const fileUrl = (version, name) => `/files/${encodeURIComponent(version)}/${name}`;
+// 相对路径：本地服务和静态演示站（GitHub Pages 的子路径）都能用
+export const fileUrl = (version, name) => `files/${encodeURIComponent(version)}/${name}`;

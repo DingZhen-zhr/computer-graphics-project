@@ -9,3 +9,4 @@ benchmarks/results/
 
 config-*.toml
 .worktrees/
+tools/

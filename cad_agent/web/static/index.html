@@ -5,10 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>CAD 建模助手</title>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' fill='%23E5322D'/%3E%3C/svg%3E">
-  <link rel="stylesheet" href="/static/style.css">
+  <link rel="stylesheet" href="static/style.css">
   <!-- three.js 放在项目里，演示时不依赖外网 -->
   <script type="importmap">
-    { "imports": { "three": "/static/vendor/three/three.module.js" } }
+    { "imports": { "three": "./static/vendor/three/three.module.js" } }
   </script>
 </head>
 <body>
@@ -97,7 +97,19 @@
     </main>
   </div>
 
+  <div class="login hidden" id="login" role="dialog" aria-modal="true" aria-labelledby="login-title">
+    <form class="login-card" id="login-form">
+      <span class="brand-mark" aria-hidden="true"></span>
+      <h2 id="login-title">输入访问密码</h2>
+      <p class="muted">这个页面连着真实的大模型，需要密码才能使用。</p>
+      <label class="sr-only" for="login-password">密码</label>
+      <input id="login-password" type="password" autocomplete="current-password" placeholder="访问密码" required>
+      <div class="login-error" id="login-error" role="alert"></div>
+      <button class="btn btn-primary" type="submit">进入</button>
+    </form>
+  </div>
+
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
-  <script type="module" src="/static/app.js"></script>
+  <script type="module" src="static/app.js"></script>
 </body>
 </html>

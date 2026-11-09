@@ -136,6 +136,28 @@ start_replay.bat                                                     # 回放模
 - 回放模式不需要 API key，也不花钱，适合预览界面；演示时网络出了问题，也可以拿它当后备。
 - 旧会话的版本没有 `model.stl` 时，先运行 `.venv\Scripts\python scriptsackfill_stl.py <会话目录>` 补出来（只在本地用 SCA，不调用大模型）。
 
+### 在线演示站（只读，任何人打开链接就能看）
+
+GitHub Pages 上放的是 `demo/phone_stand` 那次真实会话的回放，可以看对话、转 3D、看检查和版本对比；不花钱，也不碰 key。
+
+- 页面改了以后，运行 `.venv\Scripts\python -m cad_agent.web.export demo\phone_stand site` 重新导出 `site/`，提交并推送后会自动发布。
+- 第一次使用前，要在仓库的 Settings → Pages → Build and deployment 里，把 Source 选成 "GitHub Actions"。
+
+### 公网实时测试（让队员用组长的 DeepSeek 试）
+
+GitHub Pages 跑不了后台，所以实时测试的服务开在组长电脑上，用 Cloudflare 的免费临时隧道给一个公网网址。
+
+1. 双击 `start_public.bat`，输入一个访问密码（至少 6 位）。
+2. 窗口里会出现 `https://xxxx.trycloudflare.com` 这样的网址，把网址和密码发给队员。
+3. 关掉这两个窗口，就停止公开。
+
+注意：
+
+- 需要 `tools\cloudflared.exe`（不进 git；没有的话从 https://github.com/cloudflare/cloudflared/releases 下载 `cloudflared-windows-amd64.exe`，改成这个名字放进 `tools\`）。
+- 必须先在 `config.toml` 填好价目表。累计花费到上限（默认 ¥5，可在 bat 里改 `--budget`）后，不再接新消息。
+- 所有访问者共用一个会话，适合轮流试，不适合几个人同时操作。
+- 组长电脑要一直开着，每次启动网址都会变。
+
 演示前检查几件事：
 
 1. 环境变量里的 API key 已经设置好，`config.toml` 里的模型和价目表是对的。

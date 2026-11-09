@@ -26,7 +26,7 @@ from cad_agent.session import Session
 from cad_agent.web.events import fold
 
 VERSION_NAME_RE = re.compile(r"^v\d+$")
-BUSY, EMPTY, READ_ONLY, OK, ACCEPTED = 409, 400, 403, 200, 202
+BUSY, EMPTY, READ_ONLY, OK, ACCEPTED, OVER_BUDGET = 409, 400, 403, 200, 202, 402
 
 
 # ---------------------------------------------------------------- 有人在听的会话
@@ -134,9 +134,11 @@ class _Base:
 class LiveApp(_Base):
     mode = "live"
 
-    def __init__(self, make_agent: Callable[[], tuple[Agent, Session]], model_name: str) -> None:
+    def __init__(self, make_agent: Callable[[], tuple[Agent, Session]], model_name: str, budget: float | None = None) -> None:
         super().__init__(model_name)
         self._make_agent = make_agent
+        self.budget = budget   # 公网测试时的花费上限（元）；到了就不再接新消息
+        self.spent = 0.0       # 这个服务启动以来所有会话的累计花费（元），开新会话也不清零
         self._idle = threading.Event()
         self._idle.set()
         self._start_session()
@@ -178,7 +180,9 @@ class LiveApp(_Base):
 
     def _work(self, text: str) -> None:
         try:
-            self.agent.handle_user(text)
+            turn = self.agent.handle_user(text)
+            with self._lock:
+                self.spent += turn.cost or 0.0
         except Exception as e:  # noqa: BLE001 - 演示时出任何错，页面都不能卡死，服务也不能退出
             traceback.print_exc(file=sys.stderr)
             message = f"处理这条消息时出了意外错误（{type(e).__name__}）：{e}。需求单和模型都还在，可以再发一次，或者开一个新会话。"
@@ -199,7 +203,10 @@ class LiveApp(_Base):
         with self._lock:
             events, view = list(self._events), copy.deepcopy(self._view)
             busy, since, error = self._busy, self._busy_since, self._error
-        return self._compose(events, view["brief"], view["checks"], view["facts"], busy, since, error)
+        snap = self._compose(events, view["brief"], view["checks"], view["facts"], busy, since, error)
+        if self.budget is not None:
+            snap["budget"] = {"limit": self.budget, "spent": round(self.spent, 4)}
+        return snap
 
     def submit(self, text: str) -> int:
         """202 开始处理；400 空消息；409 正在处理上一条。"""
@@ -208,6 +215,8 @@ class LiveApp(_Base):
         with self._lock:
             if self._busy:
                 return BUSY
+            if self.budget is not None and self.spent >= self.budget:
+                return OVER_BUDGET
             self._busy, self._busy_since, self._error = True, time.monotonic(), None
             self._idle.clear()
         threading.Thread(target=self._work, args=(text.strip(),), daemon=True, name="agent-turn").start()

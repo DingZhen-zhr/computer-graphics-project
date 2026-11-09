@@ -1,0 +1,5 @@
+# 演示站和演示会话原样保存，不做换行符转换（发布出去的文件要和导出的一模一样）
+site/** -text
+demo/** -text
+*.stl binary
+*.step -text

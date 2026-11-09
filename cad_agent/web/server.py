@@ -2,15 +2,18 @@
 
 from __future__ import annotations
 
+import hmac
 import json
 import mimetypes
+import secrets
+import time
 import sys
 import traceback
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, unquote, urlsplit
 
-from cad_agent.web.app import READ_ONLY, VERSION_NAME_RE, LiveApp, ReplayApp
+from cad_agent.web.app import OVER_BUDGET, READ_ONLY, VERSION_NAME_RE, LiveApp, ReplayApp
 
 STATIC_DIR = Path(__file__).parent / "static"
 FILE_WHITELIST = ("view.png", "model.step", "model.stl", "model.py", "checks.json")
@@ -24,7 +27,13 @@ def _content_type(path: Path) -> str:
     return CONTENT_TYPES.get(path.suffix.lower()) or mimetypes.guess_type(path.name)[0] or "application/octet-stream"
 
 
-def make_server(state: LiveApp | ReplayApp, host: str = "127.0.0.1", port: int = 8765) -> ThreadingHTTPServer:
+COOKIE = "cad_auth"
+
+
+def make_server(state: LiveApp | ReplayApp, host: str = "127.0.0.1", port: int = 8765, password: str | None = None) -> ThreadingHTTPServer:
+    """password 不为空时（公网测试），除了页面和静态文件，其余接口都要先用密码登录，拿到 cookie。"""
+    token = secrets.token_urlsafe(32)
+
     class Handler(BaseHTTPRequestHandler):
         protocol_version = "HTTP/1.1"
         server_version = "CadAgentWeb"
@@ -42,8 +51,26 @@ def make_server(state: LiveApp | ReplayApp, host: str = "127.0.0.1", port: int =
             self.end_headers()
             self.wfile.write(body)
 
-        def _json(self, status: int, data) -> None:
-            self._send(status, json.dumps(data, ensure_ascii=False).encode("utf-8"), "application/json; charset=utf-8")
+        def _json(self, status: int, data, headers: dict | None = None) -> None:
+            body = json.dumps(data, ensure_ascii=False).encode("utf-8")
+            self.send_response(status)
+            self.send_header("Content-Type", "application/json; charset=utf-8")
+            self.send_header("Content-Length", str(len(body)))
+            self.send_header("Cache-Control", "no-store")
+            self.send_header("X-Content-Type-Options", "nosniff")
+            for k, v in (headers or {}).items():
+                self.send_header(k, v)
+            self.end_headers()
+            self.wfile.write(body)
+
+        def _authed(self) -> bool:
+            if not password:
+                return True
+            for part in (self.headers.get("Cookie") or "").split(";"):
+                name, _, value = part.strip().partition("=")
+                if name == COOKIE and hmac.compare_digest(value, token):
+                    return True
+            return False
 
         def _error(self, status: int, message: str) -> None:
             self._json(status, {"error": message})
@@ -80,6 +107,8 @@ def make_server(state: LiveApp | ReplayApp, host: str = "127.0.0.1", port: int =
                 return self._send_static("index.html")
             if path.startswith("/static/"):
                 return self._send_static(path[len("/static/"):])
+            if (path.startswith("/api/") or path.startswith("/files/")) and not self._authed():
+                return self._error(401, "需要先输入访问密码")
             if path == "/api/state":
                 return self._json(200, state.snapshot())
             if path == "/api/diff":
@@ -121,6 +150,11 @@ def make_server(state: LiveApp | ReplayApp, host: str = "127.0.0.1", port: int =
 
         def _post(self) -> None:
             path = unquote(urlsplit(self.path).path)
+            if path == "/api/login":
+                return self._login()
+            if not self._authed():
+                self._read_body()
+                return self._error(401, "需要先输入访问密码")
             if path == "/api/message":
                 return self._message()
             if path == "/api/reset":
@@ -141,6 +175,20 @@ def make_server(state: LiveApp | ReplayApp, host: str = "127.0.0.1", port: int =
                 return None
             return self.rfile.read(length) if length else b""
 
+        def _login(self) -> None:
+            raw = self._read_body() or b""
+            try:
+                given = json.loads(raw.decode("utf-8")).get("password", "") if raw else ""
+            except (UnicodeDecodeError, json.JSONDecodeError, AttributeError):
+                given = ""
+            if not password:
+                return self._json(200, {"ok": True})
+            if not isinstance(given, str) or not hmac.compare_digest(given.encode("utf-8"), password.encode("utf-8")):
+                time.sleep(1)  # 拖慢暴力猜密码
+                return self._error(401, "密码不对")
+            cookie = f"{COOKIE}={token}; HttpOnly; SameSite=Strict; Path=/; Max-Age=43200"
+            self._json(200, {"ok": True}, {"Set-Cookie": cookie})
+
         def _message(self) -> None:
             raw = self._read_body()
             if raw is None:
@@ -155,7 +203,8 @@ def make_server(state: LiveApp | ReplayApp, host: str = "127.0.0.1", port: int =
             status = state.submit(text)
             if status == 202:
                 return self._json(202, {"ok": True})
-            messages = {400: "消息不能为空", READ_ONLY: "回放模式只能看，不能发消息"}
+            messages = {400: "消息不能为空", READ_ONLY: "回放模式只能看，不能发消息",
+                        OVER_BUDGET: "这次测试的花费已经到上限了，请联系组长"}
             self._error(status, messages.get(status, "正在处理上一条消息，请稍等"))
 
     class Server(ThreadingHTTPServer):

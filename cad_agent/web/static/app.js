@@ -8,6 +8,7 @@ import { Viewer, hydrateThumbs } from "./viewer.js";
 const $ = (id) => document.getElementById(id);
 const STAGES = ["clarify", "confirm", "modeling", "checking", "delivered"];
 const POLL_MS = 1000;
+const STATIC = document.documentElement.dataset.mode === "static";  // GitHub Pages 上的只读演示站：读导出的 JSON，不发请求
 
 const els = {
   rail: $("rail"), usage: $("usage-pill"), model: $("model-pill"), replay: $("replay-pill"), reset: $("reset-btn"),
@@ -68,7 +69,7 @@ async function send(text) {
   autosize();
   renderAll(true);
   try {
-    const { status, body } = await api("/api/message", { method: "POST", body: JSON.stringify({ text }) });
+    const { status, body } = await api("api/message", { method: "POST", body: JSON.stringify({ text }) });
     if (status !== 202) {
       pending = null;
       if (status !== 409) els.input.value = text;
@@ -122,6 +123,7 @@ function renderTop() {
   const parts = [];
   const cost = fmtCost(st.cost);
   if (cost) parts.push(h("strong", {}, cost));
+  if (s.budget) parts.push(h("span", {}, `测试额度 ${fmtCost(s.budget.spent) || "¥0"} / ¥${s.budget.limit}`));
   if (st.prompt_tokens) parts.push(h("span", { class: "usage-tokens" }, `输入 ${fmtTokens(st.prompt_tokens)} token`));
   const ratio = fmtPercent(st.cache_ratio);
   if (ratio) parts.push(h("span", {}, "缓存命中 ", h("strong", {}, ratio)));
@@ -269,8 +271,10 @@ async function poll() {
   if (polling) return;
   polling = true;
   try {
-    const { status, body } = await api("/api/state", { timeout: 4000 });
+    const { status, body } = await api(STATIC ? "api/state.json" : "api/state", { timeout: 4000 });
+    if (status === 401) return showLogin();
     if (status !== 200) throw new Error(String(status));
+    hideLogin();
     if (failures) {
       els.notice.classList.add("hidden");
       toast("已重新连上");
@@ -301,7 +305,7 @@ function boot() {
   els.reset.addEventListener("click", async () => {
     if (!live() || state.busy) return;
     if (!confirm("开一个新会话？当前会话的记录和版本都会保留在会话目录里。")) return;
-    const { status, body } = await api("/api/reset", { method: "POST", body: "{}" });
+    const { status, body } = await api("api/reset", { method: "POST", body: "{}" });
     if (status !== 200) return toast(body.error || "现在不能开新会话");
     ui.shown = null;
     ui.follow = true;
@@ -316,8 +320,32 @@ function boot() {
     viewer?.setWire(on);
   });
   els.fit.addEventListener("click", () => viewer?.fit());
+  $("login-form").addEventListener("submit", login);
   poll();
-  setInterval(poll, POLL_MS);
+  if (!STATIC) setInterval(poll, POLL_MS);
+}
+
+// ------------------------------------------------------------------ 访问密码（公网模式）
+
+function showLogin() {
+  $("login").classList.remove("hidden");
+  if (document.activeElement !== $("login-password")) $("login-password").focus();
+}
+
+function hideLogin() {
+  $("login").classList.add("hidden");
+}
+
+async function login(e) {
+  e.preventDefault();
+  const { status, body } = await api("api/login", { method: "POST", body: JSON.stringify({ password: $("login-password").value }) });
+  if (status !== 200) {
+    $("login-error").textContent = body.error || "密码不对";
+    return;
+  }
+  $("login-error").textContent = "";
+  $("login-password").value = "";
+  poll();
 }
 
 boot();

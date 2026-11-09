@@ -502,3 +502,109 @@ def test_backfill_stl(tmp_path):
     assert backfill(tmp_path / "s") == [f"v1：已导出 model.stl（{(v / 'model.stl').stat().st_size} 字节）"]
     assert (v / "model.stl").stat().st_size > 84
     assert backfill(tmp_path / "s") == ["v1：已有 model.stl，跳过"]
+
+
+# ---------------------------------------------------------------- 公网测试：访问密码和花费上限
+
+
+def login(server, password: str):
+    conn = http.client.HTTPConnection("127.0.0.1", server.server_address[1], timeout=10)
+    conn.request("POST", "/api/login", body=json.dumps({"password": password}).encode(), headers={"Content-Type": "application/json"})
+    resp = conn.getresponse()
+    resp.read()
+    cookie = resp.getheader("Set-Cookie")
+    conn.close()
+    return resp.status, cookie
+
+
+def test_password_gate(tmp_path):
+    state = make_state(tmp_path, ScriptedLLM([LLMReply("在的", [], {})]))
+    server = make_server(state, port=0, password="secret-123")
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        assert call(server, "GET", "/")[0] == 200 and call(server, "GET", "/static/app.js")[0] == 200  # 页面本身能打开，好显示登录框
+        assert call(server, "GET", "/api/state")[0] == 401 and call(server, "GET", "/files/v1/view.png")[0] == 401
+        assert call(server, "POST", "/api/message", {"text": "你好"})[0] == 401
+        assert login(server, "wrong")[0] == 401
+        status, cookie = login(server, "secret-123")
+        assert status == 200 and "HttpOnly" in cookie and "SameSite=Strict" in cookie
+        token = cookie.split(";")[0]
+        conn = http.client.HTTPConnection("127.0.0.1", server.server_address[1], timeout=10)
+        conn.request("GET", "/api/state", headers={"Cookie": token})
+        resp = conn.getresponse()
+        assert resp.status == 200 and json.loads(resp.read())["mode"] == "live"
+        conn.close()
+    finally:
+        server.shutdown()
+        server.server_close()
+
+
+def test_budget_stops_new_messages(tmp_path, serve):
+    reply = LLMReply("在的", [], {})
+    reply.cost = 0.6
+    state = make_state(tmp_path, ScriptedLLM([reply, LLMReply("不该被调用", [], {})]))
+    state.budget = 0.5
+    server = serve(state)
+    snap = say(server, state, "你好")
+    assert snap["budget"] == {"limit": 0.5, "spent": 0.6}
+    status, data, _ = call(server, "POST", "/api/message", {"text": "再来"})
+    assert status == 402 and "上限" in json.loads(data)["error"]
+    assert call(server, "POST", "/api/reset", {})[0] == 200
+    assert call(server, "POST", "/api/message", {"text": "新会话也不行"})[0] == 402  # 累计花费不随新会话清零
+
+
+def test_main_public_needs_password_and_pricing(monkeypatch, tmp_path):
+    from cad_agent.web.__main__ import main
+
+    out: list[str] = []
+    monkeypatch.setenv("DEEPSEEK_API_KEY", "test-key-not-real")
+    monkeypatch.delenv("CAD_WEB_PASSWORD", raising=False)
+    assert main(["--config", str(ROOT / "config.example.toml"), "--public", "--no-browser"], print_fn=lambda *a, **k: out.append(str(a))) == 1
+    assert "CAD_WEB_PASSWORD" in "".join(out)
+    monkeypatch.setenv("CAD_WEB_PASSWORD", "long-enough")
+    out.clear()
+    assert main(["--config", str(ROOT / "config.example.toml"), "--public", "--no-browser"], print_fn=lambda *a, **k: out.append(str(a))) == 1
+    assert "pricing" in "".join(out)  # 示例配置没填价目表，没法限制花费，就不让开公网
+
+
+def test_public_launcher_and_gitignore():
+    bat = (ROOT / "start_public.bat").read_text(encoding="utf-8")
+    assert "--public" in bat and "--budget" in bat and "cloudflared.exe tunnel" in bat and "CAD_WEB_PASSWORD" in bat
+    assert "tools/" in (ROOT / ".gitignore").read_text(encoding="utf-8")
+
+
+# ---------------------------------------------------------------- 静态演示站
+
+
+def test_export_static_site(tmp_path):
+    from cad_agent.web.export import export_site
+
+    out = export_site(ROOT / "demo" / "phone_stand", tmp_path / "site")
+    html = (out / "index.html").read_text(encoding="utf-8")
+    assert 'data-mode="static"' in html and 'href="static/style.css"' in html and '"./static/vendor/three/three.module.js"' in html
+    snap = json.loads((out / "api" / "state.json").read_text(encoding="utf-8"))
+    assert snap["mode"] == "replay" and [v["name"] for v in snap["versions"]] == ["v1", "v2"]
+    for name in ("model.stl", "model.step", "view.png", "model.py", "checks.json"):
+        assert (out / "files" / "v2" / name).is_file(), name
+    assert (out / ".nojekyll").is_file() and (out / "static" / "vendor" / "three" / "three.module.js").is_file()
+    assert not (out / "static" / "index.html").exists()
+    export_site(ROOT / "demo" / "phone_stand", out)  # 再导出一次会覆盖
+    other = tmp_path / "mine"
+    other.mkdir()
+    (other / "important.txt").write_text("x", encoding="utf-8")
+    with pytest.raises(FileExistsError):
+        export_site(ROOT / "demo" / "phone_stand", other)  # 不是导出过的目录，不覆盖
+
+
+def test_committed_site_is_up_to_date(tmp_path):
+    """site/ 是要发布到 GitHub Pages 的；页面改了却忘了重新导出时，这个测试会提醒。"""
+    from cad_agent.web.export import export_site
+
+    fresh = export_site(ROOT / "demo" / "phone_stand", tmp_path / "site")
+    for path in fresh.rglob("*"):
+        if path.is_file():
+            committed = ROOT / "site" / path.relative_to(fresh)
+            assert committed.is_file() and committed.read_bytes() == path.read_bytes(), f"{path.relative_to(fresh)} 不是最新的，请重新运行 python -m cad_agent.web.export demo\phone_stand site"
+    workflow = (ROOT / ".github" / "workflows" / "pages.yml").read_text(encoding="utf-8")
+    assert "path: site" in workflow and "actions/deploy-pages" in workflow

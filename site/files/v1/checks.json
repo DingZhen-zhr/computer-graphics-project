@@ -1,0 +1,137 @@
+[
+ {
+  "id": "valid",
+  "type": "valid",
+  "passed": true,
+  "measured": null,
+  "expected": null,
+  "tol": null,
+  "detail": "几何体有效"
+ },
+ {
+  "id": "single_solid",
+  "type": "single_solid",
+  "passed": true,
+  "measured": 1.0,
+  "expected": 1.0,
+  "tol": null,
+  "detail": "模型里有 1 个实体，应当只有 1 个"
+ },
+ {
+  "id": "positive_volume",
+  "type": "positive_volume",
+  "passed": true,
+  "measured": 90633.42308546133,
+  "expected": null,
+  "tol": null,
+  "detail": "体积 90633.423，应当大于 0"
+ },
+ {
+  "id": "size-x",
+  "type": "bbox",
+  "passed": true,
+  "measured": 90.0,
+  "expected": 90.0,
+  "tol": 0.1,
+  "detail": "x 向尺寸 90.0000，期望 90.0000，容差 ±0.1"
+ },
+ {
+  "id": "plate-thickness",
+  "type": "distance",
+  "passed": true,
+  "measured": 4.999999999999999,
+  "expected": 5.0,
+  "tol": 0.1,
+  "detail": "最小距离 5.0000，期望 == 5.0000，容差 ±0.1。a 选中 2 个：[1] PLANE 中心(0, -23.0311, 5) 面积 2629.9 法向(0, 0, 1)；[2] PLANE 中心(0, 19.5144, 5) 面积 3687.4 法向(0, 0, 1)；b 选中 1 个：[1] PLANE 中心(0, 0, 0) 面积 7200 法向(0, 0, -1)"
+ },
+ {
+  "id": "tilt-angle",
+  "type": "angle",
+  "passed": true,
+  "measured": 115.0,
+  "expected": 115.0,
+  "tol": 0.5,
+  "detail": "两个平面法向夹角 115.0000°，期望 115.0000°，容差 ±0.5°。a：[1] PLANE 中心(0, 16.756, 54.8469) 面积 9900 法向(0, -0.9063, 0.4226)（共选中 1 个平面，取面积最大的）；b：[1] PLANE 中心(0, 0, 0) 面积 7200 法向(0, 0, -1)（共选中 1 个平面，取面积最大的）"
+ },
+ {
+  "id": "total-height",
+  "type": "bbox",
+  "passed": true,
+  "measured": 104.69385657403151,
+  "expected": 104.6938565740315,
+  "tol": 0.1,
+  "detail": "z 向尺寸 104.6939，期望 104.6939，容差 ±0.1"
+ },
+ {
+  "id": "slot-width",
+  "type": "distance",
+  "passed": true,
+  "measured": 13.999999999999996,
+  "expected": 14.0,
+  "tol": 0.1,
+  "detail": "最小距离 14.0000，期望 == 14.0000，容差 ±0.1。a 选中 1 个：[1] PLANE 中心(0, 16.756, 54.8469) 面积 9900 法向(0, -0.9063, 0.4226)；b 选中 2 个：[1] PLANE 中心(-27.5, -18.7657, 11.7973) 面积 525 法向(0, 0.9063, -0.4226)；[2] PLANE 中心(27.5, -18.7657, 11.7973) 面积 525 法向(0, 0.9063, -0.4226)"
+ },
+ {
+  "id": "slot-back-solid",
+  "type": "point_inside",
+  "passed": true,
+  "measured": null,
+  "expected": null,
+  "tol": null,
+  "detail": "点 (20, -3.60478, 10) 实际在材料里，要求在材料里（含表面）"
+ },
+ {
+  "id": "slot-front-empty",
+  "type": "point_outside",
+  "passed": true,
+  "measured": null,
+  "expected": null,
+  "tol": null,
+  "detail": "点 (20, -19.0521, 10) 实际在材料外，要求在材料外"
+ },
+ {
+  "id": "slot-wall-solid",
+  "type": "point_inside",
+  "passed": true,
+  "measured": null,
+  "expected": null,
+  "tol": null,
+  "detail": "点 (20, -20.1555, 10) 实际在材料里，要求在材料里（含表面）"
+ },
+ {
+  "id": "notch-empty",
+  "type": "point_outside",
+  "passed": true,
+  "measured": null,
+  "expected": null,
+  "tol": null,
+  "detail": "点 (9.5, -22.3622, 10) 实际在材料外，要求在材料外"
+ },
+ {
+  "id": "notch-wall-solid",
+  "type": "point_inside",
+  "passed": true,
+  "measured": null,
+  "expected": null,
+  "tol": null,
+  "detail": "点 (10.5, -22.3622, 10) 实际在材料里，要求在材料里（含表面）"
+ },
+ {
+  "id": "phone-width-fits",
+  "type": "point_inside",
+  "passed": true,
+  "measured": null,
+  "expected": null,
+  "tol": null,
+  "detail": "点 (39, -15.3774, 2.5) 实际在材料里，要求在材料里（含表面）"
+ },
+ {
+  "id": "phone-overhangs-stand",
+  "type": "point_outside",
+  "passed": true,
+  "measured": null,
+  "expected": null,
+  "tol": null,
+  "detail": "点 (80, 0, 2.5) 实际在材料外，要求在材料外"
+ }
+]

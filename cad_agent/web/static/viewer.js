@@ -2,8 +2,8 @@
 // 任何一步失败（没有 WebGL、没有 STL、加载出错）都退回显示截图，界面不会空着。
 
 import * as THREE from "three";
-import { OrbitControls } from "/static/vendor/three/OrbitControls.js";
-import { STLLoader } from "/static/vendor/three/STLLoader.js";
+import { OrbitControls } from "./vendor/three/OrbitControls.js";
+import { STLLoader } from "./vendor/three/STLLoader.js";
 
 const VIEW_DIR = new THREE.Vector3(-0.9, -1.45, 0.95).normalize();
 
