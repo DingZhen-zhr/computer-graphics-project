@@ -233,3 +233,14 @@
 - 做了什么：`scripts/probe_stl.py` 探测 `export_product_package_to_stl`（结果写进 `docs/sca-api-notes.md` 第 16 节：签名、二进制 STL、三角形数、精度选项、中文目录、坐标范围）；`run_job(..., export_stl=...)`，`RunResult.stl_path`、`RunResult.stl_error`；子进程里 STL 导出自己 try，失败只带回 `stl_error`，不影响 STEP、截图和 `ok`；`Session.new_version(..., stl_src=...)` 复制成版本目录里的 `model.stl`；`delivery.export_version` 交付时一起导出，STL 失败时日志记一条 `stl_error`，版本照常生成。
 - 测试数量：新增 7 个（`test_exports_stl`（sca，中文目录，校验二进制 STL 的大小 = 84 + 50 × 三角形数）、`test_exports_stl_together_with_step_and_png`、`test_stl_not_requested_means_no_stl_fields`、`test_new_version_copies_stl`、`test_new_version_without_stl_has_no_model_stl`、`test_delivery_exports_stl_too`、`test_stl_failure_does_not_block_delivery`），全部测试 470 个全部通过。旧测试没动（共用的假 `Runner` 也没改，STL 用的是测试里的子类 `StlRunner`）。
 - 说明：没有偏离。工作区里有 1.2 补丁 Task 4 留下的 `.gitignore` 改动（加了 `.worktrees/`）没有提交，这次提交只加了自己改的文件。
+
+## 网页前端 Task 2：后端（状态、线程、接口） —— 完成
+
+- 做了什么：`cad_agent/web/`：`app.py`（`describe_event`、`LiveSession`、`AppState`：一条消息一个后台线程、`snapshot()`、`submit()`、`reset()`、`wait_idle()`、版本目录和版本对比）、`server.py`（`make_server`，只监听 `127.0.0.1`，`ThreadingHTTPServer`：`/`、`/static/<文件>`、`/api/state`、`POST /api/message`、`POST /api/reset`、`/api/diff`、`/files/<版本>/<文件名>` 白名单）、`__main__.py`（读配置、`build_live_agent`、端口被占用时换下一个最多试 10 个、自动打开浏览器、Ctrl+C 正常退出）。`loop.py` 的 `build` 日志多记了 `passed_checks`、`total_checks`（进度文字 `运行检查：12/12 通过` 要用）。
+- 测试数量：新增 20 个（`tests/test_web.py`：`describe_event` 全部情形、`LiveSession` 通知与监听器出错不打断智能体、消息流程、用量累计、`cost` 没有价目表时为 null、忙时 409、空消息/坏 JSON 400、智能体意外异常后 `error` 有中文说明且还能接下一条、交付后 `checks`/`versions`、文件白名单（`..`、`brief.json`、`%2e%2e`、多余路径都是 404）、版本对比 `65 → 70`、重置、只监听 127.0.0.1、启动时缺 key/缺配置、端口换下一个、`build_live_agent`），全部测试 490 个全部通过；每个文件都不到 300 行（`app.py` 229、`server.py` 164）。
+- 说明：
+  1. 线程：智能体的数据（需求单、检查、版本）只由处理消息的线程读，生成快照放进有锁保护的变量，`/api/state` 只读快照和几个有锁的计数。
+  2. 看进度的监听器自己出错只会打到终端（`traceback`），不会打断智能体；处理消息的线程里任何异常都接住，写进 `error` 并作为一条 `kind: error` 的助手消息显示在对话里，服务不退出。
+  3. 开始处理一条消息时 `activity` 先放一条"正在思考…"，所以第一次调用模型还没返回时页面也有进度。
+  4. `/api/diff` 用 `cli.diff_briefs`；`/files` 和 `/static` 的路径检查：版本名必须是 `v<数字>`，文件名必须在白名单里，静态文件的相对路径里不许有空段、`.`、`..`、反斜杠、冒号，并且解析后必须在 `static` 目录里。
+  5. 没有偏离。`.gitignore` 里 1.2 补丁 Task 4 留下的改动仍未提交，这次提交没有带上它。

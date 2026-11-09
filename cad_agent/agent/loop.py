@@ -233,6 +233,7 @@ class Agent:
         self.session.log(
             "build", passed=body["passed"], error=body["error"], failed_checks=[f["id"] for f in body["failed_checks"]],
             missing_coverage=body["missing_coverage"], failures=self.toolbox.build_failures,
+            passed_checks=body["passed_checks"], total_checks=body["passed_checks"] + len(body["failed_checks"]),  # 网页进度条用
             duration_s=round(outcome.build.duration_s, 3),
         )
 
