@@ -331,3 +331,9 @@
 - 做了什么：`cad_agent/cases.py`（`BUILTIN_DIR`、`TAG_BONUS`、`THRESHOLD`、`MAX_CASE_CHARS`、`CaseError`、`Case`、`load_case`、`load_cases`、`score`、`pick_cases`、`render_cases`、`save_case`、`case_workspace`，另加检索用的 `query_text`）：`case.yaml` 的七个键都要有，计划用 `revise` 校验，特征和检查的 `stage` 必须在计划里，出错信息带文件位置；相似度是去掉空白和标点后的相邻二字组 Jaccard 加标签命中；渲染照提示词文档第 5 节，每个案例一段最多 3000 字符；`save_case` 只收计划全部通过的工作区，目录名 `user-<时间>`、重名加序号。`Agent.__init__` 加仅限关键字的 `cases`；分阶段、开关 `cases` 打开、需求单可以建模且还没有计划时，在快照后面接上挑中的案例，写 `cases` 日志。`pyproject.toml` 的 `package-data` 加 `case_data/*/case.yaml`。
 - 测试数量：新增 19 个（`test_cases.py` 17 个，其中坏案例 6 种参数化，另加"坏 YAML / 没有文件""空白和标点不影响分数"；`test_staged_loop.py` 加 2 个：规划那一轮注入、开关关掉或旧流程时不注入），全部测试 708 个全部通过。
 - 说明：没有偏离。`save_case` 的接口里没有一句话需求，`request` 取需求单的用途，没有用途时取零件名，再没有就用标题。自带案例目录 `case_data/` 由 Task 14 建，现在不存在时 `load_cases` 只读用户案例。写测试时一个坏案例的测试改了共用的检查字典，导致别的测试顺序相关地失败，已在测试里改成先复制。
+
+## 第二版 计划 1 Task 12：参数直改（内核部分） —— 完成
+
+- 做了什么：`cad_agent/agent/manual.py`（`ManualResult`、`apply_params`）：只在分阶段、计划全部通过、已经有至少一个版本时可用；参数名不认识、不是有限的数（布尔、文字、NaN、无穷都不行）、和现在全相同时各给一句中文、什么都不改；改动的参数写进需求单（单位、备注不变，来源改成 user），全部阶段变回未通过后调用 `advance`；没走到 complete 或缺检查（只用终检的缺检查那一项）就恢复备份（需求单、各阶段通过状态、probe 次数、上次运行结果），返回第 9 节最后一个 text 块的原文和停下那个阶段的 `failed_checks`、`error`；通过就导出新版本，变化行照第 9 节"手动修改参数"的格式，版本目录里带 `plan.json` 和各阶段 STL。两种结果都写 `manual` 日志。全程不调用模型、不做扰动验证。
+- 测试数量：新增 15 个（`tests/test_manual.py`，比计划多了：计划没全部通过时不可用、7 种坏输入参数化、出错时 `error` 的格式、成功后会话目录里的需求单和计划也更新），全部测试 723 个全部通过。
+- 计划没写到、由我定的细节：阶段 STL 先导出到临时目录，通过了才复制到会话的 `stages/`，这样失败的那次不会把阶段回看用的 STL 换成没生效的数值；成功后调用一次 `Agent._save()`，让会话目录里的 `brief.json`、`plan.json` 和新数值一致；导出失败时同样恢复备份。新版本不写 `gate.json`（这次没做扰动验证，写了反而误导）。没有偏离。
