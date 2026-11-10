@@ -49,14 +49,22 @@ class Session:
         with (self.dir / "log.jsonl").open("a", encoding="utf-8") as f:
             f.write(json.dumps(row, ensure_ascii=False, default=str) + "\n")
 
-    def save_state(self, brief: Brief, features_list: list[dict], checks_raw: list[dict], notebook_text: str) -> None:
-        _write_json(self.dir / "brief.json", brief.to_dict())
-        _write_json(self.dir / "features.json", features_list)
-        _write_json(self.dir / "checks.json", checks_raw)
-        (self.dir / "model.py").write_text(notebook_text, encoding="utf-8")
+    def part_dir(self, part_id: str = "main") -> Path:
+        """零件状态（需求单、计划、特征、检查、版本）放在哪个目录。这一版只有一个零件，就是会话目录本身（设计文档第 3.9 节）。"""
+        return self.dir
+
+    def save_state(self, brief: Brief, features_list: list[dict], checks_raw: list[dict], notebook_text: str,
+                   plan: list[dict] | None = None) -> None:
+        d = self.part_dir()
+        _write_json(d / "brief.json", brief.to_dict())
+        _write_json(d / "features.json", features_list)
+        _write_json(d / "checks.json", checks_raw)
+        (d / "model.py").write_text(notebook_text, encoding="utf-8")
+        if plan is not None:
+            _write_json(d / "plan.json", plan)
 
     def versions(self) -> list[Path]:
-        root = self.dir / "versions"
+        root = self.part_dir() / "versions"
         if not root.is_dir():
             return []
         found = [(int(m.group(1)), p) for p in root.iterdir() if p.is_dir() and (m := VERSION_RE.match(p.name))]
@@ -72,10 +80,12 @@ class Session:
         step_src: Path,
         png_src: Path,
         stl_src: Path | None = None,
+        extra_json: dict[str, Any] | None = None,
+        stages_src: Path | None = None,
     ) -> Path:
         existing = self.versions()
         n = int(VERSION_RE.match(existing[-1].name).group(1)) + 1 if existing else 1  # type: ignore[union-attr]
-        v = self.dir / "versions" / f"v{n}"
+        v = self.part_dir() / "versions" / f"v{n}"
         v.mkdir(parents=True)
         (v / "model.py").write_text(notebook_text, encoding="utf-8")
         shutil.copyfile(step_src, v / "model.step")
@@ -86,4 +96,8 @@ class Session:
         _write_json(v / "brief.json", brief.to_dict())
         lines = [f"# v{n} 变更说明", ""] + ([f"- {c}" for c in changes] if changes else ["- （需求单参数没有变化）"])
         (v / "changes.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
+        for key, data in (extra_json or {}).items():  # 分阶段时：gate.json、plan.json
+            _write_json(v / f"{key}.json", data)
+        if stages_src is not None and Path(stages_src).is_dir():  # 各阶段的 STL，给界面的阶段回看用
+            shutil.copytree(stages_src, v / "stages")
         return v

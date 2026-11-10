@@ -23,8 +23,41 @@ def load_system_prompt(staged: bool = False) -> str:
     return system + "\n\n" + sheet + "\n"
 
 
-def render_snapshot(ws: Workspace) -> str:
-    """快照，格式见 1.1 版提示词文档第 2 节。每轮开始时生成一次，这一轮中间不再改。"""
+def _plan_lines(ws: Workspace) -> str:
+    if ws.plan is None:
+        return "无"
+    cur = ws.plan.current()
+    def status(s) -> str:  # noqa: ANN001 - Stage
+        return "已通过" if s.passed else ("当前" if cur is not None and s.id == cur.id else "未开始")
+    return "\n".join(f"{s.id} {s.title}：{s.done_when} —— {status(s)}" for s in ws.plan.stages)
+
+
+def _render_staged(ws: Workspace) -> str:
+    """分阶段流程的快照，格式见第二版提示词文档第 3 节。"""
+    from cad_agent.staged.summary import feature_block  # 避免循环导入
+
+    ok, _ = ws.brief.can_build()
+    if not ok:
+        phase = "澄清中（需求单未确认）"
+    elif ws.plan is None:
+        phase = "规划中（还没有计划，先调用 set_plan）"
+    elif ws.plan.current() is not None:
+        phase = f"建模中（当前阶段 {ws.plan.current().id}）"
+    else:
+        phase = "全部阶段已通过"
+    lines = [SNAPSHOT_TITLE, f"阶段：{phase}", "需求单：", json.dumps(ws.brief.to_dict(), ensure_ascii=False, indent=1)]
+    if ok:
+        checks = json.dumps(ws.checks_raw, ensure_ascii=False, indent=1) if ws.checks_raw else "无"
+        last_build = "未运行" if ws.last_build_content is None else ws.last_build_content
+        lines += ["计划：", _plan_lines(ws), "特征（按顺序）：", feature_block(ws.features.items),
+                  "检查项：", checks, "上次 build：", last_build]
+    return "\n".join(lines)
+
+
+def render_snapshot(ws: Workspace, staged: bool = False) -> str:
+    """快照，格式见 1.1 版提示词文档第 2 节（staged 为真时见第二版第 3 节）。每轮开始时生成一次，这一轮中间不再改。"""
+    if staged:
+        return _render_staged(ws)
     ok, _ = ws.brief.can_build()
     lines = [
         SNAPSHOT_TITLE,

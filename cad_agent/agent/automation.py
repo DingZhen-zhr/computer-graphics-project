@@ -87,3 +87,13 @@ def should_build_before_reply(ws: Workspace, unbuilt_edits: bool, used_this_turn
         and bool(ws.features.items)
         and bool(ws.checks_raw)
     )
+
+
+def staged_build_ready(ws: Workspace) -> bool:
+    """分阶段时纯文字结束前兜底 build 的附加条件：当前阶段既有特征又有检查，或者计划已经全部通过。"""
+    from cad_agent.staged.select import stage_ready  # 避免循环导入
+
+    if ws.plan is None:
+        return False
+    cur = ws.plan.current()
+    return cur is None or stage_ready(ws, cur.id)

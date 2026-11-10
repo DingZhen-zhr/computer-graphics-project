@@ -27,8 +27,11 @@ def compact_text(kind: str, text: str) -> str:
     return text  # question、reply、failed：给用户看的文字原样保留
 
 
-def with_warning(content: str, calls_left: int) -> str:
-    """剩余工具调用次数不多时，给工具返回的 JSON 对象加一个 warning 字段；其他内容原样返回。"""
+def with_warning(content: str, calls_left: int, text: str | None = None) -> str:
+    """剩余工具调用次数不多时，给工具返回的 JSON 对象加一个 warning 字段；其他内容原样返回。
+
+    text 是 warning 的文字（分阶段时按阶段算，见第二版提示词文档 7.4）；不给就用旧流程的写法。
+    """
     if calls_left > WARNING_THRESHOLD:
         return content
     try:
@@ -37,7 +40,7 @@ def with_warning(content: str, calls_left: int) -> str:
         return content
     if not isinstance(data, dict):
         return content
-    data["warning"] = f"本轮工具调用只剩 {max(calls_left, 0)} 次"
+    data["warning"] = text if text is not None else f"本轮工具调用只剩 {max(calls_left, 0)} 次"
     return json.dumps(data, ensure_ascii=False)
 
 
@@ -48,11 +51,18 @@ class Context:
         self._raw_user: str | None = None   # 本轮用户原话（折叠时用）
         self._turn_user: dict | None = None  # 本轮的 user 消息（快照 + 原话）
         self._current: list[dict] = []      # 本轮已发生的 assistant / tool 消息
+        self._fold_at = 0                    # 分阶段时：本轮里上一个折叠点（_current 里的位置）
 
     def start_turn(self, user_content: str, snapshot: str) -> None:
         self._raw_user = user_content
         self._turn_user = {"role": "user", "content": f"{snapshot}\n\n{USER_HEADER}\n{user_content}"}
         self._current = []
+        self._fold_at = 0
+
+    def fold(self, summary: str) -> None:
+        """把本轮上一个折叠点之后的全部消息换成一条 user 消息（阶段小结），折叠点移到它后面。"""
+        self._current = self._current[: self._fold_at] + [{"role": "user", "content": summary}]
+        self._fold_at = len(self._current)
 
     def append(self, message: dict) -> None:
         self._current.append(message)
@@ -62,6 +72,7 @@ class Context:
             return
         self._past += [{"role": "user", "content": self._raw_user}, {"role": "assistant", "content": compact_text(kind, text)}]
         self._raw_user, self._turn_user, self._current = None, None, []
+        self._fold_at = 0
 
     def messages(self) -> list[dict]:
         """返回新列表：system；旧轮的折叠版；本轮 user（快照在前、原话在后）；本轮追加的消息。"""

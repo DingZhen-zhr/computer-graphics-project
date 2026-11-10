@@ -318,3 +318,10 @@
 - 测试数量：新增 13 个（`test_references.py` 6 个、`test_staged_extras.py` 7 个，比计划多了"probe 出错时 error 用 build 的格式"），全部测试 666 个全部通过。
 - 偏离：D11。SCA 安装包里没有任何一节超过 6000 字符（`ql-playbook` 最长的一节约 3216 字符），计划里"最长一节被截断"的断言不可能成立；测试改为先确认真实上限下不截断，再用 `monkeypatch` 调小上限验证截断写法，没有放松检查。
 - 计划没写到、由我定的细节：probe 每真正跑一次沙盒就计一次（包括 probe 代码自己抛异常的那次），没过静态检查、拼不成 notebook 的不计；不给 section 时开头一段直接截到 3000 字符、不加省略行（计划要求"不超过 3000 字符"），`truncated` 照实写。
+
+## 第二版 计划 1 Task 10：主循环接入分阶段流程 —— 完成
+
+- 做了什么：`render_snapshot(ws, staged)`（第二版提示词文档第 3 节）；`cad_agent/staged/summary.py`（`stage_summary`，第 4 节）；`Context.fold`；`with_warning` 多一个可选的提醒文字；`Session.part_dir()`，`save_state(..., plan=)` 写 `plan.json`，`new_version(..., extra_json=, stages_src=)`；`delivery_text(..., gate=)` 在检查表格之后加参数扰动验证那一行（第 9 节两种写法）；`export_version` 改用 `final_checks`、可带 `extra_json`/`stages_src`；`failure_text` 在 build 返回里有终检结果时多列一行没被约束的参数（旧流程没有这个键，文字不变）；`automation.staged_build_ready`。主循环：分阶段时用 `load_system_prompt(True)` 和分阶段快照、`stage_dir` 设成会话目录下的 `stages`；分阶段特有的部分放进新文件 `cad_agent/agent/staged_hooks.py`（每阶段工具调用计数和上限、7.4 的提醒和停止文字、stage/gate 日志、折叠）；交付时 `gate.json`、`plan.json`、`stages/` 进版本目录；`build` 日志多 `stage`、`stages_passed`。`loop.py` 超过 300 行，把一轮的计数 `_Counters` 原样移到 `cad_agent/agent/counters.py`（现在 276 行）。
+- 测试数量：新增 23 个（`test_snapshot_v2.py` 6 个、`test_staged_loop.py` 17 个，比计划多了：快照的排布、没做扰动时交付文字没有那一行、当前阶段写好时纯文字结束会兜底 build），全部测试 689 个全部通过。旧的 `test_loop.py`、`test_session.py`、`test_web.py` 原样通过。
+- 偏离：D12（折叠时机：最近一次 build 失败或终检没过时先不折叠，免得模型看不到要改的内容）。
+- 计划没写到、由我定的细节：`set_plan` 成功时当前阶段的工具调用计数清零（设计文档"规划和终检各按一个阶段算"）；阶段通过时清零，所以终检也是新的一份；达到每阶段上限而当时没有当前阶段（还没计划，或全部通过在做终检）时，用旧流程"这一轮工具调用已经达到上限"的原文、数字写每阶段上限。
