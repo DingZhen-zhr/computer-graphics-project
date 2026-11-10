@@ -304,3 +304,10 @@
 - 做了什么：`cad_agent/staged/build.py`（`StageRun`、`Advance`、`advance`、`build_tool`）：从当前阶段起取连续的、写好了特征和检查的阶段，各跑一次截断的 notebook（最多 4 个线程同时跑，各自起沙盒子进程），按顺序看结果，第一个没通过的就停；渲染或检查写法出错时不运行，记成和旧流程 `_build_without_run` 一样的结果；通过的阶段清零 `probes_used`。`build_tool`：当前阶段没有特征 / 没有检查时返回 7.3 的原文、不计失败；全部通过后再 build 会把最后一个阶段重新验证；有阶段新通过时失败计数先清零；返回体是旧流程 8 个键加 `stage`、`stages_passed`、`final_gate`，hint 按 7.2 的顺序取。`ToolBox` 新增 `stage_dir`、`last_advance`、`last_gate`。终检先放了一个只算缺检查的版本（`cad_agent/staged/final_gate.py`，`GateResult` 已按计划的接口写好，扰动在 Task 8 加），缺检查时按旧流程多放 `coverage_note`（偏离 D4 的做法）。`tests/helpers_staged.py`（`StageRunner`、`two_stage_ws` 等）。
 - 测试数量：新增 20 个（`tests/test_staged_build.py`，比计划多了：检查写法出错算阶段失败、只用 1 个线程也能跑、阶段失败时 hint 用旧流程原文、缺检查只按 from_here 算、`ToolBox` 新成员的默认值），全部测试 629 个全部通过。
 - 说明：`two_stage_ws()` 的 s1 有两条检查（`base-w` 和用到 `tilt_deg` 的 `tilt`），这样两个用户参数都有检查，终检能通过；计划写的是"每个阶段一条检查"，多一条是为了让"可以交付"的测试有意义。返回体里的 `missing_coverage` 只在做了终检时才有内容（阶段还没做完时后面阶段的检查还没写，提前报缺检查没有意义）。没有偏离。
+
+## 第二版 计划 1 Task 8：参数扰动验证与终检 —— 完成
+
+- 做了什么：`cad_agent/staged/mutation.py`（`LIMIT = 12`、`MutationResult`、`perturbations`、`run_mutation`）：只扰动用户参数、按需求单顺序取前 12 个；每个参数按顺序试数值，用改后的参数渲染全部特征、检查用 `final_checks`、`check_values` 传改之前的全部参数值；出错、超时或必做检查不过算"这个方向建不出来"，换下一个数值；有别的检查不过就是 `constrained`，全过就是 `unconstrained`；各参数之间最多 4 个线程并行，结果保持需求单的顺序。`final_gate.py` 的 `run_final_gate` 补上扰动：先算缺检查（只看 from_here），缺了就不扰动；`mutation_check` 关掉时也不扰动；通过 = 不缺检查且没有 `unconstrained`。`GateResult.to_dict()` 是 7.1 的三个键加 `skipped` 和每个参数的 `mutation` 明细。`build_tool` 在 Task 7 已经接好，`unconstrained` 时计一次失败、hint 用 7.2 的 text 块 B。
+- 测试数量：新增 24 个（`test_mutation.py` 12 个、`test_final_gate.py` 7 个、`test_staged_build.py` 加 2 个、`test_final_gate_sca.py` 3 个），全部测试 653 个全部通过。
+- 真实 SCA 的结果（设计文档成功标准 3）：壁厚写死的小盒子，终检结果 `unconstrained == ["wall"]`，另外三个尺寸都是 `constrained`；唯一用到孔径的检查期望值是 `hole_d * 0 + 80` 的板，结果 `unconstrained == ["hole_d"]`；同一块板照速查表"孔径"一条写检查，两个参数都是 `constrained`、终检通过。三条一共 6.9 秒。
+- 说明：没有偏离。一处由我定的细节：改后的参数拼不成 notebook（理论上不会发生，参数值不影响拼装）时也当作"这个方向建不出来"。

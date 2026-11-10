@@ -213,3 +213,47 @@ def test_toolbox_stage_members_default():
     box = box_for(two_stage_ws(), StageRunner())
     assert box.stage_dir is None and box.last_advance is None and box.last_gate is None
     assert CHECK_S2["stage"] == "s2"
+
+
+# ---------------------------------------------------------------- 终检（Task 8）
+
+from helpers_staged import last_slug  # noqa: E402
+
+
+class MutRunner(StageRunner):
+    """带 check_values 的调用（扰动验证）：改了 frozen 参数的那次，检查全过（参数没被约束）或指定的检查不过。"""
+
+    def __init__(self, unconstrained: set[str]) -> None:
+        super().__init__()
+        self.unconstrained = unconstrained
+
+    def __call__(self, rendered, checks_raw, param_names, **kw):
+        cv = kw.get("check_values")
+        if not cv:
+            return super().__call__(rendered, checks_raw, param_names, **kw)
+        changed = [n for n, v in cv.items() if f'"{n}", {v:g},' not in rendered.text and f"{n} = {v:g}" not in rendered.text]
+        with self.lock:
+            self.calls.append({"slug": last_slug(rendered.text), "check_ids": [c["id"] for c in checks_raw], "changed": changed, **kw})
+        if changed and changed[0] in self.unconstrained:
+            return passing(*[c["id"] for c in checks_raw])
+        return failing(checks_raw[0]["id"])
+
+
+def test_build_unconstrained_counts_as_failure():
+    box = box_for(two_stage_ws(), MutRunner({"tilt_deg"}), Gates())
+    out = box.call("build", {})
+    body = json.loads(out.content)
+    assert body["final_gate"] == {"missing_coverage": [], "unconstrained": ["tilt_deg"], "unbuildable": []}
+    assert body["hint"] == msg.hint_unconstrained(["tilt_deg"])
+    assert box.build_failures == 1 and body["failures_left"] == 2
+    assert body["passed"] is False and not out.deliverable and box.last_gate.unconstrained == ["tilt_deg"]
+
+
+def test_build_deliverable_after_gate():
+    r = MutRunner(set())
+    box = box_for(two_stage_ws(), r, Gates())
+    out = box.call("build", {})
+    body = json.loads(out.content)
+    assert out.deliverable and body["passed"] and body["hint"] == ALL_PASSED_HINT
+    assert sorted(c["changed"][0] for c in r.calls if c.get("check_values")) == ["phone_w", "tilt_deg"]
+    assert [m.verdict for m in box.last_gate.mutation] == ["constrained", "constrained"]
