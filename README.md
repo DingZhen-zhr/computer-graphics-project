@@ -143,20 +143,24 @@ GitHub Pages 上放的是 `demo/phone_stand` 那次真实会话的回放，可�
 - 页面改了以后，运行 `.venv\Scripts\python -m cad_agent.web.export demo\phone_stand site` 重新导出 `site/`，提交并推送后会自动发布。
 - 第一次使用前，要在仓库的 Settings → Pages → Build and deployment 里，把 Source 选成 "GitHub Actions"。
 
-### 公网实时测试（让队员用组长的 DeepSeek 试）
+### 公网实时体验（拿到密码的人都能自己完整走一遍流程）
 
-GitHub Pages 跑不了后台，所以实时测试的服务开在组长电脑上，用 Cloudflare 的免费临时隧道给一个公网网址。
+GitHub Pages 跑不了后台，所以实时体验的服务开在组长电脑上，用 Cloudflare 的免费临时隧道接到公网。
 
-1. 双击 `start_public.bat`，输入一个访问密码（至少 6 位）。
-2. 窗口里会出现 `https://xxxx.trycloudflare.com` 这样的网址，把网址和密码发给队员。
-3. 关掉这两个窗口，就停止公开。
+1. 双击 `start_public.bat`，输入一个访问密码（至少 6 位，输入时不显示）。
+2. 脚本会自动做三件事：
+   - 启动服务；
+   - 建立隧道；
+   - 把公网网址写进 `site/live.json` 并推送。
+3. 大约一分钟后，演示站右上角会出现红色的「开始实时体验」，把**演示站网址和密码**发给大家就行。
+4. 按 Ctrl+C 或关掉窗口，就结束开放，演示站会自动改回离线。
 
-注意：
+规则：
 
-- 需要 `tools\cloudflared.exe`（不进 git；没有的话从 https://github.com/cloudflare/cloudflared/releases 下载 `cloudflared-windows-amd64.exe`，改成这个名字放进 `tools\`）。
-- 必须先在 `config.toml` 填好价目表。累计花费到上限（默认 ¥5，可在 bat 里改 `--budget`）后，不再接新消息。
-- 所有访问者共用一个会话，适合轮流试，不适合几个人同时操作。
-- 组长电脑要一直开着，每次启动网址都会变。
+- **每个登录的人有自己的会话**，互不干扰；同时在建模的人数有上限（默认 3 个，多的人会看到"请稍等"）。
+- 所有人**共用一个花费上限**（默认 ¥5，可在 `start_public.bat` 里改 `--budget`），到了就不再接新消息。必须先在 `config.toml` 填好价目表。
+- 需要 `tools\cloudflared.exe`，它不进 git。没有的话，从 https://github.com/cloudflare/cloudflared/releases 下载 `cloudflared-windows-amd64.exe`，改成这个名字放进 `tools\`。
+- 组长电脑要一直开着；每次开放，隧道网址都会变（演示站会自动指向新网址）。
 
 演示前检查几件事：
 

@@ -13,7 +13,8 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, unquote, urlsplit
 
-from cad_agent.web.app import OVER_BUDGET, READ_ONLY, VERSION_NAME_RE, LiveApp, ReplayApp
+from cad_agent.web.app import CROWDED, OVER_BUDGET, READ_ONLY, VERSION_NAME_RE, LiveApp, ReplayApp
+from cad_agent.web.pool import VisitorPool
 
 STATIC_DIR = Path(__file__).parent / "static"
 FILE_WHITELIST = ("view.png", "model.step", "model.stl", "model.py", "checks.json")
@@ -30,8 +31,12 @@ def _content_type(path: Path) -> str:
 COOKIE = "cad_auth"
 
 
-def make_server(state: LiveApp | ReplayApp, host: str = "127.0.0.1", port: int = 8765, password: str | None = None) -> ThreadingHTTPServer:
-    """password 不为空时（公网测试），除了页面和静态文件，其余接口都要先用密码登录，拿到 cookie。"""
+def make_server(state: LiveApp | ReplayApp | None, host: str = "127.0.0.1", port: int = 8765, password: str | None = None,
+                pool: VisitorPool | None = None) -> ThreadingHTTPServer:
+    """password 不为空时（公网测试），除了页面、静态文件和 /api/health，其余接口都要先用密码登录，拿到 cookie。
+
+    给了 pool 时，每次登录发一个新令牌、开一个独立会话（多人各用各的）；没给时所有人用同一个 state。
+    """
     token = secrets.token_urlsafe(32)
 
     class Handler(BaseHTTPRequestHandler):
@@ -63,14 +68,24 @@ def make_server(state: LiveApp | ReplayApp, host: str = "127.0.0.1", port: int =
             self.end_headers()
             self.wfile.write(body)
 
-        def _authed(self) -> bool:
-            if not password:
-                return True
+        def _cookie(self) -> str | None:
             for part in (self.headers.get("Cookie") or "").split(";"):
                 name, _, value = part.strip().partition("=")
-                if name == COOKIE and hmac.compare_digest(value, token):
-                    return True
-            return False
+                if name == COOKIE:
+                    return value
+            return None
+
+        def _state(self) -> LiveApp | ReplayApp | None:
+            """这个请求对应的会话；没登录（或令牌过期）时是 None。"""
+            if pool is not None:
+                return pool.get(self._cookie())
+            if not password:
+                return state
+            given = self._cookie()
+            return state if given is not None and hmac.compare_digest(given, token) else None
+
+        def _authed(self) -> bool:
+            return self._state() is not None
 
         def _error(self, status: int, message: str) -> None:
             self._json(status, {"error": message})
@@ -107,14 +122,18 @@ def make_server(state: LiveApp | ReplayApp, host: str = "127.0.0.1", port: int =
                 return self._send_static("index.html")
             if path.startswith("/static/"):
                 return self._send_static(path[len("/static/"):])
-            if (path.startswith("/api/") or path.startswith("/files/")) and not self._authed():
+            if path == "/api/health":  # 演示站（GitHub Pages）用它判断实时体验在不在线，不含任何会话内容
+                health = {"ok": True, "public": bool(password), "busy": pool.busy_count() if pool is not None else None}
+                return self._json(200, health, {"Access-Control-Allow-Origin": "*"})
+            st = self._state()
+            if (path.startswith("/api/") or path.startswith("/files/")) and st is None:
                 return self._error(401, "需要先输入访问密码")
             if path == "/api/state":
-                return self._json(200, state.snapshot())
+                return self._json(200, st.snapshot())
             if path == "/api/diff":
-                return self._diff(parse_qs(url.query))
+                return self._diff(st, parse_qs(url.query))
             if path.startswith("/files/"):
-                return self._files(path)
+                return self._files(st, path)
             self._error(404, "没有这个页面")
 
         def _send_static(self, rel: str) -> None:
@@ -126,20 +145,20 @@ def make_server(state: LiveApp | ReplayApp, host: str = "127.0.0.1", port: int =
                 return self._error(404, "没有这个文件")
             self._send_file(target)
 
-        def _files(self, path: str) -> None:
+        def _files(self, st, path: str) -> None:
             parts = path.split("/")   # ['', 'files', 'v1', 'view.png']
             if len(parts) != 4 or parts[3] not in FILE_WHITELIST or not VERSION_NAME_RE.match(parts[2]):
                 return self._error(404, "没有这个文件")
-            version = state.version_dir(parts[2])
+            version = st.version_dir(parts[2])
             if version is None or not (version / parts[3]).is_file():
                 return self._error(404, "没有这个文件")
             self._send_file(version / parts[3])
 
-        def _diff(self, query: dict) -> None:
+        def _diff(self, st, query: dict) -> None:
             a, b = (query.get(k, [""])[0] for k in ("a", "b"))
             if not VERSION_NAME_RE.match(a) or not VERSION_NAME_RE.match(b):
                 return self._error(400, "要给两个版本名，比如 ?a=v1&b=v2")
-            changes = state.diff(a, b)
+            changes = st.diff(a, b)
             if changes is None:
                 return self._error(404, "没有这个版本")
             self._json(200, {"a": a, "b": b, "changes": changes})
@@ -152,14 +171,15 @@ def make_server(state: LiveApp | ReplayApp, host: str = "127.0.0.1", port: int =
             path = unquote(urlsplit(self.path).path)
             if path == "/api/login":
                 return self._login()
-            if not self._authed():
+            st = self._state()
+            if st is None:
                 self._read_body()
                 return self._error(401, "需要先输入访问密码")
             if path == "/api/message":
-                return self._message()
+                return self._message(st)
             if path == "/api/reset":
                 self._read_body()
-                status = state.reset()
+                status = st.reset()
                 if status == 200:
                     return self._json(200, {"ok": True})
                 return self._error(status, "回放模式只能看，不能开新会话" if status == READ_ONLY else "正在处理消息，现在不能重置")
@@ -186,10 +206,16 @@ def make_server(state: LiveApp | ReplayApp, host: str = "127.0.0.1", port: int =
             if not isinstance(given, str) or not hmac.compare_digest(given.encode("utf-8"), password.encode("utf-8")):
                 time.sleep(1)  # 拖慢暴力猜密码
                 return self._error(401, "密码不对")
-            cookie = f"{COOKIE}={token}; HttpOnly; SameSite=Strict; Path=/; Max-Age=43200"
+            issued = token
+            if pool is not None:
+                issued = pool.new_visitor()
+                if issued is None:
+                    return self._error(503, "现在体验的人太多了，请过一会儿再来")
+            secure = "; Secure" if self.headers.get("X-Forwarded-Proto", "").lower() == "https" else ""  # 经过 https 隧道时
+            cookie = f"{COOKIE}={issued}; HttpOnly; SameSite=Strict; Path=/; Max-Age=43200{secure}"
             self._json(200, {"ok": True}, {"Set-Cookie": cookie})
 
-        def _message(self) -> None:
+        def _message(self, st) -> None:
             raw = self._read_body()
             if raw is None:
                 return self._error(400, "请求内容太大或格式不对")
@@ -200,11 +226,12 @@ def make_server(state: LiveApp | ReplayApp, host: str = "127.0.0.1", port: int =
             text = body.get("text") if isinstance(body, dict) else None
             if not isinstance(text, str):
                 return self._error(400, "需要 {\"text\": \"…\"}")
-            status = state.submit(text)
+            status = st.submit(text)
             if status == 202:
                 return self._json(202, {"ok": True})
             messages = {400: "消息不能为空", READ_ONLY: "回放模式只能看，不能发消息",
-                        OVER_BUDGET: "这次测试的花费已经到上限了，请联系组长"}
+                        OVER_BUDGET: "这次测试的花费已经到上限了，请联系组长",
+                        CROWDED: "现在同时在建模的人比较多，请等一两分钟再发"}
             self._error(status, messages.get(status, "正在处理上一条消息，请稍等"))
 
     class Server(ThreadingHTTPServer):

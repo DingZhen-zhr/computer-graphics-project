@@ -543,8 +543,10 @@ def test_password_gate(tmp_path):
 def test_budget_stops_new_messages(tmp_path, serve):
     reply = LLMReply("在的", [], {})
     reply.cost = 0.6
+    from cad_agent.web.pool import Budget
+
     state = make_state(tmp_path, ScriptedLLM([reply, LLMReply("不该被调用", [], {})]))
-    state.budget = 0.5
+    state.budget = Budget(0.5)
     server = serve(state)
     snap = say(server, state, "你好")
     assert snap["budget"] == {"limit": 0.5, "spent": 0.6}
@@ -570,8 +572,113 @@ def test_main_public_needs_password_and_pricing(monkeypatch, tmp_path):
 
 def test_public_launcher_and_gitignore():
     bat = (ROOT / "start_public.bat").read_text(encoding="utf-8")
-    assert "--public" in bat and "--budget" in bat and "cloudflared.exe tunnel" in bat and "CAD_WEB_PASSWORD" in bat
+    assert r"scripts\go_public.py" in bat and "--budget" in bat
+    script = (ROOT / "scripts" / "go_public.py").read_text(encoding="utf-8")
+    assert '"--public"' in script and "cloudflared" in script and "CAD_WEB_PASSWORD" in script and '"--", "site/live.json"' in script
+    assert "getpass" in script  # 密码不回显、不写文件
     assert "tools/" in (ROOT / ".gitignore").read_text(encoding="utf-8")
+
+
+# ---------------------------------------------------------------- 公网多人：每人一个会话
+
+
+def make_pool(tmp_path, replies_per_visitor, max_busy=3, max_visitors=30):
+    from cad_agent.web.pool import Budget, VisitorPool
+
+    budget = Budget(10)
+    scripts = iter(replies_per_visitor)
+    holder = {}
+
+    def make_app():
+        llm = next(scripts)
+        n = len(holder)
+        holder[n] = True
+
+        def make_agent():
+            session = LiveSession(tmp_path / f"visitor{n}")
+            return Agent(llm, ToolBox(Workspace(Brief(), FeatureList(), []), run_job=Runner()), session, Config(base_url="http://x", model="m")), session
+
+        return LiveApp(make_agent, "m", budget=budget, can_start=lambda: pool.can_start())
+
+    pool = VisitorPool(make_app, max_busy=max_busy, max_visitors=max_visitors)
+    return pool
+
+
+def cookie_call(server, method, path, cookie, body=None):
+    conn = http.client.HTTPConnection("127.0.0.1", server.server_address[1], timeout=10)
+    payload = json.dumps(body, ensure_ascii=False).encode() if body is not None else None
+    headers = {"Cookie": cookie}
+    if payload is not None:
+        headers["Content-Type"] = "application/json"
+    conn.request(method, path, body=payload, headers=headers)
+    resp = conn.getresponse()
+    data = resp.read()
+    conn.close()
+    return resp.status, json.loads(data) if data else None
+
+
+def test_each_visitor_gets_their_own_session(tmp_path):
+    pool = make_pool(tmp_path, [ScriptedLLM([LLMReply("你好甲", [], {})]), ScriptedLLM([LLMReply("你好乙", [], {})])])
+    server = make_server(None, port=0, password="secret-123", pool=pool)
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    try:
+        _, ca = login(server, "secret-123")
+        _, cb = login(server, "secret-123")
+        ca, cb = ca.split(";")[0], cb.split(";")[0]
+        assert ca != cb and len(pool) == 2
+        assert cookie_call(server, "POST", "/api/message", ca, {"text": "我是甲"})[0] == 202
+        pool.get(ca.split("=", 1)[1]).wait_idle(10)
+        a = cookie_call(server, "GET", "/api/state", ca)[1]
+        b = cookie_call(server, "GET", "/api/state", cb)[1]
+        assert [t["text"] for t in a["transcript"]] == ["我是甲", "你好甲"] and b["transcript"] == []
+        assert cookie_call(server, "GET", "/api/state", "cad_auth=forged")[0] == 401
+    finally:
+        server.shutdown()
+        server.server_close()
+
+
+def test_too_many_busy_visitors_wait(tmp_path):
+    gate = GateLLM(LLMReply("好", [], {}))
+    pool = make_pool(tmp_path, [gate, ScriptedLLM([LLMReply("不该被调用", [], {})])], max_busy=1)
+    server = make_server(None, port=0, password="secret-123", pool=pool)
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    try:
+        ca, cb = (login(server, "secret-123")[1].split(";")[0] for _ in range(2))
+        assert cookie_call(server, "POST", "/api/message", ca, {"text": "先来"})[0] == 202
+        assert gate.entered.wait(5)
+        status, body = cookie_call(server, "POST", "/api/message", cb, {"text": "后到"})
+        assert status == 429 and "稍" in body["error"] or "等" in body["error"]
+    finally:
+        gate.gate.set()
+        server.shutdown()
+        server.server_close()
+
+
+def test_visitor_limit_and_health(tmp_path):
+    pool = make_pool(tmp_path, [ScriptedLLM([])], max_visitors=1)
+    server = make_server(None, port=0, password="secret-123", pool=pool)
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    try:
+        assert login(server, "secret-123")[0] == 200
+        assert login(server, "secret-123")[0] == 503
+        conn = http.client.HTTPConnection("127.0.0.1", server.server_address[1], timeout=10)
+        conn.request("GET", "/api/health")
+        resp = conn.getresponse()
+        body = json.loads(resp.read())
+        assert resp.status == 200 and resp.getheader("Access-Control-Allow-Origin") == "*" and body == {"ok": True, "public": True, "busy": 0}
+        conn.close()
+    finally:
+        server.shutdown()
+        server.server_close()
+
+
+def test_export_keeps_live_json(tmp_path):
+    from cad_agent.web.export import export_site
+
+    out = export_site(ROOT / "demo" / "phone_stand", tmp_path / "site")
+    (out / "live.json").write_text('{"url": "https://x.trycloudflare.com"}', encoding="utf-8")
+    export_site(ROOT / "demo" / "phone_stand", out)
+    assert json.loads((out / "live.json").read_text(encoding="utf-8"))["url"] == "https://x.trycloudflare.com"
 
 
 # ---------------------------------------------------------------- 静态演示站

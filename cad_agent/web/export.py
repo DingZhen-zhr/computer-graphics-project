@@ -18,10 +18,12 @@ from cad_agent.web.app import ReplayApp
 from cad_agent.web.server import FILE_WHITELIST, STATIC_DIR
 
 MARKER = ".cad-agent-site"  # 只清空带这个标记的目录，免得误删别的东西
+LIVE_FILE = "live.json"
 
 
 def export_site(session_dir: Path, out_dir: Path) -> Path:
     out_dir = Path(out_dir)
+    live = (out_dir / LIVE_FILE).read_bytes() if (out_dir / LIVE_FILE).is_file() else None  # 实时体验的网址，由 go_public 维护，导出时保留
     if out_dir.exists():
         if any(out_dir.iterdir()) and not (out_dir / MARKER).is_file():
             raise FileExistsError(f"{out_dir} 不是空目录，也不是之前导出的演示站，不覆盖")
@@ -29,6 +31,8 @@ def export_site(session_dir: Path, out_dir: Path) -> Path:
     out_dir.mkdir(parents=True)
     (out_dir / MARKER).write_text("由 python -m cad_agent.web.export 生成，重新导出时会整个覆盖\n", encoding="utf-8")
     (out_dir / ".nojekyll").write_text("", encoding="utf-8")  # GitHub Pages 不要用 Jekyll 处理
+    if live is not None:
+        (out_dir / LIVE_FILE).write_bytes(live)
 
     app = ReplayApp(Path(session_dir))
     shutil.copytree(STATIC_DIR, out_dir / "static", ignore=shutil.ignore_patterns("index.html"))

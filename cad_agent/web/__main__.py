@@ -5,8 +5,8 @@
     python -m cad_agent.web --config config.toml --public [--budget 5]
 
 第二种是只读回放：不需要 API key，不花钱，用来预览界面，演示时断网也能当后备。
-第三种给公网测试用（配合 start_public.bat 的临时隧道）：访问密码从环境变量 CAD_WEB_PASSWORD 读，
-所有访问者共用一个会话；累计花费到 --budget（元）后不再接新消息。
+第三种给公网测试用（配合 start_public.bat 的临时隧道）：访问密码从环境变量 CAD_WEB_PASSWORD 读；
+每个登录的人有自己的会话，同时在建模的最多 --max-busy 个；大家共用花费上限 --budget（元），到了就不再接新消息。
 """
 
 from __future__ import annotations
@@ -27,6 +27,7 @@ from cad_agent.llm.factory import make_llm
 from cad_agent.notebook import FeatureList
 from cad_agent.tools import ToolBox, Workspace
 from cad_agent.web.app import LiveApp, LiveSession, ReplayApp
+from cad_agent.web.pool import Budget, VisitorPool
 from cad_agent.web.server import make_server
 
 PORT_TRIES = 10  # 端口被占用时，往后最多再试这么多个
@@ -45,12 +46,13 @@ def build_live_agent(config: Config) -> tuple[Agent, LiveSession]:
     return agent, session
 
 
-def bind_server(state: LiveApp | ReplayApp, host: str, port: int, password: str | None = None) -> ThreadingHTTPServer:
+def bind_server(state: LiveApp | ReplayApp | None, host: str, port: int, password: str | None = None,
+                pool: VisitorPool | None = None) -> ThreadingHTTPServer:
     """从 port 开始找能用的端口，最多试 PORT_TRIES 个。"""
     last: OSError | None = None
     for candidate in range(port, port + PORT_TRIES):
         try:
-            return make_server(state, host, candidate, password=password)
+            return make_server(state, host, candidate, password=password, pool=pool)
         except OSError as e:
             last = e
     raise OSError(f"端口 {port}～{port + PORT_TRIES - 1} 都被占用了，可以用 --port 换一个起点") from last
@@ -63,25 +65,32 @@ def main(argv: list[str] | None = None, print_fn: Callable[..., None] = print) -
     parser.add_argument("--port", type=int, default=8765, help="端口，默认 8765；被占用时自动换下一个")
     parser.add_argument("--no-browser", action="store_true", help="不自动打开浏览器")
     parser.add_argument("--public", action="store_true", help=f"公网测试：要求访问密码（环境变量 {PASSWORD_ENV}），并限制花费")
-    parser.add_argument("--budget", type=float, default=5.0, help="公网测试时的花费上限（元），默认 5")
+    parser.add_argument("--budget", type=float, default=5.0, help="公网测试时所有人共用的花费上限（元），默认 5")
+    parser.add_argument("--max-busy", type=int, default=3, help="公网测试时同时在建模的人数上限，默认 3")
     args = parser.parse_args(argv)
     password = None
+    pool = None
 
     try:
         if args.replay:
             state: LiveApp | ReplayApp = ReplayApp(Path(args.replay))
         else:
             config = load_config(Path(args.config))
-            budget = None
+            pool = None
             if args.public:
                 password = os.environ.get(PASSWORD_ENV, "").strip()
                 if len(password) < MIN_PASSWORD:
                     raise ConfigError(f"公网测试要先设置访问密码：环境变量 {PASSWORD_ENV}，至少 {MIN_PASSWORD} 个字符")
                 if config.llm_settings("base").pricing is None:
                     raise ConfigError("公网测试要限制花费，请先在 config.toml 里填好 [llm.pricing]")
-                budget = args.budget
-            state = LiveApp(lambda: build_live_agent(config), config.model, budget=budget)
-        server = bind_server(state, "127.0.0.1", args.port, password=password)
+                budget = Budget(args.budget)
+                pool = VisitorPool(lambda: LiveApp(lambda: build_live_agent(config), config.model, budget=budget,
+                                                   can_start=lambda: pool.can_start()), max_busy=args.max_busy)
+                config.api_key()  # 先确认 key 在，免得有人登录时才报错
+                state = None
+            else:
+                state = LiveApp(lambda: build_live_agent(config), config.model)
+        server = bind_server(state, "127.0.0.1", args.port, password=password, pool=pool)
     except (ConfigError, OSError) as e:
         print_fn(str(e))
         return 1

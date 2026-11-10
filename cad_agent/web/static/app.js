@@ -145,6 +145,7 @@ function renderComposer() {
   const disabled = !live() || state.busy || !!pending;
   els.input.disabled = !live();
   els.send.disabled = disabled || !els.input.value.trim();
+  if (STATIC) return;
   els.hint.textContent = !live()
     ? `回放模式：正在查看已保存的会话 ${state.replay_of || ""}，不能发消息`
     : state.busy ? "正在处理上一条消息，完成后可以继续说" : "Enter 发送 · Shift + Enter 换行";
@@ -323,6 +324,37 @@ function boot() {
   $("login-form").addEventListener("submit", login);
   poll();
   if (!STATIC) setInterval(poll, POLL_MS);
+  else checkLive();
+}
+
+// ------------------------------------------------------------------ 演示站上的"实时体验"入口
+// live.json 由组长电脑上的 go_public 脚本写入：开着服务时是隧道网址，关掉后是 null。
+// 网址在、而且服务真的能连上时，右上角才出现入口。
+
+async function checkLive() {
+  let url = null;
+  try {
+    const res = await fetch("live.json", { cache: "no-store" });
+    if (res.ok) url = (await res.json()).url;
+  } catch { /* 没有 live.json 就当离线 */ }
+  const hint = $("composer-hint");
+  if (!url) {
+    hint.textContent = "这是一次真实会话的回放。实时体验暂时没有开放（需要组长电脑开着服务）。";
+    return;
+  }
+  try {
+    const ctrl = new AbortController();
+    setTimeout(() => ctrl.abort(), 5000);
+    const res = await fetch(`${url.replace(/\/$/, "")}/api/health`, { signal: ctrl.signal, cache: "no-store" });
+    if (!res.ok || !(await res.json()).ok) throw new Error("offline");
+  } catch {
+    hint.textContent = "这是一次真实会话的回放。实时体验现在连不上（组长电脑可能没开着），稍后再试。";
+    return;
+  }
+  const link = $("live-link");
+  link.href = url;
+  link.classList.remove("hidden");
+  hint.textContent = "这是一次真实会话的回放。想自己试：点右上角「开始实时体验」，输入组长给的密码。";
 }
 
 // ------------------------------------------------------------------ 访问密码（公网模式）

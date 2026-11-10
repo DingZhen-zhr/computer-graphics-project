@@ -93,6 +93,11 @@ img { display: block; max-width: 100%; }
 .pill strong { color: var(--ink); font-weight: 600; font-variant-numeric: tabular-nums; }
 .pill.replay { background: var(--ink); color: #fff; }
 .pill.replay .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--mark); }
+.btn-live {
+  height: 28px; padding: 0 14px; border-radius: 999px; background: var(--mark); color: #fff; font-size: 12px; font-weight: 600;
+  display: inline-flex; align-items: center; text-decoration: none; white-space: nowrap; transition: background .2s var(--ease);
+}
+.btn-live:hover { background: #C62722; }
 .btn-ghost {
   height: 28px; padding: 0 12px; border-radius: 999px; border: 1px solid var(--hairline); background: var(--bg);
   font-size: 12px; transition: background .2s var(--ease), border-color .2s var(--ease);
