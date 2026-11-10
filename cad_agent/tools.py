@@ -8,21 +8,20 @@ from __future__ import annotations
 
 import copy
 import difflib
-import json
 from dataclasses import dataclass
 from typing import Any, Callable, Iterable
 
 from cad_agent.agent.api_docs import api_names, lookup_api, normalize_api_name
 from cad_agent.brief import Brief, BriefError
-from cad_agent.checks.spec import CheckSpecError, missing_coverage, parse_checks, parse_where
-from cad_agent.notebook import Feature, FeatureList, NotebookError, render_notebook
+from cad_agent.gates import Gates
+from cad_agent.notebook import FeatureList
 from cad_agent.plan import Plan
 from cad_agent.sandbox import execute
 from cad_agent.sandbox.execute import RunResult
-from cad_agent.sandbox.guard import check_code
+from cad_agent.tool_common import INSPECT_LIMIT, ToolOutcome, _err, _error_for_model, _hint, _json  # noqa: F401 - 其他模块从这里导入
 from cad_agent.tool_specs import PRE_CONFIRM_TOOLS, TOOL_NAMES, TOOL_SPECS
+from cad_agent.tools_legacy import LegacyTools
 
-INSPECT_LIMIT = 30
 MAX_QUESTIONS = 5
 
 
@@ -38,50 +37,17 @@ class Workspace:
     probes_used: int = 0                     # 当前阶段已经用了几次 probe
 
 
-@dataclass
-class ToolOutcome:
-    content: str                    # 给模型看的 JSON 文本
-    end_turn: bool = False          # 为真时本轮到此结束，等用户回复
-    kind: str | None = None         # "question" 或 "confirm"
-    build: RunResult | None = None  # 只有 build 工具会带
-    deliverable: bool = False       # 只有 build 全部通过且不缺检查时为真
-
-
-def _json(data: Any) -> str:
-    return json.dumps(data, ensure_ascii=False)
-
-
-def _err(message: str, **extra: Any) -> ToolOutcome:
-    return ToolOutcome(_json({"error": message, **extra}))
-
-
-def _error_for_model(err: dict) -> dict:
-    return {"feature": err.get("cell"), "type": err["type"], "message": err["message"]}
-
-
-def _hint(error: dict | None, timed_out: bool, failed: list, missing: list[str]) -> str:
-    if timed_out:
-        return "运行超时了。检查是否写了很慢的操作，比如过多的阵列数量或过细的样条。"
-    if error and error["feature"]:
-        return f"只修改特征 {error['feature']}。拿不准函数用法时先用 api_help 查。"
-    if error:
-        return "出错位置不在某个特征里，多半是参数或特征之间的引用有问题。先检查参数名和变量名是否一致。"
-    if failed:
-        return "先看每条 detail 里选中了哪些几何：选错了就改检查条件，选对了但数值不对就改模型。"
-    if missing:
-        return f"模型和检查都通过了，但这些用户参数还没有检查：{'、'.join(missing)}。补上检查后再 build。"
-    return "全部通过，程序会自动交付。"
-
-
-class ToolBox:
+class ToolBox(LegacyTools):
     def __init__(
         self,
         ws: Workspace,
         run_job: Callable[..., RunResult] = execute.run_job,
         timeout_s: float = 60,
         secret_names: Iterable[str] = (),
+        gates: Gates | None = None,
     ) -> None:
         self.ws = ws
+        self.gates = gates or Gates.legacy()   # 不传 gates 就是 1.2 版的流程
         self.run_job = run_job
         self.timeout_s = timeout_s
         self.secret_names = tuple(secret_names)
@@ -93,6 +59,14 @@ class ToolBox:
             "upsert_feature": self._upsert_feature, "remove_feature": self._remove_feature, "set_checks": self._set_checks,
             "build": self._build, "inspect": self._inspect, "api_help": self._api_help,
         }
+        self._specs, self._names, self._pre_confirm = TOOL_SPECS, list(TOOL_NAMES), list(PRE_CONFIRM_TOOLS)
+        if self.gates.staged:  # 分阶段：工具表和建模类工具换成 staged/ 里的（导入放这里，避免循环导入）
+            from cad_agent.staged.specs import PRE_CONFIRM_TOOLS_V2, TOOL_NAMES_V2, TOOL_SPECS_V2
+            from cad_agent.staged.tools import StagedTools
+
+            ws.brief.require_relations = True
+            self._specs, self._names, self._pre_confirm = TOOL_SPECS_V2, list(TOOL_NAMES_V2), list(PRE_CONFIRM_TOOLS_V2)
+            self._handlers = StagedTools(self).handlers()
 
     # ---- 对外接口 ----
     def begin_turn(self) -> None:
@@ -101,11 +75,11 @@ class ToolBox:
 
     def available(self) -> list[str]:
         ok, _ = self.ws.brief.can_build()
-        return list(TOOL_NAMES) if ok else list(PRE_CONFIRM_TOOLS)
+        return list(self._names) if ok else list(self._pre_confirm)
 
     def schemas(self) -> list[dict]:
         names = set(self.available())
-        return [copy.deepcopy(s) for s in TOOL_SPECS if s["function"]["name"] in names]
+        return [copy.deepcopy(s) for s in self._specs if s["function"]["name"] in names]
 
     def call(self, name: str, args: dict) -> ToolOutcome:
         """调用一个工具。任何问题都变成给模型看的中文错误，不抛异常。"""
@@ -125,7 +99,7 @@ class ToolBox:
         if name not in self.available():
             ok, why = self.ws.brief.can_build()
             return _err(f"需求单现在不能建模：{why}。建模工具要等需求单确认后才能用。现在可用的工具：{'、'.join(self.available())}")
-        spec = next(s for s in TOOL_SPECS if s["function"]["name"] == name)["function"]
+        spec = next(s for s in self._specs if s["function"]["name"] == name)["function"]
         missing = [k for k in spec["parameters"].get("required", []) if k not in args]
         if missing:
             return _err(f"工具 {name} 缺少参数 {'、'.join(missing)}")
@@ -140,6 +114,8 @@ class ToolBox:
         ok, why = self.ws.brief.can_build()
         if changes:  # 什么都没改的 update_brief 不算改动
             self.unbuilt_edits = True
+            if self.gates.staged and self.ws.plan is not None:  # 需求单变了：全部阶段都要重新验证
+                self.ws.plan.invalidate_all()
         body: dict[str, Any] = {"changes": changes, "can_build": ok}
         if not ok:
             body["why_not"] = why
@@ -165,114 +141,6 @@ class ToolBox:
             _json({"status": "需求单已展示给用户，等用户确认", "brief_text": self.ws.brief.render_text()}),
             end_turn=True, kind="confirm",
         )
-
-    # ---- 建模阶段 ----
-    def _feature_names(self) -> list[str]:
-        return [f"{f.slug}({f.role})" for f in self.ws.features.items]
-
-    def _upsert_feature(self, args: dict) -> ToolOutcome:
-        slug, role, code, before = args["slug"], args["role"], args["code"], args.get("before")
-        if not all(isinstance(v, str) for v in (slug, role, code)) or not (before is None or isinstance(before, str)):
-            return _err("slug、role、code、before 都必须是文字")
-        problems = check_code(code)
-        if problems:
-            return _err(f"特征 {slug} 的代码没有通过检查，没有改动：" + "；".join(problems))
-        try:
-            self.ws.features.upsert(Feature(slug, role, code), before)
-        except NotebookError as e:
-            return _err(str(e))
-        self.unbuilt_edits = True
-        return ToolOutcome(_json({"ok": True, "features": self._feature_names()}))
-
-    def _remove_feature(self, args: dict) -> ToolOutcome:
-        try:
-            self.ws.features.remove(args["slug"])
-        except NotebookError as e:
-            return _err(str(e))
-        self.unbuilt_edits = True
-        return ToolOutcome(_json({"ok": True, "features": self._feature_names()}))
-
-    def _set_checks(self, args: dict) -> ToolOutcome:
-        raw = args["checks"]
-        try:
-            checks = parse_checks(raw, set(self.ws.brief.param_values()))
-        except CheckSpecError as e:
-            return _err(f"检查项没有通过校验，原有检查项保持不变：{e}")
-        self.ws.checks_raw = copy.deepcopy(raw)
-        self.unbuilt_edits = True
-        missing = sorted(missing_coverage(checks, self.ws.brief.user_param_names()))
-        return ToolOutcome(_json({"ok": True, "count": len(raw), "missing_coverage": missing}))
-
-    def _build(self, args: dict) -> ToolOutcome:
-        ws = self.ws
-        self.unbuilt_edits = False  # 一运行就算 build 过了，不管通没通过
-        names = set(ws.brief.param_values())
-        try:
-            rendered = render_notebook(ws.brief.params, ws.features.items)
-            checks = parse_checks(ws.checks_raw, names)
-        except NotebookError as e:
-            return self._build_without_run({"cell": e.feature, "type": "NotebookError", "message": str(e)})
-        except CheckSpecError as e:
-            return self._build_without_run({"cell": None, "type": "CheckSpecError", "message": str(e)})
-        run = self.run_job(rendered, ws.checks_raw, names, mode="build", timeout_s=self.timeout_s, secret_names=self.secret_names)
-        ws.last_run = run
-        missing = sorted(missing_coverage(checks, ws.brief.user_param_names()))
-        deliverable = run.ok and not missing
-        if not run.ok:  # C4：几何没出错、检查都通过、只是缺检查，不算失败（hint 里提醒补检查）
-            self.build_failures += 1
-        error = _error_for_model(run.error) if run.error else None
-        failed = [
-            {"id": c.id, "type": c.type, "expected": c.expected, "measured": c.measured, "tol": c.tol, "detail": c.detail}
-            for c in run.checks if not c.passed
-        ]
-        body: dict[str, Any] = {
-            "passed": deliverable,
-            "error": error,
-            "failed_checks": failed,
-            "passed_checks": sum(1 for c in run.checks if c.passed),
-            "missing_coverage": missing,
-            "facts": {"size": run.facts["size"], "volume": run.facts["volume"]} if run.facts else None,
-            "failures_left": max(0, self.max_build_failures - self.build_failures),
-            "hint": _hint(error, run.timed_out, failed, missing),
-        }
-        if missing:  # 计划的测试要求出现“缺少检查”；提示词文档的 hint 原文写的是“还没有检查”，所以多放一个字段
-            body["coverage_note"] = f"缺少检查的用户参数：{'、'.join(missing)}"
-        ws.last_build_content = _json(body)
-        return ToolOutcome(ws.last_build_content, build=run, deliverable=deliverable)
-
-    def _build_without_run(self, err: dict) -> ToolOutcome:
-        """渲染 notebook 或解析检查项时就出错了：没有运行，但仍然计一次失败。"""
-        run = RunResult(ok=False, error=err)
-        self.unbuilt_edits = False
-        self.ws.last_run = run
-        self.build_failures += 1
-        error = _error_for_model(err)
-        body = {
-            "passed": False, "error": error, "failed_checks": [], "passed_checks": 0, "missing_coverage": [], "facts": None,
-            "failures_left": max(0, self.max_build_failures - self.build_failures),
-            "hint": _hint(error, False, [], []),
-        }
-        self.ws.last_build_content = _json(body)
-        return ToolOutcome(self.ws.last_build_content, build=run)
-
-    def _inspect(self, args: dict) -> ToolOutcome:
-        kind = args["kind"]
-        if kind not in ("faces", "edges"):
-            return _err(f"kind 只能是 faces 或 edges，收到 {kind!r}")
-        names = set(self.ws.brief.param_values())
-        try:
-            where = parse_where(args.get("where", []), names)
-            rendered = render_notebook(self.ws.brief.params, self.ws.features.items)
-        except (CheckSpecError, NotebookError) as e:
-            return _err(str(e))
-        run = self.run_job(rendered, [], names, mode="inspect", query_spec={"kind": kind, "where": where},
-                           timeout_s=self.timeout_s, secret_names=self.secret_names)
-        if run.error:
-            return ToolOutcome(_json({"error": _error_for_model(run.error)}))
-        items = run.query or []
-        return ToolOutcome(_json({
-            "items": items[:INSPECT_LIMIT], "total": len(items), "truncated": len(items) > INSPECT_LIMIT, "facts": run.facts,
-        }))
 
     # ---- 查文档 ----
     def _api_help(self, args: dict) -> ToolOutcome:

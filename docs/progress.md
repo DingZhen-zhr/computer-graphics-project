@@ -288,5 +288,13 @@
 
 - 做了什么：`render_notebook(params, features, probe=None)`：给了 probe 时在最后一个特征之后加 probe 单元（形状逐字照计划 Step 3），没有特征时先加占位方块单元、产品用它；`probe` 为 `None` 时输出和原来逐字相同。`run_job(..., mode="probe", check_values=...)`；`RunResult.probe_output`；`PROBE_OUTPUT_LIMIT = 2000`（超过时截断并加一行"…（后面的输出省略）"）。子进程里 probe 模式不量、不跑检查、不导出，不管成功、出错还是超时都读回 `probe_out.txt`；出错帧在 probe 单元里时 `error["cell"]` 是 `"probe"`（笔记第 17 节的办法）。`check_values` 给了时，检查和查询用它代替运行得到的参数值，`values` 仍照实返回。
 - 测试数量：新增 14 个（`test_probe_notebook.py` 6 个，多了一个"probe 单元的形状逐行等于计划"；`test_execute_v2.py` 8 个，多了一个"build 的结果没有 probe_output"），全部测试 581 个全部通过。旧的 `test_execute.py`、`test_notebook.py` 原样通过。
-- 说明：`notebook.py` 加上 probe 单元后超过 300 行，把读名字用的 `_Names` 原样移到新文件 `cad_agent/code_names.py`（行为不变，不是接口）。`test_probe_prints_facts` 的包围盒写法按偏离 D10 用顶点坐标。改文件时用 Python 的 `write_text` 拼带反斜杠的字符串出过一次错（`
+- 说明：`notebook.py` 加上 probe 单元后超过 300 行，把读名字用的 `_Names` 原样移到新文件 `cad_agent/code_names.py`（行为不变，不是接口）。`test_probe_prints_facts` 的包围盒写法按偏离 D10 用顶点坐标。改文件时用 Python 的 `write_text` 拼带反斜杠的字符串出过一次错（`
+
 ` 被展开成真的换行），已改回并核对测试。
+
+## 第二版 计划 1 Task 6：分阶段的工具（一）：计划、特征、检查的关卡 —— 完成
+
+- 做了什么：`scripts/gen_staged_specs.py` 生成 `cad_agent/staged/specs.py`（12 个工具，顺序照提示词文档第 6 节；7 个取第二版 json 块和 set_checks 的拼法，5 个取 1.1 版原文；`PRE_CONFIRM_TOOLS_V2`）；`system_v2.md` 逐字取自提示词文档第 1 节；`cad_agent/staged/messages.py`（7.2、7.3、7.4 的全部原文）；`cad_agent/staged/tools.py`（`StagedTools`：`set_plan`，以及按阶段把关的 `upsert_feature`、`remove_feature`、`set_checks`；没有计划时建模类五个工具返回 `NO_PLAN`；`build`、`probe`、`read_reference` 先占位）。`ToolBox.__init__` 加 `gates`（不传就是 `Gates.legacy()`）；分阶段时打开 `require_relations`、换成 V2 的工具表和处理函数；`_update_brief` 在分阶段、有改动、已有计划时把全部阶段变回未通过。
+- 测试数量：新增 28 个（`tests/test_staged_tools.py`，比计划多了：7.2–7.4 原文逐条比对、`set_plan` 交付后追加阶段、缺参数时用 V2 的表、`missing_coverage` 只算 from_here；没有计划那条按 5 个工具参数化），全部测试 609 个全部通过。旧的 `test_tools.py` 原样通过。
+- 说明：`tools.py` 加上开关后会超过 300 行，按计划的说明把旧流程的 `_upsert_feature`、`_remove_feature`、`_set_checks`、`_build`、`_build_without_run`、`_inspect`（连同只给它们用的 `_feature_names`）原样移到 `cad_agent/tools_legacy.py`（`ToolBox` 继承它，公开成员不变）；共用的 `ToolOutcome`、`_json`、`_err`、`_error_for_model`、`_hint`、`INSPECT_LIMIT` 放进新文件 `cad_agent/tool_common.py`，`tools.py` 照旧能导入它们。现在 `tools.py` 155 行。
+- 计划没写到、由我定的细节：`set_checks` 的 `stage` 不是文字时，按"没有这个阶段"报错；校验时把这个阶段的新检查和别的阶段的检查合在一起交给 `parse_checks`，所以 id 和别的阶段重名也会被拦下（终检要把各阶段的检查合起来跑）；`remove_feature` 的返回和 `upsert_feature` 一样列出特征（带阶段），只是没有 `stage` 键。没有偏离。
