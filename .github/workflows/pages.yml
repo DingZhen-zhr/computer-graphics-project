@@ -32,3 +32,4 @@ jobs:
       - id: deployment
         uses: actions/deploy-pages@v4
 # 网址：https://dingzhen-zhr.github.io/computer-graphics-project/（Settings → Pages 的 Source 要选 GitHub Actions）
+# 页面改了以后：python -m cad_agent.web.export demo\phone_stand site，提交 site/ 就会自动发布
