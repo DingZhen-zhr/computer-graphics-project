@@ -11,7 +11,8 @@ from typing import Any, Literal
 
 UNITS = ("mm", "deg", "1")
 SOURCES = ("user", "suggested")
-PATCH_KEYS = ("part", "set_params", "remove_params", "features", "open_questions")
+PATCH_KEYS = ("part", "set_params", "remove_params", "features", "open_questions", "relations")
+NAME_STOPS = "，,；;：:（("  # 组成部分的名字到这些符号为止
 NAME_RE = re.compile(r"^[a-z][a-z0-9_]*$")
 # 这些名字会和 notebook 里已有的名字或检查表达式里的函数冲突，不能当参数名
 RESERVED_NAMES = frozenset({
@@ -67,6 +68,12 @@ def _parse_param(raw: Any) -> Param:
     return Param(name, float(value), unit, source, note)
 
 
+def feature_name(text: str) -> str:
+    """组成部分的名字：取 NAME_STOPS 里最早出现的那个符号之前的部分，去掉首尾空白。"""
+    cut = min((i for i in (text.find(ch) for ch in NAME_STOPS) if i >= 0), default=len(text))
+    return text[:cut].strip()
+
+
 def _str_list(raw: Any, key: str) -> list[str]:
     if not isinstance(raw, list) or not all(isinstance(x, str) and x.strip() for x in raw):
         raise BriefError(f"{key} 必须是非空文字组成的数组")
@@ -81,6 +88,8 @@ class Brief:
     features: list[str] = field(default_factory=list)
     open_questions: list[str] = field(default_factory=list)
     confirmed: bool = False
+    relations: list[str] = field(default_factory=list)       # 各部分怎么相接，每条一句话
+    require_relations: bool = field(default=False, compare=False)  # 分阶段时由 ToolBox 打开；不写进 to_dict
 
     # ---- 查询 ----
     def can_build(self) -> tuple[bool, str]:
@@ -89,6 +98,13 @@ class Brief:
         if not self.confirmed:
             return False, "需求单还未确认，请先用 request_confirmation 请用户确认"
         return True, ""
+
+    def missing_relations(self) -> list[str]:
+        """除第一个部分外，名字没有在任何一条 relations 里出现的部分；不要求位置关系时总是空表。"""
+        if not self.require_relations or len(self.features) < 2:
+            return []
+        names = [feature_name(f) for f in self.features[1:]]
+        return [n for n in names if not any(n in r for r in self.relations)]
 
     def user_param_names(self) -> set[str]:
         return {p.name for p in self.params if p.source == "user"}
@@ -159,6 +175,13 @@ class Brief:
                 work.features = new_features
                 lines.append("组成部分: " + "；".join(new_features))
 
+        if "relations" in patch:
+            new_relations = _str_list(patch["relations"], "relations")
+            if new_relations != work.relations:
+                work.relations = new_relations
+                work.confirmed = False  # 确认之后改了相接方式，要重新确认
+                lines.append("位置关系有改动")
+
         if "open_questions" in patch:
             new_questions = _str_list(patch["open_questions"], "open_questions")
             if new_questions != work.open_questions:
@@ -181,6 +204,7 @@ class Brief:
                 for p in self.params
             ],
             "features": list(self.features),
+            **({"relations": list(self.relations)} if self.relations else {}),
             "open_questions": list(self.open_questions),
             "confirmed": self.confirmed,
         }
@@ -195,6 +219,7 @@ class Brief:
             features=list(d.get("features", [])),
             open_questions=list(d.get("open_questions", [])),
             confirmed=bool(d.get("confirmed", False)),
+            relations=list(d.get("relations", [])),
         )
 
     def render_text(self) -> str:
@@ -212,6 +237,9 @@ class Brief:
             out.extend(f"  {i}. {f}" for i, f in enumerate(self.features, 1))
         else:
             out.append("  （还没有）")
+        if self.relations:
+            out.append("位置关系：")
+            out.extend(f"  - {r}" for r in self.relations)
         if self.open_questions:
             out.append("待确认问题：")
             out.extend(f"  - {q}" for q in self.open_questions)

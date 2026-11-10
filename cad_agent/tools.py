@@ -140,6 +140,9 @@ class ToolBox:
         body: dict[str, Any] = {"changes": changes, "can_build": ok}
         if not ok:
             body["why_not"] = why
+        missing = self.ws.brief.missing_relations()
+        if missing:
+            body["relations_missing"] = missing
         return ToolOutcome(_json(body))
 
     def _ask_user(self, args: dict) -> ToolOutcome:
@@ -151,6 +154,9 @@ class ToolBox:
     def _request_confirmation(self, args: dict) -> ToolOutcome:
         if self.ws.brief.open_questions:
             return _err("还有待确认的问题，不能请用户确认需求单：" + "；".join(self.ws.brief.open_questions) + "。先用 ask_user 问清楚")
+        missing = self.ws.brief.missing_relations()
+        if missing:
+            return _err(f"这些部分还没有写明怎么相接：{'、'.join(missing)}。在 relations 里各写一句，要原样写出它的名字")
         self.ws.awaiting_confirmation = True
         return ToolOutcome(
             _json({"status": "需求单已展示给用户，等用户确认", "brief_text": self.ws.brief.render_text()}),

@@ -271,3 +271,9 @@
 - 做了什么：新文件 `cad_agent/gates.py`（`Gates` 四个开关，`Gates.legacy()` 全关）；`Config` 新增 `gates`、`max_tool_calls_per_stage`（25）、`max_tool_calls_total`（200）、`cases_dir`（`cases`），都从 `[agent]` 读；开关写成别的类型时报"应该是 true 或 false"，两个上限写 0 或负数时报"应该是正整数"，信息里都有键名；`config.example.toml` 的 `[agent]` 里用注释写出这几项和默认值。
 - 测试数量：新增 10 个（`test_gates.py` 3 个，含一个"开关不可改"；`test_config.py` 7 个，上限那条按两个键 × 两个值参数化），全部测试 526 个全部通过。旧的 `test_load_example` 原样通过（新项在示例里是注释，读出来就是默认值）。
 - 说明：没有偏离。旧的类型错误信息（"类型不对"）没有改，只有新加的布尔开关用新的说法。
+
+## 第二版 计划 1 Task 3：需求单的位置关系 —— 完成
+
+- 做了什么：`Brief.relations`（默认空）、`Brief.require_relations`（默认假，不参与比较、不写进 `to_dict`）；`PATCH_KEYS` 末尾加 `relations`；`feature_name()`；`Brief.missing_relations()`；`to_dict` 只在有位置关系时写 `relations`（紧跟 `features`），`from_dict` 读回；`render_text` 在"组成部分"之后列"位置关系："；`apply_patch` 整体替换 `relations`，必须是非空文字数组，有变化时确认状态清零、变化行写"位置关系有改动"。`ToolBox._request_confirmation` 在缺位置关系时用计划里的原文拒绝；`_update_brief` 的返回在缺的时候多一个 `relations_missing`。
+- 测试数量：新增 15 个（`tests/test_brief_relations.py`，含坏值的 5 种参数化、"不要求位置关系时请确认照旧"），全部测试 541 个全部通过。旧的 `test_brief.py`、`test_tools.py` 原样通过。
+- 说明：没有偏离。计划里说"确认之后改了它，确认状态清零（和 features 的规则相同）"，但现有代码里改 `features` 并不会清确认（只有待问问题、建议参数改动会清）；这里照设计文档 3.2"确认之后再改 relations，确认状态清零"只对 `relations` 清零，`features` 的规则不动（旧测试不改）。另外 `PATCH_KEYS` 加了 `relations` 以后，旧流程的 `update_brief` 也能接受这个键（旧流程的工具说明里没有它，模型不会传；"未知字段"报错里列出的可用字段多了一个），这是计划要求的接口，旧测试都通过。
