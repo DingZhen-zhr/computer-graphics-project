@@ -21,6 +21,13 @@ from cad_agent.notebook import RenderedNotebook
 from cad_agent.sandbox.guard import clean_env
 
 GRACE_S = 30  # 子进程里除了运行模型，还要跑检查、导出、截图，所以外层超时比 timeout_s 多留一点
+PROBE_OUTPUT_LIMIT = 2000  # probe 打印的内容最多返回这么多字符
+PROBE_TAIL = "\n…（后面的输出省略）"
+
+
+def truncate_probe(text: str) -> str:
+    """probe 的输出超过上限时截断，末尾加一行说明。"""
+    return text if len(text) <= PROBE_OUTPUT_LIMIT else text[:PROBE_OUTPUT_LIMIT] + PROBE_TAIL
 
 
 @dataclass
@@ -37,6 +44,7 @@ class RunResult:
     timed_out: bool = False
     stl_path: Path | None = None   # 网页预览用的 STL；导出失败时是 None，原因在 stl_error 里
     stl_error: str | None = None
+    probe_output: str | None = None  # 只有 probe 模式才有：probe 打印的内容（已截断）
 
 
 def _kill_tree(proc: subprocess.Popen) -> None:
@@ -58,8 +66,9 @@ def run_job(
     checks_raw: list[dict],
     param_names: set[str],
     *,
-    mode: Literal["build", "inspect"] = "build",
+    mode: Literal["build", "inspect", "probe"] = "build",
     query_spec: dict | None = None,
+    check_values: dict[str, float] | None = None,
     export_step: Path | None = None,
     render_png: Path | None = None,
     export_stl: Path | None = None,
@@ -79,6 +88,7 @@ def run_job(
             "param_names": sorted(param_names),
             "mode": mode,
             "query_spec": query_spec,
+            "check_values": check_values or None,
             "export_step": export_step is not None,
             "render_png": render_png is not None,
             "export_stl": export_stl is not None,
@@ -104,6 +114,7 @@ def run_job(
             return RunResult(
                 ok=False, timed_out=True, duration_s=time.monotonic() - started,
                 error={"cell": None, "type": "TimeoutError", "message": f"运行超过 {timeout_s:g} 秒被终止"},
+                probe_output="" if mode == "probe" else None,
             )
 
         result_path = workdir / "result.json"
@@ -123,6 +134,7 @@ def run_job(
             error=res["error"], values=res["values"], checks=checks, facts=res["facts"], query=res["query"],
             step_path=step_path, png_path=png_path, duration_s=time.monotonic() - started, timed_out=bool(res["timed_out"]),
             stl_path=stl_path, stl_error=res.get("stl_error"),
+            probe_output=truncate_probe(res.get("probe_output") or "") if mode == "probe" else None,
         )
     finally:
         shutil.rmtree(workdir, ignore_errors=True)  # 只是清理临时目录，删不掉（比如被占用）不应让整次运行失败

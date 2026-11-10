@@ -283,3 +283,10 @@
 - 做了什么：新文件 `cad_agent/plan.py`（`Stage`、`Plan`、`PlanError`、`revise`，`MAX_STAGES = 12`；提示词文档 7.3 里 set_plan 的两条报错原文放在这里的常量 `PLAN_LOCKED`、`STAGE_HAS_FEATURES`，因为 `plan.py` 不能依赖工具层，Task 6 的 `messages.py` 直接引用它们）；`cad_agent/staged/select.py`（`features_upto`、`checks_for_stage`、`final_checks`、`stage_ready`、`insert_index`）；`Feature.stage`（默认空，`to_list` 只在非空时写）、`FeatureList.insert`、`FeatureList.in_stage`；`checks/spec.py` 的 `HOLDS`、`Check.stage`、`Check.holds`，`KNOWN_KEYS` 加了 `stage`、`holds`；`Workspace.plan`、`Workspace.probes_used`。
 - 测试数量：新增 26 个（`test_plan.py` 18 个，含 10 种坏写法的参数化；`test_select.py` 8 个，另加 `in_stage`/`insert` 和 `Workspace` 新字段的默认值），全部测试 567 个全部通过。旧的 `test_notebook.py`、`test_check_spec.py` 原样通过。
 - 说明：没有偏离。两处计划没写到、由我定的细节：没写 `stage` 的检查或特征按第一个阶段算；`stage` 写了计划里没有的编号时，选取时跳过它（`set_checks` 会先拦下不存在的阶段，所以正常不会出现）。
+
+## 第二版 计划 1 Task 5：沙盒支持 probe 和冻结期望值 —— 完成
+
+- 做了什么：`render_notebook(params, features, probe=None)`：给了 probe 时在最后一个特征之后加 probe 单元（形状逐字照计划 Step 3），没有特征时先加占位方块单元、产品用它；`probe` 为 `None` 时输出和原来逐字相同。`run_job(..., mode="probe", check_values=...)`；`RunResult.probe_output`；`PROBE_OUTPUT_LIMIT = 2000`（超过时截断并加一行"…（后面的输出省略）"）。子进程里 probe 模式不量、不跑检查、不导出，不管成功、出错还是超时都读回 `probe_out.txt`；出错帧在 probe 单元里时 `error["cell"]` 是 `"probe"`（笔记第 17 节的办法）。`check_values` 给了时，检查和查询用它代替运行得到的参数值，`values` 仍照实返回。
+- 测试数量：新增 14 个（`test_probe_notebook.py` 6 个，多了一个"probe 单元的形状逐行等于计划"；`test_execute_v2.py` 8 个，多了一个"build 的结果没有 probe_output"），全部测试 581 个全部通过。旧的 `test_execute.py`、`test_notebook.py` 原样通过。
+- 说明：`notebook.py` 加上 probe 单元后超过 300 行，把读名字用的 `_Names` 原样移到新文件 `cad_agent/code_names.py`（行为不变，不是接口）。`test_probe_prints_facts` 的包围盒写法按偏离 D10 用顶点坐标。改文件时用 Python 的 `write_text` 拼带反斜杠的字符串出过一次错（`
+` 被展开成真的换行），已改回并核对测试。

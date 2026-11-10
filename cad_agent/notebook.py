@@ -12,6 +12,7 @@ import re
 from dataclasses import dataclass
 
 from cad_agent.brief import Param
+from cad_agent.code_names import _Names
 
 ROLES = {"build", "add", "subtract", "intersect", "modify", "pattern"}
 SLUG_RE = re.compile(r"^[a-z][a-z0-9-]*$")
@@ -126,74 +127,6 @@ class RenderedNotebook:
     cell_lines: dict[str, tuple[int, int]]
 
 
-class _Names(ast.NodeVisitor):
-    """收集一段代码读取了哪些名字、在最外层给哪些名字赋了值。
-
-    函数、lambda、推导式、类里面的局部名字不算最外层的赋值；它们读取的名字照常算读取。
-    """
-
-    def __init__(self) -> None:
-        self.reads: set[str] = set()
-        self.writes: set[str] = set()
-        self._depth = 0
-
-    def visit_Name(self, node: ast.Name) -> None:
-        if isinstance(node.ctx, ast.Load):
-            self.reads.add(node.id)
-        elif isinstance(node.ctx, ast.Store) and self._depth == 0:
-            self.writes.add(node.id)
-
-    def visit_AugAssign(self, node: ast.AugAssign) -> None:
-        if isinstance(node.target, ast.Name):
-            self.reads.add(node.target.id)
-        self.generic_visit(node)
-
-    def _enter(self, children: list[ast.AST]) -> None:
-        self._depth += 1
-        for child in children:
-            self.visit(child)
-        self._depth -= 1
-
-    def visit_FunctionDef(self, node: ast.FunctionDef) -> None:
-        if self._depth == 0:
-            self.writes.add(node.name)
-        for outer in [*node.decorator_list, *node.args.defaults, *[d for d in node.args.kw_defaults if d]]:
-            self.visit(outer)
-        self._enter(list(node.body))
-
-    visit_AsyncFunctionDef = visit_FunctionDef  # type: ignore[assignment]
-
-    def visit_ClassDef(self, node: ast.ClassDef) -> None:
-        if self._depth == 0:
-            self.writes.add(node.name)
-        for outer in [*node.decorator_list, *node.bases]:
-            self.visit(outer)
-        self._enter(list(node.body))
-
-    def visit_Lambda(self, node: ast.Lambda) -> None:
-        for outer in [*node.args.defaults, *[d for d in node.args.kw_defaults if d]]:
-            self.visit(outer)
-        self._enter([node.body])
-
-    def _comprehension(self, node: ast.AST) -> None:
-        self._enter(list(ast.iter_child_nodes(node)))
-
-    visit_ListComp = visit_SetComp = visit_DictComp = visit_GeneratorExp = _comprehension  # type: ignore[assignment]
-
-    def visit_Import(self, node: ast.Import) -> None:
-        if self._depth == 0:
-            self.writes.update((a.asname or a.name.split(".")[0]) for a in node.names)
-
-    def visit_ImportFrom(self, node: ast.ImportFrom) -> None:
-        if self._depth == 0:
-            self.writes.update((a.asname or a.name) for a in node.names)
-
-    def visit_ExceptHandler(self, node: ast.ExceptHandler) -> None:
-        if node.name and self._depth == 0:
-            self.writes.add(node.name)
-        self.generic_visit(node)
-
-
 def _analyse(f: Feature) -> _Names:
     try:
         tree = ast.parse(f.code.replace("\r\n", "\n"))
@@ -212,8 +145,34 @@ def _literal(v: float) -> str:
     return str(int(v)) if float(v).is_integer() else repr(float(v))
 
 
-def render_notebook(params: list[Param], features: list[Feature]) -> RenderedNotebook:
-    if not features:
+PLACEHOLDER = "placeholder_body"  # 没有特征时 probe 用的占位实体（笔记第 17 节）
+PLACEHOLDER_CODE = f"{PLACEHOLDER} = scad.make_box_rsolid(width=1, height=1, depth=1, bottom_face_center=(0, 0, 0))"
+
+
+def _probe_cell(code: str, available: set[str], last: str | None) -> tuple[list[str], list[str]]:
+    """probe 单元的输入和内容（笔记第 17 节）。probe 代码已经先过 check_code；这段包装是程序写的。"""
+    try:
+        tree = ast.parse(code.replace("\r\n", "\n"))
+    except SyntaxError as e:
+        raise NotebookError(f"probe 代码有语法错误：第 {e.lineno} 行，{e.msg}") from e
+    names = _Names()
+    names.visit(tree)
+    inputs = {n for n in names.reads if n in available}
+    if last is not None:
+        inputs.add(last)
+    lines = code.replace("\r\n", "\n").strip("\n").splitlines() or ["pass"]
+    body = [
+        "# ---- probe ----", "import contextlib as _ctx", "import io as _io", "def _probe(model):",
+        *(("    " + ln) if ln.strip() else "" for ln in lines),
+        "_buf = _io.StringIO()", "try:", "    with _ctx.redirect_stdout(_buf):", f"        _probe({last or 'None'})", "finally:",
+        '    with open("probe_out.txt", "w", encoding="utf-8") as _f:', "        _f.write(_buf.getvalue())", "return ()",
+    ]
+    return sorted(inputs), body
+
+
+def render_notebook(params: list[Param], features: list[Feature], probe: str | None = None) -> RenderedNotebook:
+    """拼出 notebook。probe 不是 None 时，在最后一个特征之后加一个 probe 单元（没有特征时先加一个占位实体）。"""
+    if not features and probe is None:
         raise NotebookError("还没有任何特征，无法生成模型。请先用 upsert_feature 写至少一个特征")
     param_names = [p.name for p in params]
     for f in features:
@@ -266,7 +225,13 @@ def render_notebook(params: list[Param], features: list[Feature]) -> RenderedNot
         cell_lines[f.slug] = add_cell(inputs, body)
         available.add(f.var)
 
-    last = features[-1].var
-    add_cell([last], [f'model = scad.Part(part_id="model", body={last})', "return (model,)"])
+    last = features[-1].var if features else None
+    if probe is not None:
+        if last is None:
+            add_cell([], [PLACEHOLDER_CODE, f"return ({PLACEHOLDER},)"])
+        sig, body = _probe_cell(probe, available, last)
+        add_cell(sig, body)
+    body_var = last or PLACEHOLDER
+    add_cell([body_var], [f'model = scad.Part(part_id="model", body={body_var})', "return (model,)"])
     text = "\n".join(lines) + "\n" + FOOTER
     return RenderedNotebook(text=text, cell_lines=cell_lines)

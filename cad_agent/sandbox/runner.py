@@ -16,6 +16,7 @@ from pathlib import Path
 from typing import Any
 
 FEATURE_RE = re.compile(r"# ---- feature: ([a-z][a-z0-9-]*) \(")
+PROBE_HEADER = "# ---- probe ----"   # probe 单元的第一行（笔记第 17 节）
 SECTION_RE = re.compile(r"^(Operation|Signature|Documentation|What happened|Measurements|Evidence|Possible causes|How to fix|Technical details|Inventory):\s*(.*)$")
 MAX_MESSAGE = 800
 
@@ -74,8 +75,9 @@ def failed_slug(e: BaseException, nb_path: Path, cell_lines: dict[str, list[int]
     nb_norm = os.path.normcase(os.path.abspath(nb_path))
     for f in traceback.extract_tb(e.__traceback__):
         if "__marimo__cell_" in f.filename:
-            m = FEATURE_RE.search("".join(linecache.getlines(f.filename)[:3]))
-            slug = m.group(1) if m else None
+            head = "".join(linecache.getlines(f.filename)[:3])
+            m = FEATURE_RE.search(head)
+            slug = m.group(1) if m else ("probe" if PROBE_HEADER in head else None)
         elif os.path.normcase(os.path.abspath(f.filename)) == nb_norm:
             for name, (start, end) in cell_lines.items():
                 if start <= f.lineno <= end:
@@ -91,6 +93,17 @@ def _error(cell: str | None, e: BaseException) -> dict:
 
 
 def _work(job: dict, out: dict[str, Any]) -> None:
+    if job["mode"] != "probe":
+        _run(job, out)
+        return
+    try:
+        _run(job, out)
+    finally:  # 无论运行成功、出错还是超时，都把 probe 已经打印的内容带回去
+        path = Path(job["workdir"]) / "probe_out.txt"
+        out["probe_output"] = path.read_text(encoding="utf-8", errors="replace") if path.exists() else ""
+
+
+def _run(job: dict, out: dict[str, Any]) -> None:
     import simplecadapi as scad
     from simplecadapi import exporter
     from simplecadapi.runtime import run_notebook
@@ -115,13 +128,17 @@ def _work(job: dict, out: dict[str, Any]) -> None:
         solid = run.product.body
         values = {n: float(run.values[n]) for n in job["param_names"] if n in run.values}
         out["values"] = values
+        if job["mode"] == "probe":  # probe 只要打印的内容：不量、不跑检查、不导出
+            return
         out["facts"] = body_facts(solid)
+        # 参数扰动验证时，检查的期望值和选择条件冻结在原来的参数值上（设计文档第 3.6 节）
+        measured_with = {**values, **(job.get("check_values") or {})}
         if job["mode"] == "inspect":
             spec = job.get("query_spec") or {}
-            out["query"] = query(solid, spec.get("kind", "faces"), spec.get("where", []), values)
+            out["query"] = query(solid, spec.get("kind", "faces"), spec.get("where", []), measured_with)
         else:
             checks = parse_checks(job["checks_raw"], set(job["param_names"]))
-            out["checks"] = [r.to_dict() for r in run_checks(solid, checks, values)]
+            out["checks"] = [r.to_dict() for r in run_checks(solid, checks, measured_with)]
     except Exception as e:  # noqa: BLE001 - 检查或查询的写法问题，翻译后交回模型
         out["error"] = _error(None, e)
         return
