@@ -26,8 +26,10 @@ NOT_READY = "这个工具还没有接上"  # build、probe、read_reference 由�
 
 class StagedTools:
     def __init__(self, box: "ToolBox") -> None:
+        from cad_agent.staged.build import build_tool  # build.py 要用到这里的东西，放在这里导入
+
         self.box = box
-        self.build: Handler = lambda args: _err(NOT_READY)
+        self.build: Handler = lambda args: build_tool(box)
         self.probe: Handler = lambda args: _err(NOT_READY)
         self.read_reference: Handler = lambda args: _err(NOT_READY)
 

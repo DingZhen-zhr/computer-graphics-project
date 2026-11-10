@@ -9,7 +9,8 @@ from __future__ import annotations
 import copy
 import difflib
 from dataclasses import dataclass
-from typing import Any, Callable, Iterable
+from pathlib import Path
+from typing import TYPE_CHECKING, Any, Callable, Iterable
 
 from cad_agent.agent.api_docs import api_names, lookup_api, normalize_api_name
 from cad_agent.brief import Brief, BriefError
@@ -21,6 +22,10 @@ from cad_agent.sandbox.execute import RunResult
 from cad_agent.tool_common import INSPECT_LIMIT, ToolOutcome, _err, _error_for_model, _hint, _json  # noqa: F401 - 其他模块从这里导入
 from cad_agent.tool_specs import PRE_CONFIRM_TOOLS, TOOL_NAMES, TOOL_SPECS
 from cad_agent.tools_legacy import LegacyTools
+
+if TYPE_CHECKING:
+    from cad_agent.staged.build import Advance
+    from cad_agent.staged.final_gate import GateResult
 
 MAX_QUESTIONS = 5
 
@@ -48,6 +53,9 @@ class ToolBox(LegacyTools):
     ) -> None:
         self.ws = ws
         self.gates = gates or Gates.legacy()   # 不传 gates 就是 1.2 版的流程
+        self.stage_dir: Path | None = None     # 分阶段时各阶段 STL 放哪里（主循环设成会话目录下的 stages）
+        self.last_advance: Advance | None = None   # 上次分阶段 build 的推进结果
+        self.last_gate: GateResult | None = None   # 上次终检的结果
         self.run_job = run_job
         self.timeout_s = timeout_s
         self.secret_names = tuple(secret_names)

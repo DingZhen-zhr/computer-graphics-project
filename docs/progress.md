@@ -298,3 +298,9 @@
 - 测试数量：新增 28 个（`tests/test_staged_tools.py`，比计划多了：7.2–7.4 原文逐条比对、`set_plan` 交付后追加阶段、缺参数时用 V2 的表、`missing_coverage` 只算 from_here；没有计划那条按 5 个工具参数化），全部测试 609 个全部通过。旧的 `test_tools.py` 原样通过。
 - 说明：`tools.py` 加上开关后会超过 300 行，按计划的说明把旧流程的 `_upsert_feature`、`_remove_feature`、`_set_checks`、`_build`、`_build_without_run`、`_inspect`（连同只给它们用的 `_feature_names`）原样移到 `cad_agent/tools_legacy.py`（`ToolBox` 继承它，公开成员不变）；共用的 `ToolOutcome`、`_json`、`_err`、`_error_for_model`、`_hint`、`INSPECT_LIMIT` 放进新文件 `cad_agent/tool_common.py`，`tools.py` 照旧能导入它们。现在 `tools.py` 155 行。
 - 计划没写到、由我定的细节：`set_checks` 的 `stage` 不是文字时，按"没有这个阶段"报错；校验时把这个阶段的新检查和别的阶段的检查合在一起交给 `parse_checks`，所以 id 和别的阶段重名也会被拦下（终检要把各阶段的检查合起来跑）；`remove_feature` 的返回和 `upsert_feature` 一样列出特征（带阶段），只是没有 `stage` 键。没有偏离。
+
+## 第二版 计划 1 Task 7：分阶段的 build —— 完成
+
+- 做了什么：`cad_agent/staged/build.py`（`StageRun`、`Advance`、`advance`、`build_tool`）：从当前阶段起取连续的、写好了特征和检查的阶段，各跑一次截断的 notebook（最多 4 个线程同时跑，各自起沙盒子进程），按顺序看结果，第一个没通过的就停；渲染或检查写法出错时不运行，记成和旧流程 `_build_without_run` 一样的结果；通过的阶段清零 `probes_used`。`build_tool`：当前阶段没有特征 / 没有检查时返回 7.3 的原文、不计失败；全部通过后再 build 会把最后一个阶段重新验证；有阶段新通过时失败计数先清零；返回体是旧流程 8 个键加 `stage`、`stages_passed`、`final_gate`，hint 按 7.2 的顺序取。`ToolBox` 新增 `stage_dir`、`last_advance`、`last_gate`。终检先放了一个只算缺检查的版本（`cad_agent/staged/final_gate.py`，`GateResult` 已按计划的接口写好，扰动在 Task 8 加），缺检查时按旧流程多放 `coverage_note`（偏离 D4 的做法）。`tests/helpers_staged.py`（`StageRunner`、`two_stage_ws` 等）。
+- 测试数量：新增 20 个（`tests/test_staged_build.py`，比计划多了：检查写法出错算阶段失败、只用 1 个线程也能跑、阶段失败时 hint 用旧流程原文、缺检查只按 from_here 算、`ToolBox` 新成员的默认值），全部测试 629 个全部通过。
+- 说明：`two_stage_ws()` 的 s1 有两条检查（`base-w` 和用到 `tilt_deg` 的 `tilt`），这样两个用户参数都有检查，终检能通过；计划写的是"每个阶段一条检查"，多一条是为了让"可以交付"的测试有意义。返回体里的 `missing_coverage` 只在做了终检时才有内容（阶段还没做完时后面阶段的检查还没写，提前报缺检查没有意义）。没有偏离。
