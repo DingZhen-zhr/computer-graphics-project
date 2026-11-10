@@ -337,3 +337,11 @@
 - 做了什么：`cad_agent/agent/manual.py`（`ManualResult`、`apply_params`）：只在分阶段、计划全部通过、已经有至少一个版本时可用；参数名不认识、不是有限的数（布尔、文字、NaN、无穷都不行）、和现在全相同时各给一句中文、什么都不改；改动的参数写进需求单（单位、备注不变，来源改成 user），全部阶段变回未通过后调用 `advance`；没走到 complete 或缺检查（只用终检的缺检查那一项）就恢复备份（需求单、各阶段通过状态、probe 次数、上次运行结果），返回第 9 节最后一个 text 块的原文和停下那个阶段的 `failed_checks`、`error`；通过就导出新版本，变化行照第 9 节"手动修改参数"的格式，版本目录里带 `plan.json` 和各阶段 STL。两种结果都写 `manual` 日志。全程不调用模型、不做扰动验证。
 - 测试数量：新增 15 个（`tests/test_manual.py`，比计划多了：计划没全部通过时不可用、7 种坏输入参数化、出错时 `error` 的格式、成功后会话目录里的需求单和计划也更新），全部测试 723 个全部通过。
 - 计划没写到、由我定的细节：阶段 STL 先导出到临时目录，通过了才复制到会话的 `stages/`，这样失败的那次不会把阶段回看用的 STL 换成没生效的数值；成功后调用一次 `Agent._save()`，让会话目录里的 `brief.json`、`plan.json` 和新数值一致；导出失败时同样恢复备份。新版本不写 `gate.json`（这次没做扰动验证，写了反而误导）。没有偏离。
+
+## 第二版 计划 1 Task 13：六个新评测任务 —— 完成
+
+- 做了什么：`benchmarks/tasks/` 新增 `bearing_block`、`battery_box`、`spur_gear`（中等）和 `heatsink`、`tee_fitting`、`bracket_arm`（困难）六个 YAML：一句话需求、隐藏需求、修改请求、验收数字全部照计划原文，`max_user_turns` 都是 14，注释里写了坐标约定和每个点是怎么选的。`benchmarks/run.py`：`MEDIUM_TASKS`、`HARD_TASKS`，`TASK_SETS` 加 `medium`、`hard`、`v2`（开发 3 + 留出 2 + 新 6），`--set` 的说明同步。`tests/test_benchmark_references_v2.py`：六个任务各一个分阶段的标准答案（3~4 个阶段，参数全部是用户参数，检查都带 stage，用到了 here_only），草图 L 形（支架臂）、标准件齿轮（直齿轮）都只用笔记里实测过的写法。
+- 测试数量：新增 49 个（`test_benchmarks_v2.py` 13 个；`test_benchmark_references_v2.py` 21 个真实 SCA：12 条"推进到全部阶段通过 + 终检含扰动通过 + 验收全过"、6 条"没改的旧模型对修改后的验收恰好卡在计划写的那几项"、另加 3 条"超过 12 个、终检没有扰动的参数，挪到前面单独扰动也都被约束"），全部测试 757 个全部通过（7 分 7 秒，其中新的真实 SCA 测试约 4 分钟）。
+- 验收数字：六个任务、十二组验收**全部按计划的数字一次通过**，没有改任何数字，也没有放宽容差；旧模型卡住的集合和计划写的完全一致（轴承座 out-6；电池盒 out-3、out-4；直齿轮 in-5、out-5；散热器 fin-tops、in-3、out-6；三通 out-7；支架臂 size-z、in-5、in-6、out-4）。齿顶圆实测 64（笔记第 21 节），不需要记偏离。
+- 终检扰动：每个任务的终检都通过，参与扰动的参数全部是 constrained，没有 unbuildable。散热器有 16 个参数、三通 14 个、支架臂 18 个，超过 12 个上限，终检按需求单顺序跳过最后 4 / 2 / 6 个（散热器：hole_x、mount_y、pin_d、pin_depth；三通：top_bolt_d、top_bolt_pcd；支架臂：hole_d、cb_d、cb_depth、hole1_x、hole2_x、hole2_y）；另加的测试把它们挪到前面单独扰动，也全部被检查约束。
+- 说明：计划要求 `run.py` 的 `main` 造智能体时传 `gates` 和案例库；`main` 是通过 `cli.build_agent` 造智能体的，而 `build_agent` 的这两项改动在 Task 15 的接口里，所以放到 Task 15 一起做（`main` 不用另写一份），这里没有改 `main`。为了让数字测试先失败，写完 YAML 后临时把它们挪走跑了一遍红灯，再挪回来补上 `run.py`。没有偏离。

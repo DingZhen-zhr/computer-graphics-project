@@ -1,0 +1,55 @@
+# 中等任务 3：直齿轮。考查：标准件齿轮（不要自己画齿形）、轮毂、轴孔加键槽、减重孔的圆周阵列。
+# 坐标约定：轴线就是 z 轴，齿轮的一个端面贴 z=0；键槽在 +y 方向；一个减重孔在 +x 方向上。
+# 齿顶圆直径按 模数 ×（齿数 + 2）= 64 算（笔记第 21 节实测：x 方向 64.0、y 方向 63.79，所以 tol 写 1.0）。
+id: spur_gear
+initial: "做一个直齿轮"
+max_user_turns: 14
+
+hidden_spec: |
+  - 直齿圆柱齿轮：模数 2，齿数 30，齿宽 12 mm。轴线竖直，齿轮的一个端面贴着桌面。
+  - 朝上的一面有轮毂：外径 24 mm，比齿轮端面再高出 8 mm，所以总厚 20 mm。
+  - 轴孔 φ10，贯通全厚。
+  - 轴孔上有一个键槽：宽 3 mm，开在 +y 方向，槽底到孔心 6.4 mm，贯通全厚。
+  - 齿轮盘上有 6 个 φ8 的减重孔，均匀分布在 φ40 的圆上，贯通齿宽，其中一个孔在 +x 方向上。
+
+modifications:
+  - "减重孔改成 4 个"
+
+# 点是怎么选的：
+#   齿根圆半径 27.5；轴孔半径 5；键槽 x∈[-1.5,1.5]、y∈[0,6.4]；轮毂半径 12，z∈[12,20]；
+#   减重孔半径 4，孔心在半径 20 的圆上：6 个时在 0°、60°、120°……，4 个时在 0°、90°、180°、270°。
+#   in-1 轴孔和减重孔之间；in-2 轮毂；in-3 减重孔外侧、齿根以内；in-4 键槽底以外（y=7.5）；
+#   in-5 半径 20、30° 处（两个孔之间）；in-6 半径 20、90° 处（6 孔时在 60° 和 120° 两孔之间）。
+#   out-1 轴孔；out-2 0° 的减重孔；out-3 键槽里；out-4 齿轮上方、轮毂外；out-5 60° 的减重孔。
+#   改后：60° 处 [10,17.32,6] 变成材料（in-5），90° 处 [0,20,6] 变成孔（out-5）。没改的旧模型恰好卡在 in-5、out-5。
+acceptance:
+  after_initial:
+    - {id: size-x, type: bbox, axis: x, expected: 64, tol: 1.0}
+    - {id: size-y, type: bbox, axis: y, expected: 64, tol: 1.0}
+    - {id: size-z, type: bbox, axis: z, expected: 20, tol: 0.5}
+    - {id: in-1, type: point_inside, point: [8, 0, 6]}
+    - {id: in-2, type: point_inside, point: [10, 0, 16]}
+    - {id: in-3, type: point_inside, point: [26, 0, 6]}
+    - {id: in-4, type: point_inside, point: [0, 7.5, 6]}
+    - {id: in-5, type: point_inside, point: [17.32, 10, 6]}
+    - {id: in-6, type: point_inside, point: [0, 20, 6]}
+    - {id: out-1, type: point_outside, point: [0, 0, 10]}
+    - {id: out-2, type: point_outside, point: [20, 0, 6]}
+    - {id: out-3, type: point_outside, point: [0, 5.8, 10]}
+    - {id: out-4, type: point_outside, point: [15, 0, 16]}
+    - {id: out-5, type: point_outside, point: [10, 17.32, 6]}
+  after_mod_1:
+    - {id: size-x, type: bbox, axis: x, expected: 64, tol: 1.0}
+    - {id: size-y, type: bbox, axis: y, expected: 64, tol: 1.0}
+    - {id: size-z, type: bbox, axis: z, expected: 20, tol: 0.5}
+    - {id: in-1, type: point_inside, point: [8, 0, 6]}
+    - {id: in-2, type: point_inside, point: [10, 0, 16]}
+    - {id: in-3, type: point_inside, point: [26, 0, 6]}
+    - {id: in-4, type: point_inside, point: [0, 7.5, 6]}
+    - {id: in-5, type: point_inside, point: [10, 17.32, 6]}
+    - {id: in-6, type: point_inside, point: [17.32, 10, 6]}
+    - {id: out-1, type: point_outside, point: [0, 0, 10]}
+    - {id: out-2, type: point_outside, point: [20, 0, 6]}
+    - {id: out-3, type: point_outside, point: [0, 5.8, 10]}
+    - {id: out-4, type: point_outside, point: [15, 0, 16]}
+    - {id: out-5, type: point_outside, point: [0, 20, 6]}

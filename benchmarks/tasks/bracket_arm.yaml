@@ -1,0 +1,67 @@
+# 困难任务 3：支架臂。考查：草图画 L 形轮廓再拉伸、横向耳孔、贯穿的减重槽、两个沉头孔、三角加强筋、倒角。
+# 坐标约定：底面贴 z=0，xy 以原点为中心，最长的水平方向（底板长 120）沿 x；立臂在左端（-x），L 形的侧面在 XZ 平面里，宽度沿 y。
+id: bracket_arm
+initial: "做一个 L 形的支架臂"
+max_user_turns: 14
+
+hidden_spec: |
+  - 从侧面看是一个 L 形：底板长 120 mm、厚 8 mm；左端有一根立臂，宽 20 mm（沿长度方向），从桌面算起总高 60 mm，立臂的外侧面和底板的左端面平齐。整个 L 形的宽度是 30 mm。
+  - 立臂上有一个 φ12 的耳孔：轴线沿长度方向，穿透立臂，在宽度方向居中，孔心离立臂顶端 15 mm。
+  - 底板上有一个矩形的减重槽，贯穿底板厚度：沿长度方向从底板中心到中心右边 30 mm，宽 12 mm（居中）。
+  - 底板上有两个沉头孔，从顶面往下：通孔 φ5，沉头 φ10、深 3 mm。一个孔心在中心右边 48 mm、宽度方向居中；另一个在中心左边 25 mm、宽度方向偏 +y 9 mm。
+  - 立臂和底板的内角有一块三角形加强筋：厚 6 mm（宽度方向居中），贴着底板顶面的那条边长 30 mm，贴着立臂的那条边高 30 mm。
+  - 底板右端的上棱倒角 2 mm。
+
+modifications:
+  - "立臂总高改成 70 mm，耳孔离顶端的距离不变"
+
+# 点是怎么选的：
+#   底板 x∈[-60,60]、z∈[0,8]、y∈[-15,15]；立臂 x∈[-60,-40]、z 到 60（改后 70）；耳孔轴线沿 x，在 (y=0, z=45)（改后 z=55），半径 6；
+#   减重槽 x∈[0,30]、y∈[-6,6]；沉头孔 1 在 (48, 0)，沉头孔 2 在 (-25, 9)：通孔半径 2.5，沉头半径 5、z∈[5,8]；
+#   加强筋是 (x,z) = (-40,8)、(-10,8)、(-40,38) 的三角形，y∈[-3,3]（斜边 x+z=28）；倒角面 x+z=66。
+#   初始：in-1 底板（离孔 1 有 10 mm）；in-2 沉头下方、通孔外（z=3）；in-3 槽外侧（y=10）；in-4 立臂下部；in-5 立臂、耳孔上方（z=55）；
+#   in-6 加强筋；in-7 倒角面以内（58.5+6.5=65 ≤ 66）；in-8 耳孔旁边（y=10）。
+#   改后：in-1~in-4 不变；in-5 [-50,0,45]（耳孔上移后这里是材料）；in-6 [-50,0,65]（立臂加高后的顶部）；in-7 加强筋；in-8 倒角面以内。
+#   out-1 通孔；out-2 沉头里；out-3 减重槽；out-4 耳孔（改后 z=55）；out-5 加强筋旁边；out-6 加强筋斜边以外；out-7 倒角切掉的地方（67 > 66）；out-8 沉头孔 2 的通孔。
+#   没改的旧模型恰好卡在 size-z、in-5（[-50,0,45] 在旧耳孔里）、in-6（[-50,0,65] 在旧立臂顶以上）、out-4（[-50,0,55] 在旧模型里是材料）。
+acceptance:
+  after_initial:
+    - {id: size-x, type: bbox, axis: x, expected: 120, tol: 0.5}
+    - {id: size-y, type: bbox, axis: y, expected: 30, tol: 0.5}
+    - {id: size-z, type: bbox, axis: z, expected: 60, tol: 0.5}
+    - {id: in-1, type: point_inside, point: [50, 10, 4]}
+    - {id: in-2, type: point_inside, point: [48, 4, 3]}
+    - {id: in-3, type: point_inside, point: [15, 10, 4]}
+    - {id: in-4, type: point_inside, point: [-50, 0, 20]}
+    - {id: in-5, type: point_inside, point: [-50, 0, 55]}
+    - {id: in-6, type: point_inside, point: [-35, 0, 12]}
+    - {id: in-7, type: point_inside, point: [58.5, 0, 6.5]}
+    - {id: in-8, type: point_inside, point: [-50, 10, 45]}
+    - {id: out-1, type: point_outside, point: [48, 0, 4]}
+    - {id: out-2, type: point_outside, point: [48, 4, 7]}
+    - {id: out-3, type: point_outside, point: [15, 0, 4]}
+    - {id: out-4, type: point_outside, point: [-50, 0, 45]}
+    - {id: out-5, type: point_outside, point: [-35, 5, 12]}
+    - {id: out-6, type: point_outside, point: [-20, 0, 30]}
+    - {id: out-7, type: point_outside, point: [59.5, 0, 7.5]}
+    - {id: out-8, type: point_outside, point: [-25, 9, 4]}
+  after_mod_1:
+    - {id: size-x, type: bbox, axis: x, expected: 120, tol: 0.5}
+    - {id: size-y, type: bbox, axis: y, expected: 30, tol: 0.5}
+    - {id: size-z, type: bbox, axis: z, expected: 70, tol: 0.5}
+    - {id: in-1, type: point_inside, point: [50, 10, 4]}
+    - {id: in-2, type: point_inside, point: [48, 4, 3]}
+    - {id: in-3, type: point_inside, point: [15, 10, 4]}
+    - {id: in-4, type: point_inside, point: [-50, 0, 20]}
+    - {id: in-5, type: point_inside, point: [-50, 0, 45]}
+    - {id: in-6, type: point_inside, point: [-50, 0, 65]}
+    - {id: in-7, type: point_inside, point: [-35, 0, 12]}
+    - {id: in-8, type: point_inside, point: [58.5, 0, 6.5]}
+    - {id: out-1, type: point_outside, point: [48, 0, 4]}
+    - {id: out-2, type: point_outside, point: [48, 4, 7]}
+    - {id: out-3, type: point_outside, point: [15, 0, 4]}
+    - {id: out-4, type: point_outside, point: [-50, 0, 55]}
+    - {id: out-5, type: point_outside, point: [-35, 5, 12]}
+    - {id: out-6, type: point_outside, point: [-20, 0, 30]}
+    - {id: out-7, type: point_outside, point: [59.5, 0, 7.5]}
+    - {id: out-8, type: point_outside, point: [-25, 9, 4]}

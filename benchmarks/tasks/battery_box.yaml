@@ -1,0 +1,52 @@
+# 中等任务 2：电池盒。考查：敞口薄壁盒、中间隔板、内角的安装柱（柱子贴着两面内壁）和柱顶盲孔、侧壁上的走线缺口。
+# 坐标约定：底面贴 z=0，xy 以原点为中心，最长的水平方向（90）沿 x；走线缺口在 +x 侧壁。
+id: battery_box
+initial: "做一个装两节电池的小盒子"
+max_user_turns: 14
+
+hidden_spec: |
+  - 外形 90×60×25 mm（长×宽×高），上面敞口，不做盖子。四面侧壁厚 2 mm，底厚 2 mm。不要圆角。
+  - 盒子正中间有一块隔板，把内腔沿长度方向分成两格：隔板厚 2 mm，和宽度方向平行，两端连到侧壁，高度到盒口。
+  - 四个内角各有一根 φ8 的安装柱：柱心离相邻的两面内壁各 4 mm，从盒底内表面往上高 20 mm。每根柱子顶面正中有一个 φ3 的盲孔，深 10 mm。
+  - 长度方向正的那一端（+x 侧）的侧壁正中有一个走线缺口：宽 10 mm，从盒口往下深 8 mm，穿透壁厚。
+
+modifications:
+  - "安装柱的高度改成 15 mm，孔深不变"
+
+# 点是怎么选的：
+#   内壁在 x=±43、y=±28；底板 z∈[0,2]；隔板 x∈[-1,1]；柱心 (±39, ±24)，半径 4（x 35~43），柱顶 z=22（改后 17）；
+#   盲孔半径 1.5（x 37.5~40.5），z∈[12,22]（改后 [7,17]）；走线缺口 x∈[43,45]、y∈[-5,5]、z∈[17,25]。
+#   in-1 底板；in-2 +x 侧壁缺口下方；in-3 隔板；in-4 柱子盲孔下方；in-5 柱子里、盲孔外侧（x=41.5）；in-6 -x 侧壁（那边没有缺口）。
+#   out-1、out-4 两格的内腔；out-2 走线缺口；out-3 盲孔里。
+#   改后：in-4 换成 z=5（新孔底 7 以下），in-5 换成 z=15（新柱顶 17 以下）；out-3 换成 z=10（落在新盲孔里），
+#   多一个 out-4 [41.5,24,20]（新柱顶 17 以上，是内腔），原来的 out-4 顺延成 out-5。没改的旧模型恰好卡在 out-3、out-4。
+acceptance:
+  after_initial:
+    - {id: size-x, type: bbox, axis: x, expected: 90, tol: 0.5}
+    - {id: size-y, type: bbox, axis: y, expected: 60, tol: 0.5}
+    - {id: size-z, type: bbox, axis: z, expected: 25, tol: 0.5}
+    - {id: in-1, type: point_inside, point: [0, 0, 1]}
+    - {id: in-2, type: point_inside, point: [44, 0, 10]}
+    - {id: in-3, type: point_inside, point: [0, 10, 12]}
+    - {id: in-4, type: point_inside, point: [39, 24, 10]}
+    - {id: in-5, type: point_inside, point: [41.5, 24, 20]}
+    - {id: in-6, type: point_inside, point: [-44, 0, 20]}
+    - {id: out-1, type: point_outside, point: [20, 0, 12]}
+    - {id: out-2, type: point_outside, point: [44, 0, 20]}
+    - {id: out-3, type: point_outside, point: [39, 24, 18]}
+    - {id: out-4, type: point_outside, point: [-20, 0, 12]}
+  after_mod_1:
+    - {id: size-x, type: bbox, axis: x, expected: 90, tol: 0.5}
+    - {id: size-y, type: bbox, axis: y, expected: 60, tol: 0.5}
+    - {id: size-z, type: bbox, axis: z, expected: 25, tol: 0.5}
+    - {id: in-1, type: point_inside, point: [0, 0, 1]}
+    - {id: in-2, type: point_inside, point: [44, 0, 10]}
+    - {id: in-3, type: point_inside, point: [0, 10, 12]}
+    - {id: in-4, type: point_inside, point: [39, 24, 5]}
+    - {id: in-5, type: point_inside, point: [41.5, 24, 15]}
+    - {id: in-6, type: point_inside, point: [-44, 0, 20]}
+    - {id: out-1, type: point_outside, point: [20, 0, 12]}
+    - {id: out-2, type: point_outside, point: [44, 0, 20]}
+    - {id: out-3, type: point_outside, point: [39, 24, 10]}
+    - {id: out-4, type: point_outside, point: [41.5, 24, 20]}
+    - {id: out-5, type: point_outside, point: [-20, 0, 12]}

@@ -1,0 +1,57 @@
+# 困难任务 2：三通管接头。考查：两根管子相贯、三个法兰、三组斜 45° 的螺栓孔、两个内孔贯通。
+# 坐标约定：底面贴 z=0，xy 以原点为中心；主管沿 x，轴线在 (y=0, z=35)；支管竖直，轴线是 x=0、y=0 的竖线。
+id: tee_fitting
+initial: "做一个带法兰的三通管接头"
+max_user_turns: 14
+
+hidden_spec: |
+  - 主管水平放，沿长度方向：外径 40 mm，内径 30 mm，全长 120 mm，轴线离桌面 35 mm。
+  - 主管两端各有一个法兰：外径 70 mm，厚 8 mm，算在 120 mm 全长之内。每个法兰上 4 个 φ7 的螺栓通孔，均匀分布在 φ56 的圆上，孔在斜 45° 的四个方向上。
+  - 支管从主管正中间竖直向上伸出：外径 30 mm，内径 20 mm，顶端离桌面 85 mm。
+  - 支管顶端有一个法兰：外径 56 mm，厚 8 mm（顶面就是支管顶端）。上面 4 个 φ6 的螺栓通孔，均匀分布在 φ44 的圆上，孔在斜 45° 的四个方向上。
+  - 主管的内孔全长贯通；支管的内孔从顶端一直通到主管的内孔里。
+
+modifications:
+  - "支管的内径改成 24 mm"
+
+# 点是怎么选的：
+#   主管到轴线 (y, z-35) 的距离：内孔 < 15，管壁 15~20；两端法兰 x∈[52,60] 和 [-60,-52]，半径 35；
+#   端法兰的螺栓孔在 (y, z) = (±19.8, 35±19.8)（φ56 的圆、45°），半径 3.5。
+#   支管到竖轴的距离：内孔 < 10（改后 < 12），管壁 10~15，z∈[35,85]；顶法兰 z∈[77,85]，半径 28；顶法兰的孔在 (±15.56, ±15.56)，半径 3。
+#   in-1 主管壁；in-2 支管壁（半径 12.5，改后换成 13.5）；in-3、in-5 两端法兰（两孔之间）；in-4 顶法兰；in-6 支管壁内侧（半径 11）。
+#   out-1 主管内孔；out-2 支管内孔；out-3 端法兰的一个螺栓孔；out-4 顶法兰的一个螺栓孔；out-5 支管外面；
+#   out-6 主管顶部管壁那一高度、支管内孔穿过的地方（证明支管内孔通到了主管内孔）。
+#   改后 [11,0,60] 落在 φ24 的内孔里，成为 out-7。没改的旧模型恰好卡在 out-7。
+acceptance:
+  after_initial:
+    - {id: size-x, type: bbox, axis: x, expected: 120, tol: 0.5}
+    - {id: size-y, type: bbox, axis: y, expected: 70, tol: 0.5}
+    - {id: size-z, type: bbox, axis: z, expected: 85, tol: 0.5}
+    - {id: in-1, type: point_inside, point: [0, 17.5, 35]}
+    - {id: in-2, type: point_inside, point: [12.5, 0, 60]}
+    - {id: in-3, type: point_inside, point: [58, 30, 35]}
+    - {id: in-4, type: point_inside, point: [20, 0, 81]}
+    - {id: in-5, type: point_inside, point: [-58, -30, 35]}
+    - {id: in-6, type: point_inside, point: [11, 0, 60]}
+    - {id: out-1, type: point_outside, point: [0, 0, 35]}
+    - {id: out-2, type: point_outside, point: [0, 0, 60]}
+    - {id: out-3, type: point_outside, point: [58, 19.8, 54.8]}
+    - {id: out-4, type: point_outside, point: [15.56, 15.56, 81]}
+    - {id: out-5, type: point_outside, point: [30, 0, 60]}
+    - {id: out-6, type: point_outside, point: [0, 0, 52]}
+  after_mod_1:
+    - {id: size-x, type: bbox, axis: x, expected: 120, tol: 0.5}
+    - {id: size-y, type: bbox, axis: y, expected: 70, tol: 0.5}
+    - {id: size-z, type: bbox, axis: z, expected: 85, tol: 0.5}
+    - {id: in-1, type: point_inside, point: [0, 17.5, 35]}
+    - {id: in-2, type: point_inside, point: [13.5, 0, 60]}
+    - {id: in-3, type: point_inside, point: [58, 30, 35]}
+    - {id: in-4, type: point_inside, point: [20, 0, 81]}
+    - {id: in-5, type: point_inside, point: [-58, -30, 35]}
+    - {id: out-1, type: point_outside, point: [0, 0, 35]}
+    - {id: out-2, type: point_outside, point: [0, 0, 60]}
+    - {id: out-3, type: point_outside, point: [58, 19.8, 54.8]}
+    - {id: out-4, type: point_outside, point: [15.56, 15.56, 81]}
+    - {id: out-5, type: point_outside, point: [30, 0, 60]}
+    - {id: out-6, type: point_outside, point: [0, 0, 52]}
+    - {id: out-7, type: point_outside, point: [11, 0, 60]}

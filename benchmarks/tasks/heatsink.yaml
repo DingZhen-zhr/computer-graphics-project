@@ -1,0 +1,57 @@
+# 困难任务 1：散热器。考查：底板圆角、鳍片阵列（先做一片再阵列）、四角安装孔、带盲孔的风扇安装柱。
+# 坐标约定：底面贴 z=0，xy 以原点为中心，最长的水平方向（80）沿 x；鳍片沿 y 方向放、沿 x 方向排开。
+id: heatsink
+initial: "做一个铝散热器"
+max_user_turns: 14
+
+hidden_spec: |
+  - 底板 80×60×6 mm（长×宽×厚），四个竖边倒圆角 R3。
+  - 底板上面立着 9 片鳍片：每片厚 2 mm，沿宽度方向长 44 mm（居中），高 24 mm（顶端离桌面 30 mm）。鳍片沿长度方向均匀排开，最外面两片的中心离底板中心 36 mm。
+  - 四个角上各一个 φ4.5 的安装通孔，孔心离中心：长度方向 34 mm，宽度方向 26 mm。
+  - 四根 φ6 的风扇安装柱，立在底板顶面上，顶端和鳍片一样高；柱心离中心：长度方向 20 mm，宽度方向 26 mm。每根柱子顶面正中有一个 φ2.5 的盲孔，深 8 mm。
+
+modifications:
+  - "鳍片改成 11 片，最外面两片的位置不变"
+
+# fin-tops 数的是顶面在 z=30 的朝上平面：9 片鳍片的顶面 + 4 根柱子的顶面（带盲孔的圆环面）= 13；改成 11 片后是 15。
+# 点是怎么选的：
+#   鳍片中心 x = -36 + 72·i/(n-1)：9 片时间距 9（…, 0, 9, …, 36），11 片时间距 7.2（…, 0, 7.2, 14.4, …, 36）；每片 x 方向 ±1、y∈[-22,22]、z∈[6,30]。
+#   柱子在 (±20, ±26)，半径 3，盲孔半径 1.25、z∈[22,30]；安装孔在 (±34, ±26)，半径 2.25；底板圆角圆心 (±37, ±27)，半径 3。
+#   in-1 底板；in-2 中间那片鳍片；in-3 x=9 那片（改后换成 x=7.2）；in-4 柱子（盲孔下方）；in-5 圆角里面（离圆心 2.1）；in-6 最外一片。
+#   out-1 两片之间；out-2 鳍片两端以外；out-3 盲孔里；out-4 安装孔；out-5 圆角切掉的角（离圆心 3.5）；out-6 最外一片以外（改后换成 x=9，11 片时落在两片之间）。
+#   没改的旧模型恰好卡在 fin-tops、in-3、out-6。
+acceptance:
+  after_initial:
+    - {id: size-x, type: bbox, axis: x, expected: 80, tol: 0.5}
+    - {id: size-y, type: bbox, axis: y, expected: 60, tol: 0.5}
+    - {id: size-z, type: bbox, axis: z, expected: 30, tol: 0.5}
+    - {id: fin-tops, type: count, kind: faces, where: [["geom.type", "==", "PLANE"], ["geom.normal.z", ">=", 0.99], ["geom.center.z", ">=", 29.9]], expected: 13}
+    - {id: in-1, type: point_inside, point: [0, 0, 3]}
+    - {id: in-2, type: point_inside, point: [0, 0, 20]}
+    - {id: in-3, type: point_inside, point: [9, 0, 20]}
+    - {id: in-4, type: point_inside, point: [20, 26, 20]}
+    - {id: in-5, type: point_inside, point: [38.5, 28.5, 3]}
+    - {id: in-6, type: point_inside, point: [36, 0, 20]}
+    - {id: out-1, type: point_outside, point: [4.5, 0, 20]}
+    - {id: out-2, type: point_outside, point: [0, 25, 20]}
+    - {id: out-3, type: point_outside, point: [20, 26, 26]}
+    - {id: out-4, type: point_outside, point: [34, 26, 3]}
+    - {id: out-5, type: point_outside, point: [39.5, 29.5, 3]}
+    - {id: out-6, type: point_outside, point: [38.5, 0, 20]}
+  after_mod_1:
+    - {id: size-x, type: bbox, axis: x, expected: 80, tol: 0.5}
+    - {id: size-y, type: bbox, axis: y, expected: 60, tol: 0.5}
+    - {id: size-z, type: bbox, axis: z, expected: 30, tol: 0.5}
+    - {id: fin-tops, type: count, kind: faces, where: [["geom.type", "==", "PLANE"], ["geom.normal.z", ">=", 0.99], ["geom.center.z", ">=", 29.9]], expected: 15}
+    - {id: in-1, type: point_inside, point: [0, 0, 3]}
+    - {id: in-2, type: point_inside, point: [0, 0, 20]}
+    - {id: in-3, type: point_inside, point: [7.2, 0, 20]}
+    - {id: in-4, type: point_inside, point: [20, 26, 20]}
+    - {id: in-5, type: point_inside, point: [38.5, 28.5, 3]}
+    - {id: in-6, type: point_inside, point: [36, 0, 20]}
+    - {id: out-1, type: point_outside, point: [4.5, 0, 20]}
+    - {id: out-2, type: point_outside, point: [0, 25, 20]}
+    - {id: out-3, type: point_outside, point: [20, 26, 26]}
+    - {id: out-4, type: point_outside, point: [34, 26, 3]}
+    - {id: out-5, type: point_outside, point: [39.5, 29.5, 3]}
+    - {id: out-6, type: point_outside, point: [9, 0, 20]}

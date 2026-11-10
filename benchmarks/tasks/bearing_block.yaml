@@ -1,0 +1,56 @@
+# 中等任务 1：轴承座。考查：底板 + 横放的圆柱座 + 支撑块的相接，轴孔沿宽度方向，油孔从顶面打到轴孔。
+# 坐标约定：底面贴 z=0，xy 以原点为中心，最长的水平方向（底板长 100）沿 x；圆柱座的轴线沿 y，轴心在 (x=0, z=40)。
+id: bearing_block
+initial: "做一个轴承座"
+max_user_turns: 14
+
+hidden_spec: |
+  - 底板 100×40×10 mm（长×宽×厚），四个竖边倒圆角 R5。
+  - 底板两端各一个 φ9 的安装通孔，孔心在长度方向离中心 38 mm、宽度方向居中。
+  - 底板中间上方是一个横放的圆柱座：轴线沿宽度方向，轴心离桌面 40 mm，外径 50 mm，沿轴线方向长 40 mm（和底板同宽）。
+  - 圆柱座和底板之间是一块实心的支撑块：宽 50 mm（和圆柱外径相同），沿轴线方向长 40 mm，从底板顶面一直到轴心的高度。
+  - 轴孔 φ25，沿轴线方向贯通。
+  - 圆柱座顶部正中有一个 φ4 的竖直油孔，从顶面一直打到轴孔。
+
+modifications:
+  - "轴孔直径改成 30 mm"
+
+# 点是怎么选的（y=0 的点都在中间截面上）：
+#   底板 x∈[-50,50]、y∈[-20,20]、z∈[0,10]；安装孔在 x=±38，半径 4.5（x 33.5~42.5）；竖边圆角圆心 (±45, ±15)。
+#   支撑块 x∈[-25,25]、z∈[10,40]；圆柱座到轴心 (x, z-40) 的距离 ≤ 25；轴孔半径 12.5（改后 15）；油孔 x∈[-2,2]、z∈[52.5,65]。
+#   in-1 底板中心；in-2 底板右端（安装孔外侧）；in-3 圆柱座壁（距轴心 22.4）；in-4 支撑块；in-5 圆角里面（离圆角圆心 4.2 < 5）；
+#   in-6 轴心高度上离轴心 13.5（在轴孔外、圆柱座壁里）。改后 in-6 换成 16.5（轴孔半径变成 15）。
+#   out-1 轴孔中心；out-2 安装孔中心；out-3 油孔里；out-4 支撑块和圆柱座外面；out-5 圆角切掉的角（离圆角圆心 6.4 > 5）。
+#   改后多一个 out-6：原来的 in-6 那一点 [13.5,0,40] 现在落在 φ30 的轴孔里。没改的旧模型恰好卡在 out-6。
+acceptance:
+  after_initial:
+    - {id: size-x, type: bbox, axis: x, expected: 100, tol: 0.5}
+    - {id: size-y, type: bbox, axis: y, expected: 40, tol: 0.5}
+    - {id: size-z, type: bbox, axis: z, expected: 65, tol: 0.5}
+    - {id: in-1, type: point_inside, point: [0, 0, 5]}
+    - {id: in-2, type: point_inside, point: [45, 0, 5]}
+    - {id: in-3, type: point_inside, point: [10, 0, 60]}
+    - {id: in-4, type: point_inside, point: [20, 0, 20]}
+    - {id: in-5, type: point_inside, point: [48, 18, 5]}
+    - {id: in-6, type: point_inside, point: [13.5, 0, 40]}
+    - {id: out-1, type: point_outside, point: [0, 0, 40]}
+    - {id: out-2, type: point_outside, point: [38, 0, 5]}
+    - {id: out-3, type: point_outside, point: [0, 0, 60]}
+    - {id: out-4, type: point_outside, point: [40, 0, 30]}
+    - {id: out-5, type: point_outside, point: [49.5, 19.5, 5]}
+  after_mod_1:
+    - {id: size-x, type: bbox, axis: x, expected: 100, tol: 0.5}
+    - {id: size-y, type: bbox, axis: y, expected: 40, tol: 0.5}
+    - {id: size-z, type: bbox, axis: z, expected: 65, tol: 0.5}
+    - {id: in-1, type: point_inside, point: [0, 0, 5]}
+    - {id: in-2, type: point_inside, point: [45, 0, 5]}
+    - {id: in-3, type: point_inside, point: [10, 0, 60]}
+    - {id: in-4, type: point_inside, point: [20, 0, 20]}
+    - {id: in-5, type: point_inside, point: [48, 18, 5]}
+    - {id: in-6, type: point_inside, point: [16.5, 0, 40]}
+    - {id: out-1, type: point_outside, point: [0, 0, 40]}
+    - {id: out-2, type: point_outside, point: [38, 0, 5]}
+    - {id: out-3, type: point_outside, point: [0, 0, 60]}
+    - {id: out-4, type: point_outside, point: [40, 0, 30]}
+    - {id: out-5, type: point_outside, point: [49.5, 19.5, 5]}
+    - {id: out-6, type: point_outside, point: [13.5, 0, 40]}

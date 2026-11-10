@@ -28,7 +28,12 @@ from cad_agent.sandbox import execute
 TASKS_DIR = Path(__file__).parent / "tasks"
 ALL_TASKS = ["phone_stand", "flange", "l_bracket"]
 HOLDOUT_TASKS: list[str] = ["enclosure", "stepped_shaft"]  # 留出任务：只用来测，不许为它们调提示词
-TASK_SETS: dict[str, list[str]] = {"dev": ALL_TASKS, "holdout": HOLDOUT_TASKS, "all": ALL_TASKS + HOLDOUT_TASKS}
+MEDIUM_TASKS = ["bearing_block", "battery_box", "spur_gear"]   # 第二版：中等
+HARD_TASKS = ["heatsink", "tee_fitting", "bracket_arm"]        # 第二版：困难
+TASK_SETS: dict[str, list[str]] = {
+    "dev": ALL_TASKS, "holdout": HOLDOUT_TASKS, "all": ALL_TASKS + HOLDOUT_TASKS,
+    "medium": MEDIUM_TASKS, "hard": HARD_TASKS, "v2": ALL_TASKS + HOLDOUT_TASKS + MEDIUM_TASKS + HARD_TASKS,
+}
 DEFAULT_MAX_USER_TURNS = 12
 LENGTH_TYPES = ("bbox", "distance")  # “尺寸偏差”只统计以 mm 为单位的长度类检查
 TABLE_HEADER = "任务 | 成功 | 修复次数 | 耗时(s) | 模型调用 | token | 最大尺寸偏差"
@@ -239,7 +244,8 @@ def run_benchmarks(names: list[str], make_agent: Callable[[Path], object], make_
 def main(argv: list[str] | None = None, print_fn: Callable[..., None] = print) -> int:
     parser = argparse.ArgumentParser(prog="python -m benchmarks.run", description="跑 CAD 建模智能体的评测")
     parser.add_argument("--set", dest="task_set", choices=list(TASK_SETS), default="dev",
-                        help="跑哪一组任务：dev（开发任务，默认）、holdout（留出任务）、all（两组都跑）")
+                        help="跑哪一组任务：dev（开发任务，默认）、holdout（留出任务）、all（这两组）、"
+                             "medium（第二版中等）、hard（第二版困难）、v2（以上全部 11 个）")
     parser.add_argument("--repeat", type=int, default=1, help="每个任务跑几遍，默认 1")
     parser.add_argument("--tasks", nargs="+", default=[], help="直接指定要跑的任务；给了就以它为准，不看 --set")
     parser.add_argument("--config", default="config.toml", help="配置文件路径，默认 config.toml")
