@@ -67,6 +67,7 @@ class Agent:
                  cases: list[Case] | None = None) -> None:
         self.llm, self.toolbox, self.session, self.config = llm, toolbox, session, config
         self.cases = list(cases or [])   # 案例库（分阶段且开关 cases 打开时，规划那一轮挑相似的给模型）
+        self.case_problems: list[str] = []   # 读案例库时跳过的案例和原因（由组装智能体的地方填，写进启动日志）
         self.modeling_llm = modeling_llm  # 建模阶段（需求单已确认）用的模型；没有就一直用 llm
         self.toolbox.max_build_failures = config.max_build_failures
         self.staged = toolbox.gates.staged

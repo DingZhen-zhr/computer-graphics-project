@@ -43,7 +43,21 @@ def describe_event(kind: str, data: dict) -> str | None:
             return "检查没通过：" + _short("、".join(data["failed_checks"]))
         if data.get("missing_coverage"):
             return "还缺检查：" + _short("、".join(data["missing_coverage"]))
+        if "stages_passed" in data:  # 分阶段：阶段通过由 stage 记录说，终检没过由 gate 记录说
+            return None
         return "运行没通过"
+    if kind == "stage":
+        return f"阶段 {data.get('id', '')}（{data.get('title', '')}）通过，检查 {data.get('checks', 0)} 条"
+    if kind == "gate":
+        if data.get("missing_coverage"):
+            return "终检没通过：还缺检查（" + _short("、".join(data["missing_coverage"])) + "）"
+        if data.get("unconstrained"):
+            return "终检没通过：这些参数改了检查也不变（" + _short("、".join(data["unconstrained"])) + "）"
+        return "终检通过"
+    if kind == "cases":
+        return f"参考了 {len(data.get('ids') or [])} 个相似案例"
+    if kind == "manual":
+        return "手动修改了参数"
     if kind == "auto":
         if data.get("action") == "request_confirmation":
             return "需求单整理好了，请你确认"
@@ -76,7 +90,7 @@ def _describe_tool(data: dict) -> str | None:
 
 
 _TOOL_LABEL = {"update_brief": "更新需求单", "upsert_feature": "写特征", "remove_feature": "删除特征", "set_checks": "写检查项",
-               "inspect": "查看几何", "api_help": "查函数用法"}
+               "inspect": "查看几何", "api_help": "查函数用法", "set_plan": "制定计划", "probe": "试验代码", "read_reference": "查阅文档"}
 
 
 # ---------------------------------------------------------------- 一轮结束 → 一条助手消息

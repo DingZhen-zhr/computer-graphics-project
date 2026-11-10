@@ -15,6 +15,7 @@ from typing import Callable
 from cad_agent import __version__
 from cad_agent.agent.loop import Agent
 from cad_agent.brief import Brief
+from cad_agent.cases import load_cases
 from cad_agent.config import Config, ConfigError, load_config
 from cad_agent.llm.factory import make_llm
 from cad_agent.notebook import FeatureList
@@ -33,10 +34,20 @@ HELP = """可用命令：
 def build_agent(config: Config) -> tuple[Agent, Session]:
     """按配置组装智能体。没有设置 API key 时抛 ConfigError（此时还不会创建会话目录）。"""
     key = config.api_key()
-    toolbox = ToolBox(Workspace(Brief(), FeatureList(), []), timeout_s=config.run_timeout_s, secret_names=(config.api_key_env,))
+    toolbox = ToolBox(Workspace(Brief(), FeatureList(), []), timeout_s=config.run_timeout_s, secret_names=(config.api_key_env,),
+                      gates=config.gates)
     session = Session(config.sessions_dir)
-    agent = Agent(make_llm(config, "clarify", key), toolbox, session, config, modeling_llm=make_llm(config, "modeling", key))
+    cases, problems = load_cases(config.cases_dir)
+    agent = Agent(make_llm(config, "clarify", key), toolbox, session, config, modeling_llm=make_llm(config, "modeling", key), cases=cases)
+    agent.case_problems = problems
     return agent, session
+
+
+def startup_info(agent: Agent, info: dict) -> dict:
+    """启动日志：版本信息之外，再记下读到几个案例、跳过了哪些（测试里的假智能体没有这两项时不记）。"""
+    if hasattr(agent, "cases"):
+        info = {**info, "cases": len(agent.cases), "case_problems": list(getattr(agent, "case_problems", []))}
+    return info
 
 
 def find_sca() -> str | None:
@@ -90,7 +101,7 @@ def main(argv: list[str] | None = None, input_fn: Callable[[str], str] = input, 
 
     banner, info = _banner(config, session)
     print_fn(banner)
-    session.log("startup", **info)  # 作业要求记录软件和模型版本
+    session.log("startup", **startup_info(agent, info))  # 作业要求记录软件和模型版本
 
     editors: list[subprocess.Popen] = []
 

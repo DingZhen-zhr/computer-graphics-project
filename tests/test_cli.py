@@ -256,3 +256,52 @@ def test_build_agent_wires_everything(monkeypatch, tmp_path):
     assert session.dir.parent == tmp_path / "s" and agent.toolbox.max_build_failures == 3
     assert agent.toolbox.secret_names == ("DEEPSEEK_API_KEY",) and agent.toolbox.timeout_s == 60
     assert "test-key-not-real" not in repr(agent.toolbox.secret_names)
+
+
+# ---- 第二版计划 1 Task 15：命令行用上分阶段内核 ----
+
+
+def test_build_agent_passes_gates_and_cases(monkeypatch, tmp_path):
+    from dataclasses import replace
+
+    from cad_agent.agent.state import load_system_prompt
+    from cad_agent.cases import load_cases
+    from cad_agent.config import load_config
+    from cad_agent.gates import Gates
+
+    monkeypatch.setenv("DEEPSEEK_API_KEY", "test-key-not-real")
+    user_cases = tmp_path / "cases"
+    (user_cases / "broken").mkdir(parents=True)   # 读不了的用户案例：跳过，原因写进启动日志
+    config = replace(load_config(EXAMPLE), sessions_dir=tmp_path / "s", cases_dir=user_cases)
+    agent, session = cli.build_agent(config)
+    assert agent.toolbox.gates == Gates() and agent.toolbox.ws.brief.require_relations
+    assert [c.id for c in agent.cases] == [c.id for c in load_cases(user_cases)[0]] and len(agent.cases) == 8
+    assert agent.system_prompt == load_system_prompt(True)
+    assert len(agent.case_problems) == 1 and "broken" in agent.case_problems[0]
+
+
+def test_build_agent_legacy_when_staged_off(monkeypatch, tmp_path):
+    from cad_agent.agent.state import load_system_prompt
+    from cad_agent.config import load_config
+
+    monkeypatch.setenv("DEEPSEEK_API_KEY", "test-key-not-real")
+    cfg = tmp_path / "c.toml"
+    cfg.write_text(f'[llm]\nbase_url = "http://x"\nmodel = "m"\n[agent]\nstaged = false\nsessions_dir = "{(tmp_path / "s").as_posix()}"\n',
+                   encoding="utf-8")
+    agent, _ = cli.build_agent(load_config(cfg))
+    assert agent.toolbox.gates.staged is False and agent.system_prompt == load_system_prompt()
+    assert agent.toolbox.ws.brief.require_relations is False
+
+
+def test_startup_log_has_case_count(monkeypatch, tmp_path):
+    monkeypatch.setenv("DEEPSEEK_API_KEY", "test-key-not-real")
+    cfg = tmp_path / "c.toml"
+    cfg.write_text(f'[llm]\nbase_url = "http://x"\nmodel = "m"\n[agent]\nsessions_dir = "{(tmp_path / "s").as_posix()}"\n'
+                   f'cases_dir = "{(tmp_path / "cases").as_posix()}"\n', encoding="utf-8")
+    out: list[str] = []
+    code = cli.main(["--config", str(cfg)], input_fn=lambda p="": "/quit", print_fn=lambda *a, **k: out.append(" ".join(map(str, a))))
+    assert code == 0
+    log = next((tmp_path / "s").iterdir()) / "log.jsonl"
+    startup = json.loads(log.read_text(encoding="utf-8").splitlines()[0])
+    assert startup["kind"] == "startup" and startup["cases"] == 8 and startup["case_problems"] == []
+    assert "test-key-not-real" not in log.read_text(encoding="utf-8")

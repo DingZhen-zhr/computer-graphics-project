@@ -715,3 +715,64 @@ def test_committed_site_is_up_to_date(tmp_path):
             assert committed.is_file() and committed.read_bytes() == path.read_bytes(), f"{path.relative_to(fresh)} 不是最新的，请重新运行 python -m cad_agent.web.export demo\phone_stand site"
     workflow = (ROOT / ".github" / "workflows" / "pages.yml").read_text(encoding="utf-8")
     assert "path: site" in workflow and "actions/deploy-pages" in workflow
+
+
+# ---------------------------------------------------------------- 第二版计划 1 Task 15：新流程的进度文字
+
+
+def test_describe_new_events():
+    assert describe_event("stage", {"id": "s2", "title": "立板", "checks": 7}) == "阶段 s2（立板）通过，检查 7 条"
+    assert describe_event("gate", {"missing_coverage": [], "unconstrained": [], "unbuildable": ["b"], "skipped": [], "mutation": []}) == "终检通过"
+    assert describe_event("gate", {"missing_coverage": ["a", "b"], "unconstrained": []}) == "终检没通过：还缺检查（a、b）"
+    assert describe_event("gate", {"missing_coverage": [], "unconstrained": ["wall"]}) == "终检没通过：这些参数改了检查也不变（wall）"
+    assert describe_event("cases", {"ids": ["tray", "knob"]}) == "参考了 2 个相似案例"
+    assert describe_event("manual", {"values": {"a": 1}, "ok": True, "version": "v2"}) == "手动修改了参数"
+    assert describe_event("tool", {"name": "set_plan", "args": {}, "content": "{}"}) == "制定计划"
+    assert describe_event("tool", {"name": "probe", "args": {"code": "print(1)"}, "content": "{}"}) == "试验代码"
+    assert describe_event("tool", {"name": "read_reference", "args": {"name": "x"}, "content": "{}"}) == "查阅文档"
+    assert describe_event("tool", {"name": "probe", "args": {}, "content": '{"error": "x"}'}) == "试验代码出错，模型正在改"
+    # 分阶段的 build：有阶段通过、没有别的问题时不另报"运行没通过"（阶段通过由 stage 记录说）
+    assert describe_event("build", {"passed": False, "error": None, "failed_checks": [], "missing_coverage": [], "stages_passed": ["s1"]}) is None
+    # 旧流程的 build 记录没有 stages_passed，说法不变
+    assert describe_event("build", {"passed": False, "error": None, "failed_checks": [], "missing_coverage": []}) == "运行没通过"
+
+
+class StagedScriptLLM:
+    """先按脚本回复两次（规划、写完并通过 s1），第三次调用卡住，直到测试放行再回复 s2。"""
+
+    def __init__(self, first: list, last) -> None:
+        self.first, self.last = list(first), last
+        self.gate, self.entered = threading.Event(), threading.Event()
+
+    def chat(self, messages, tools):
+        if self.first:
+            return self.first.pop(0)
+        self.entered.set()
+        assert self.gate.wait(15), "测试没有放行"
+        return self.last
+
+
+def test_web_state_with_staged_session(tmp_path, serve):
+    from cad_agent.gates import Gates
+    from helpers_staged import StageRunner, staged_brief
+    from test_staged_loop import PLAN, S1, S2
+
+    llm = StagedScriptLLM([PLAN, S1], S2)
+
+    def make_agent():
+        ws = Workspace(staged_brief(), FeatureList(), [])
+        session = LiveSession(tmp_path / "sessions")
+        box = ToolBox(ws, run_job=StageRunner(), gates=Gates(mutation_check=False, visual_review=False, cases=False))
+        return Agent(llm, box, session, Config(base_url="http://x", model="m")), session
+
+    state = LiveApp(make_agent, "test-model")
+    server = serve(state)
+    status, _, _ = call(server, "POST", "/api/message", {"text": "开始"})
+    assert status == 202 and llm.entered.wait(15)
+    busy = get_state(server)   # 第三次调用模型时卡住：这时 s1 已经通过
+    assert busy["busy"] is True
+    assert "制定计划" in busy["activity"] and "阶段 s1（底板）通过，检查 5 条" in busy["activity"]
+    llm.gate.set()
+    assert state.wait_idle(15)
+    done = get_state(server)
+    assert done["transcript"][-1]["kind"] == "delivered" and done["busy"] is False

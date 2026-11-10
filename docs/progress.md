@@ -353,3 +353,11 @@
 - 偏离：D13。计划里的 `gear-rack`（标准件直齿条）做不出来：SCA 2.2.7 的两个齿条函数做出的实体都无效、和别的实体合并会卡住。停下来问了写计划的规划会话，它决定（选项 A）换成 `ring-gear` 内齿圈，仍示范"标准件"。内齿圈先探测、写进笔记第 21 节再用；计划 Task 14 的 id 表和测试的 id 集合已同步改，`test_builtin_cases_are_not_benchmark_tasks` 照常通过，断言没放松。这个决定是规划会话做的计划修订，用户本人还没有表态。
 - 扰动验证报 unconstrained 时改的是检查：`tray` 的圆角半径改成 12 后，抽壳出来的内壁圆角面积恰好落进原来 ±5% 的窗口边上，`corner_r` 被判为没约束，于是补了一条圆角平分线上的点检查（`corner-body`）。`pull-handle` 第一阶段只有弯管、从 z=5 开始，原来写的整体高度检查放错了阶段，改成第一阶段 here_only 的弯管高度加第二阶段的整体高度。
 - 说明：案例的 YAML 由一个临时生成脚本写出（代码用 YAML 的字面块，便于阅读），脚本没有放进仓库；YAML 本身就是案例的唯一来源。
+
+## 第二版 计划 1 Task 15：接到入口上，并做一次真实沙盒的全流程 —— 完成
+
+- 做了什么：`cli.build_agent` 和网页的 `build_live_agent` 都把 `gates=config.gates` 传给 `ToolBox`、把 `load_cases(config.cases_dir)[0]` 传给 `Agent`；读不了的案例写进 `Agent.case_problems`，启动日志（第一行 `startup`）多两项 `cases`（读到几个）和 `case_problems`。`benchmarks/run.py` 的 `main` 本来就通过 `cli.build_agent` 造智能体，所以评测也用上了开关和案例库（Task 13 留到这里一起做）。`web/events.py` 的 `describe_event`：`stage`、`gate`（通过 / 还缺检查 / 参数改了检查也不变）、`cases`、`manual` 四种新记录，工具标签加 `set_plan`、`probe`、`read_reference`；分阶段的 `build` 记录在只是阶段通过时不再说"运行没通过"（旧流程的记录没有 `stages_passed`，说法不变）。现有网页没有别的改动。README 在"核心思路"后面加了"分阶段建模与终检"一节（流程图、四个开关、怎么关掉、成功率要等付费评测），"评测"一节补了第二版的 6 个任务和 `--set medium|hard|v2`。
+- 测试数量：新增 6 个（`test_cli.py` 3 个：开关和案例库接上、`staged = false` 时是旧流程、启动日志有案例个数；`test_web.py` 2 个：新记录的进度文字、分阶段的假会话走网页接口时 `/api/state` 的 `activity` 里有"阶段 s1（底板）通过，检查 5 条"；`test_staged_e2e.py` 1 个真实 SCA），全部测试 781 个全部通过（8 分 40 秒）。
+- 真实沙盒全流程（`test_real_staged_flow`，假模型剧本"带孔的板"，`Gates(visual_review=False, cases=False)`，会话目录带中文）：3 次模型调用交付 v1，版本目录里有 `model.step`、`view.png`、`model.stl`、`gate.json`、`plan.json`、`stages/s1.stl`、`stages/s2.stl`；`gate.json` 里 4 个用户参数都是 constrained，交付文字里有"参数扰动验证：4 个用户参数都被检查约束。"；接着 `apply_params` 把孔径改成 14，交付 v2，模型调用次数没有增加。
+- 手动跑（Step 4）：把 key 的环境变量去掉后运行 `.venv\Scripts\python -m cad_agent --config config.toml`，提示"请先设置环境变量 DEEPSEEK_API_KEY"、返回 1；用一个假的 key 运行并马上输入 `/quit`，正常启动、返回 0，启动日志里 `cases` 是 8、`case_problems` 是空表，日志里没有出现 key。没有发送任何消息，没有调用模型；手动跑出来的会话目录已删掉。
+- 说明：README 里原来没有单独的"核心思路"小节，核心思路是开头的一段话，新的一节就接在那段话后面。没有偏离。
