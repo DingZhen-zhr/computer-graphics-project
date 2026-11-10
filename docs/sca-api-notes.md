@@ -486,3 +486,140 @@ report = exporter.export_product_package_to_stl(cap.package, "model.stl")   # �
 - 坐标就是模型自己的坐标，单位毫米，z 朝上、底面在 z=0：这块板的顶点范围 x ±30、y ±20、z 0~8。
 - 写进中文目录成功。
 - 第一个版本（STEP）已经在同一个 `capture` 的包上导出，所以网页版的交付在子进程里只多一步 STL 导出，不用再 `capture` 一次。
+
+## 17. probe 单元与占位产品
+
+探测脚本 `scripts/probe_v2.py`（第二版计划 1 Task 1，2026-11-10），输出在 `docs/sca-probe-output.txt` 末尾。
+
+probe 单元的形状（程序写，放在最后一个特征之后、产品单元之前）：
+
+```python
+@app.cell
+def _(base, n, phone_w):
+    # ---- probe ----
+    import contextlib as _ctx
+    import io as _io
+    def _probe(model):
+        print('phone_w =', float(phone_w))
+        print('n =', n)
+    _buf = _io.StringIO()
+    try:
+        with _ctx.redirect_stdout(_buf):
+            _probe(base)
+    finally:
+        with open("probe_out.txt", "w", encoding="utf-8") as _f:
+            _f.write(_buf.getvalue())
+    return ()
+```
+
+实测：
+- `run_notebook` 正常运行，5 个 cell 都是 `ran`；`probe_out.txt` 写在**当前工作目录**（沙盒里就是临时目录），内容是 `'phone_w = 78.0\nmodel type Solid\nn = 3\n'`。参数（`Var` 和整数）、特征变量都能读到；`model` 就是传进去的实体（`Solid`）。`return ()` 的 cell 没问题。
+- probe 里抛异常时（先 `print('到这里')` 再用未定义的名字）：`run_notebook` 原样抛出 `NameError`；`finally` 照样写出文件，内容是 `'到这里\n'`。
+- 出错帧：traceback 里有两个文件名含 `__marimo__cell_` 的帧（cell 本身，函数 `<module>`；`_probe` 里面，函数名被改写成 `_cell_<哈希>-vblA_probe`），用 `linecache.getlines(帧文件)[:3]` 读到的源码第一行都是 `# ---- probe ----`。所以判断办法和特征一样：取最后一个 `__marimo__cell_` 帧，源码前几行里有 `# ---- probe ----` 就把出错位置标成 `probe`。`_probe` 里的行号是 cell 内部行号（probe 代码的第 1 行是 cell 的第 5 行）。
+- **笔记第 4 节的 `brep.inspect_shape_rbrepinspection` 在 notebook 里不能用**：`RuntimeError: simplecadapi.inspect.brep tools cannot run inside an active GraphSession`（官方文档 `geometric-validation.md` 也写了检视函数只能在 GraphSession 之外用）。probe 里量尺寸要用这几种在 notebook 里能用的写法：
+  - 体积：`model.get_volume()` → `24960.0`；
+  - 包围盒：全部顶点的坐标取最大最小，`_pts = [v.get_center() for v in ql.vertices().resolve(model)]`，再分别取 `p.x`、`p.y`、`p.z` 的范围 → `78.0 40.0 8.0`。只有平面围成的零件这样量是准的；有圆柱面、圆角时，顶点范围可能比真实包围盒小（圆柱面中间鼓出去的部分没有顶点）。
+  - 面数、边数：`len(ql.faces().resolve(model))` → 6，`len(ql.edges().resolve(model))` → 12。
+  - probe 代码要过 `check_code`，所以不能写 `getattr`、`import`。
+
+没有特征时的占位（实验 2）：在 probe 单元前面加一个程序写的单元 `placeholder_body = scad.make_box_rsolid(width=1, height=1, depth=1, bottom_face_center=(0, 0, 0))`，probe 单元里写 `_probe(None)`，产品单元用 `placeholder_body`。实测能运行，`probe_out.txt` 是 `'True\n78.0\n'`（`model is None`、参数可读），产品包围盒 `[-0.5, -0.5, 0, 0.5, 0.5, 1]`。
+
+**一次运行取各阶段末尾的实体（实验 3，只记结论，这一版不用）：** `run.values` 里有**全部** cell 定义的名字：`['base', 'hole', 'math', 'model', 'n', 'phone_w', 'ql', 'scad']`。`run.values['base']` 是 `Solid`，在 notebook 外用检视函数量得包围盒 `[-39, -20, 0, 39, 20, 8]`、体积 24960；`run.values['hole']` 体积 24331.68。所以一次运行就能拿到每个特征（也就是每个阶段最后一个特征）的实体，以后可以把"每个阶段各跑一次截断的 notebook"优化成一次运行。
+
+## 18. 草图轮廓
+
+最短可行写法（L 形，画在 XZ 平面，顶点里直接用 `Var` 表达式）：
+
+```python
+_s = scad.make_sketch_rsketch("l_profile", plane="XZ")
+_pts = [(-l / 2, 0), (l / 2, 0), (l / 2, t), (-l / 2 + 20, t), (-l / 2 + 20, h), (-l / 2, h)]
+for _i, (_u, _v) in enumerate(_pts):
+    _s = scad.add_point_rsketch(_s, f"p{_i}", _u, _v)
+for _i in range(6):
+    _s = scad.add_line_rsketch(_s, f"e{_i}", f"p{_i}", f"p{(_i + 1) % 6}")
+_face = scad.make_face_from_sketch_rface(_s)
+_solid = scad.extrude_rsolid(profile=_face, direction=(0, 1, 0), distance=w)
+lsk = scad.translate_shape(shape=_solid, vector=(0, -w / 2, 0))
+```
+
+实测：l=120、t=8、h=60、w=30 → 包围盒 `[-60, -15, 0, 60, 15, 60]`，体积 60000（= 120×8×30 + 20×52×30），8 个平面，有效。
+- 签名：`make_sketch_rsketch(name=None, *, plane='XY')`，`plane` 只能是 `'XY'`、`'XZ'`、`'YZ'`（写 `'ZX'` 报 `Sketch plane must be 'XY', 'XZ', 'YZ', or a plane mapping`）。`add_point_rsketch(sketch, point_id, x, y)`；`add_line_rsketch(sketch, entity_id, start, end)` 的 `start`、`end` **必须是点的名字（或 SketchRef）**，直接传坐标元组报 `TypeError: incompatible function arguments`。每个 `add_*` 都返回新的草图，要重新赋值。
+- 平面映射：`XZ` 平面上局部坐标 (u, v) → (x, z)，面的法向是 (0, −1, 0)；`XY` → (x, y)，法向 (0, 0, 1)；`YZ` → (y, z)，法向 (1, 0, 0)。
+- 拉伸方向：XZ 平面的面沿 (0, 1, 0) 拉伸 30 → y 从 0 到 30；要在 y 方向以 0 为中心，再 `translate_shape` 平移 −w/2。**沿面内方向拉伸不会报错**：沿 (0, 0, 1) 拉伸得到体积 0、`valid=True` 的"实体"，所以拉伸后一定要用体积或包围盒检查。
+- 求解状态：`scad.inspect_sketch_rsketchresult(_s)` 返回 `SketchSolveResult`：`status='underconstrained'`、`dof=12`、`residual_norm=0.0`。没加任何约束时也能照样转成面（`make_face_from_sketch_rface` 默认 `require_fully_constrained=False`），顶点就在给定坐标上。卡尺里尺寸都由参数直接给出，不需要加约束。
+- 圆弧：`scad.add_arc_rsketch(sketch, entity_id, start, end, center)`（三个都是点的名字），从 `start` 按正方向（逆时针）扫到 `end`。实测：(−20,−10)→(20,−10) 直线 + 圆心 (20,0) 从 (20,−10) 到 (20,10) 的半圆 + 两段直线，拉伸 5 → 包围盒 `[-20, -10, 0, 30, 10, 5]`、体积 4785.3982，和手算 (40×20 + π×100/2)×5 一致。
+
+## 19. 抽壳
+
+```python
+_box = scad.make_box_rsolid(width=l, height=w, depth=h, bottom_face_center=(0, 0, 0))
+_top = ql.faces().where(ql.and_(ql.prop("geom.type", "==", "PLANE"), ql.prop("geom.normal.z", ">=", 0.99)))
+tray = scad.shell_rsolid(solid=_box, faces_to_remove=_top, thickness=wall)
+```
+
+实测：80×50×30、去掉顶面、壁厚 2 → 外形不变 `[-40, -25, 0, 40, 25, 30]`，体积 22112（= 80×50×30 − 76×46×28），11 个平面。
+- 签名 `shell_rsolid(solid, faces_to_remove, thickness)`；`faces_to_remove` 传选择器或 `.resolve()` 出来的列表都行。**壁厚向里长**（外形尺寸不变）。`thickness` 必须是正数，写负数报 `Failed to apply the shell operation`。
+- "外形减内腔"的写法 `cut_rsolid(_box, 小一圈的盒子（底面在 z=wall）, skip_non_intersecting=False)` 得到完全相同的结果（体积 22112）。两种都可控：要底厚和侧壁厚不同时，只能用"减内腔"；壁厚一样时用 `shell_rsolid` 更短。
+- 先圆角再抽壳：四条竖棱 R6 圆角后再抽壳，成功，体积 21569.49，多出 8 个圆柱面（外圆角 4 个、内壁跟着变成的圆角 4 个）。所以外竖边的圆角放在抽壳**前面**，内壁会自动带上圆角。
+
+沉头孔（实验 8）：一次减两个同轴圆柱，通孔 φ5 贯穿、沉头 φ10 从顶面往下 3（工具体多伸出 1 mm）：
+
+```python
+_hole = scad.make_cylinder_rsolid(radius=2.5, height=t + 2, bottom_face_center=(0, 0, -1))
+_cb = scad.make_cylinder_rsolid(radius=5, height=3 + 1, bottom_face_center=(0, 0, t - 3))
+plate = scad.cut_rsolid(_plate, _hole, _cb, skip_non_intersecting=False)
+```
+
+80×50×8 的板 → 结果是一个有效实体，体积 31666.2058（= 32000 − π×2.5²×5 − π×5²×3，一致），2 个圆柱面。
+
+## 20. 扫掠
+
+```python
+_c = math.cos(math.radians(45))
+_e1 = scad.make_segment_redge(start=(0, 0, 0), end=(0, 0, h))
+_e2 = scad.make_three_point_arc_redge(start=(0, 0, h), middle=(10 - 10 * _c, 0, h + 10 * _c), end=(10, 0, h + 10))
+_e3 = scad.make_segment_redge(start=(10, 0, h + 10), end=(10 + l, 0, h + 10))
+_path = scad.make_wire_from_edges_rwire(edges=[_e1, _e2, _e3])
+_profile = scad.make_circle_rface(center=(0, 0, 0), radius=r, normal=(0, 0, 1))
+pipe = scad.sweep_rsolid(profile=_profile, path=_path)
+```
+
+实测：r=4、h=30、l=40（圆弧半径 10，圆心 (10, 0, 30)）→ 包围盒 `[-4, -4, 0, 50, 4, 44]`，体积 4308.1521，和 π×4²×(30 + 40 + 10×π/2) 完全一致；面型 2 个圆柱面 + 1 个圆环面 + 2 个平面。
+- 截面放在路径起点、法向沿路径起始方向。`is_frenet=True` 结果一样。
+- 路径各段首尾要相接；边用 `make_segment_redge`、`make_three_point_arc_redge`（起点、中间一点、终点），再用 `make_wire_from_edges_rwire(edges=[...])` 连成线。
+- 折线路径（`make_polyline_rwire` 的直角拐弯，不带圆弧）也能扫，但拐角处是尖角拼接（体积 1507.96，出现一个 `SurfaceOfExtrusion` 面），拉手这类要圆滑过渡的用圆弧段。
+
+## 21. 标准件：齿轮与齿条
+
+齿轮在 `scad.std.gear` 里（不在 `api/` 文档目录，文档在 `references/docs/stdlib/make_spur_gear_rsolid.md`；`api_help` 查不到）：
+
+```python
+gear = scad.std.gear.make_spur_gear_rsolid(n_teeth=z, module=m, gear_height=gw)
+```
+
+- 签名 `make_spur_gear_rsolid(n_teeth, module, pressure_angle=20.0, gear_height=6.0, *, addendum_factor=1.0, clearance_factor=0.25, backlash=0.0)`。`n_teeth` 是整数（参数单位写 `1`），`gear_height` 可以是 `Var`。
+- 模数 2、齿数 30、齿宽 12：**轴线是 z 轴**，z 从 0 到 12；包围盒 `[-32, -31.893, 0, 32, 31.893, 12]`，即 x 方向 64.0、y 方向 63.79。**齿顶圆直径实测 64**（= 模数×(齿数+2)），和验收里按 64 算一致，不用改数字。x 方向是 64 是因为 +x 方向正对一个齿的中心：点 (31.9, 0, 6) 在材料里、(32.1, 0, 6) 在材料外；y 方向两侧不是齿尖，所以略小于 64。体积 33435.25，182 个面。
+- 能直接和圆柱 `union_rsolid`（轮毂 φ24 高 20）、能直接 `cut_rsolid` 轴孔（φ10）：结果有效，包围盒 z 到 20，体积 35483.57。单个齿轮约 1.5 秒。
+
+齿条：
+
+```python
+rack = scad.std.gear.make_spur_rack_rsolid(module=2, n_teeth=10, rack_height=10)
+```
+
+- 签名 `make_spur_rack_rsolid(module, n_teeth=10, pressure_angle=20.0, rack_height=6.0)`。齿形在 XY 平面里，沿 z 拉伸 `rack_height`；x 方向长 n_teeth×π×module（62.83），y 方向只有齿高（−2.5 到 2.0，即齿根 1.25m、齿顶 1m），**没有齿条的背板**。
+- **踩到的坑：SCA 2.2.7 生成的齿条 `valid=False`**（`BRepCheck_Analyzer` 也判定无效），三组参数（m2 z10、m1 z5、m2.5 z12 h8）都一样。减孔（`cut_rsolid`）能算出来，但结果仍然无效；和一个方块 `union_rsolid`（默认和 `glue=True` 都试了）在 60 秒内不返回。所以齿条**不能**用来做必须通过"实体有效"检查的零件。要做齿条时得另想办法（比如用第 18 节的草图画齿形再拉伸），这个写法还没有实测，用之前要先探测。
+
+## 22. 多视角渲染
+
+`render_screenshot_rpath(body, path, view=...)` 的 `view` 用 `(仰角, 方位角)`，实测用一块 +x、+y 角上带立柱的不对称零件认方向：
+
+| 视图 | `view` | 画面 |
+|---|---|---|
+| 正视（从 −y 看） | `(0, -90)`，等同于预设 `"front"` | x 向右、z 向上 |
+| 俯视（从 +z 看） | `(90, 0)`，等同于预设 `"top"` | x 向右、y 向上 |
+| 右视（从 +x 看） | `(0, 0)`，等同于预设 `"right"` | y 向右、z 向上 |
+| 等轴测 | `"iso"` | — |
+
+- 每张都正常写出 PNG（500×400 时约 11 KB，iso 约 20 KB）。预设名和对应的角度元组得到的图一样（左下角标注不同："front" 与 "view"）。
+- 渲染在独立子进程里完成，不会拖垮调用方。

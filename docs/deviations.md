@@ -68,3 +68,10 @@
   1. `update_brief` 只在 `changes` 不为空（真的改了东西）时设 `unbuilt_edits = True`；什么都没改的调用不算改动。其余三个工具（upsert_feature、remove_feature、set_checks）成功就设 True，和计划一致。第 2 条旧测试不用改。
   2. 第 1 条旧测试 `test_no_auto_build_when_param_added` 只改了最小的两处：脚本多加一条纯文字回复（`LLMReply("补上检查后再 build", [], {})`），断言从 `llm_calls == 2` 改成 `== 3`；"没有自动重建"的断言保留强度，改成"自动重建记录只有一条，reason 是 turn_end（没有 param_change）"。测试名不变；"没有 v2、结果是 reply"的断言没动。
 - 影响：只影响 1.2 Task 3；Task 4 评测不受影响。
+
+## D10（第二版计划 1 Task 1）probe 里量包围盒不能用笔记第 4 节的写法
+
+- 原计划：Task 5 的测试 `test_probe_prints_facts` 里，probe 打印 `model` 的包围盒尺寸，"写法取自笔记第 4 节"（`brep.inspect_shape_rbrepinspection`）。
+- 实际情况：Task 1 探测（笔记第 17 节）发现，`simplecadapi.inspect.brep` 的检视函数在 notebook 里一律报 `RuntimeError: simplecadapi.inspect.brep tools cannot run inside an active GraphSession`，probe 代码运行在 notebook 里，所以第 4 节的写法在 probe 里用不了。官方文档 `geometric-validation.md` 也写明检视函数只能在 GraphSession 之外用。
+- 怎么改：probe 里量尺寸改用笔记第 17 节实测过的写法：体积 `model.get_volume()`，包围盒取 `ql.vertices().resolve(model)` 全部顶点坐标的范围（平面围成的零件是准的）。`test_probe_prints_facts` 照这个写，断言（输出里有 `78`、`error is None`）不变。速查表补充的"分阶段时的写法"一节多写一条这个用法，提醒模型不要在 probe 里用检视函数。计划 1 Task 5 的测试描述已同步改成"写法取自笔记第 17 节"。
+- 影响：只影响 Task 5 的这一条测试的 probe 代码；接口不变。

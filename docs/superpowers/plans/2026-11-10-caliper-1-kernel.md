@@ -249,7 +249,7 @@ tests/helpers_staged.py                   分阶段测试共用的假 run_job（
   - `test_probe_without_features_uses_placeholder`：没有特征但有 probe 时不抛 `NotebookError`，产品单元的实体来自占位方块。
   - `test_no_features_and_no_probe_still_raises`。
 - [ ] **Step 2：** 写测试 `tests/test_execute_v2.py`（`sca`）：
-  - `test_probe_prints_facts`：一个方块特征，probe 是 `print(phone_w)` 和打印 `model` 的包围盒尺寸（写法取自笔记第 4 节）；`result.probe_output` 里有 `78`，`result.error is None`。
+  - `test_probe_prints_facts`：一个方块特征，probe 是 `print(phone_w)` 和打印 `model` 的包围盒尺寸（写法取自笔记第 17 节；第 4 节的检视函数在 notebook 里不能用，见偏离 D10）；`result.probe_output` 里有 `78`，`result.error is None`。
   - `test_probe_model_is_none_without_features`：probe `print(model is None)` → 输出 `True`。
   - `test_probe_error_is_reported_with_partial_output`：probe 先 `print("到这里")` 再用一个未定义的名字；`error["cell"] == "probe"`、`error["type"] == "NameError"`，输出里有 `到这里`。
   - `test_probe_output_truncated`：打印 5000 个字符 → 输出长度不超过 `PROBE_OUTPUT_LIMIT` 加上末尾一行 `…（后面的输出省略）`。

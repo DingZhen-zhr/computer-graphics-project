@@ -132,3 +132,72 @@
 [15 报错/参数名写错(base_wd)] 异常类型=builtins.NameError 信息原文="name 'base_wd' is not defined"
 [15 报错/关键字参数名写错(w= 而不是 width=)] 异常类型=builtins.TypeError 信息原文='make_box_rsolid(): incompatible function arguments. The following argument types are supported:\n    1. (width: float | Expr, height: float | Expr, depth: float | Expr, bottom_face_center: typing.Annotated[collections.abc.Sequence[float | Expr], "FixedSize(3)"] = (0, 0, 0), *, tag_prefix: str | None = None, result_tag: str | None = None, bottom_face_tag: str | None = None, top_face_tag: str | None = None, front_face_tag: str | None = None, back_face_tag: str | None = None, left_face_tag: str | None = None, right_face_tag: str | None = None) -> simplecadapi._cpp._native.Solid\n\nInvoked with: kwargs: w=Var(name=\'base_w\', default=60.0, comment=None, expr_id=\'var_9a7eb803dc4c8b1e\', tolerance=None, unit=Unit(symbol=\'mm\', dimension=Dimension(length=1, angle=0), scale_to_canonical=1.0), tolerance_unit=None), height=Var(name=\'base_d\', default=40.0, comment=None, expr_id=\'var_cef21c18b7525ab0\', tolerance=None, unit=Unit(symbol=\'mm\', dimension=Dimension(length=1, angle=0), scale_to_canonical=1.0), tolerance_unit=None), depth=Var(name=\'base_t\', default=8.0, comment=None, expr_id=\'var_7fd8db2c6b7ddf2f\', tolerance=None, unit=Unit(symbol=\'mm\', dimension=Dimension(length=1, angle=0), scale_to_canonical=1.0), tolerance_unit=None)'
 [15 报错/函数名写错] 异常类型=builtins.AttributeError 信息原文="module 'simplecadapi' has no attribute 'make_box'"
+
+
+==================== 第二版计划 1 Task 1：scripts/probe_v2.py（2026-11-10，Windows 11、simplecadapi 2.2.7） ====================
+
+==== probe 单元 ====
+[1 probe 正常] cells=(CellReport(name='setup', key='c49600b30', status='ran'), CellReport(name='_', key='c83a75362', status='ran'), CellReport(name='_', key='cea321751', status='ran'), CellReport(name='_', key='c650b26c5', status='ran'), CellReport(name='_', key='c950c2692', status='ran'))
+[1 probe 正常] probe_out.txt 内容='phone_w = 78.0\nmodel type Solid\nn = 3\n'
+[1 probe 正常] 产品体积=24960.0
+
+==== probe 里用 brep ====
+[probe 里用 brep] 异常 RuntimeError: simplecadapi.inspect.brep tools cannot run inside an active GraphSession; inspect exported geometry outside the modeling script
+
+==== probe 里量尺寸 ====
+[1 probe 包围盒（顶点）] 'volume 24960.0\nsize 78.0 40.0 8.0\nfaces 6 edges 12\n'
+
+==== probe 出错 ====
+[1 probe 出错] 异常 NameError: name 'undefined_name' is not defined
+[1 probe 出错帧] 文件名含 __marimo__cell_，行号=10，函数=<module>，源码前两行='# ---- probe ---- ⏎ import contextlib as _ctx ⏎ '
+[1 probe 出错帧] 文件名含 __marimo__cell_，行号=6，函数=_cell_b7bcf9d9-vblA_probe，源码前两行='# ---- probe ---- ⏎ import contextlib as _ctx ⏎ '
+[1 probe 出错] 最新的 probe_out.txt 内容='到这里\n'
+
+==== 占位产品 ====
+[2 占位产品] 运行成功，probe_out.txt='True\n78.0\n'，产品=[-0.5, -0.5, 0.0, 0.5, 0.5, 1.0]
+
+==== 各阶段实体 ====
+[3 中间实体] run.values 的键=['base', 'hole', 'math', 'model', 'n', 'phone_w', 'ql', 'scad']
+[3 中间实体] run.values['base'] 类型=Solid，facts=[-39.0, -20.0, 0.0, 39.0, 20.0, 8.0]，体积=24960.0
+[3 中间实体] run.values['hole'] 类型=Solid，facts=[-39.0, -20.0, 0.0, 39.0, 20.0, 8.0]，体积=24331.6815
+
+==== 草图 ====
+[4 草图 L 形（XZ 平面，Var 坐标）] {'valid': True, 'bbox': [-60.0, -15.0, 0.0, 60.0, 15.0, 60.0], 'volume': 60000.0, 'solids': 1, 'faces': 8, 'edges': 18, 'surface_types': {'Plane': 8}}，用时 0.1 秒
+[4 求解状态] status=underconstrained dof=12 residual=0.0
+[4 面的法向] XZ 平面草图的面法向=(0.0, -1.0, -0.0)（局部 u→x、v→z）
+[4 拉伸方向] direction=(0, 1, 0): [-60.0, 0.0, 0.0, 60.0, 30.0, 60.0] 体积=60000.0 valid=True
+[4 拉伸方向] direction=(0, 0, 1): [-60.0, 0.0, 0.0, 60.0, 0.0, 90.0] 体积=0.0 valid=True
+[4 圆弧] 直线 + 半圆（圆心 (20,0)，从 (20,-10) 逆时针到 (20,10)）：[-20.0, -10.0, 0.0, 30.0, 10.0, 5.0] 体积=4785.3982（期望 4785.3982）
+
+==== 抽壳与沉头孔 ====
+[5 抽壳 shell_rsolid] {'valid': True, 'bbox': [-40.0, -25.0, 0.0, 40.0, 25.0, 30.0], 'volume': 22112.0, 'solids': 1, 'faces': 11, 'edges': 24, 'surface_types': {'Plane': 11}}，用时 0.0 秒
+[5 外形减内腔] {'valid': True, 'bbox': [-40.0, -25.0, 0.0, 40.0, 25.0, 30.0], 'volume': 22112.0, 'solids': 1, 'faces': 11, 'edges': 24, 'surface_types': {'Plane': 11}}，用时 0.0 秒
+[5 期望体积] 22112
+[5 抽壳负厚度] 异常 SimpleCADError: Operation: shell_rsolid | Signature: shell_rsolid(solid, faces_to_remove, thickness, *, result_tag=None, body_faces_tag=None, offset_faces_tag=None, closing_faces_tag=None, wall_edges_tag=None) | Documentation: For full usage details, run help(simplecadapi.shell_rsolid). | What happened: Failed to a
+[5 先圆角再抽壳] {'valid': True, 'bbox': [-40.0, -25.0, 0.0, 40.0, 25.0, 30.0], 'volume': 21569.4866, 'solids': 1, 'faces': 19, 'edges': 48, 'surface_types': {'Plane': 11, 'Cylinder': 8}}，用时 0.1 秒
+[8 沉头孔（通孔 φ5 + 沉头 φ10 深 3，板厚 8）] {'valid': True, 'bbox': [-40.0, -25.0, 0.0, 40.0, 25.0, 8.0], 'volume': 31666.2058, 'solids': 1, 'faces': 9, 'edges': 18, 'surface_types': {'Plane': 7, 'Cylinder': 2}}，用时 0.0 秒
+[8 期望体积] 31666.2058
+
+==== 扫掠 ====
+[6 扫掠（直线-圆弧-直线）] {'valid': True, 'bbox': [-4.0, -4.0, 0.0, 50.0, 4.0, 44.0], 'volume': 4308.1521, 'solids': 1, 'faces': 5, 'edges': 7, 'surface_types': {'Cylinder': 2, 'Torus': 1, 'Plane': 2}}，用时 0.1 秒
+[6 期望体积] 4308.1521
+[6 扫掠（折线，没有圆弧）] {'valid': True, 'bbox': [-4.0, -4.0, 0.0, 44.0, 4.0, 30.0], 'volume': 1507.9645, 'solids': 1, 'faces': 4, 'edges': 5, 'surface_types': {'Cylinder': 1, 'SurfaceOfExtrusion': 1, 'Plane': 2}}，用时 0.0 秒
+
+==== 标准件 ====
+[7 齿轮 m=2 z=30 齿宽 12] {'valid': True, 'bbox': [-32.0, -31.893324, -0.0, 32.0, 31.893324, 12.0], 'volume': 33435.2508, 'solids': 1, 'faces': 182, 'edges': 540, 'surface_types': {'Cylinder': 60, 'SurfaceOfExtrusion': 120, 'Plane': 2}}，用时 1.5 秒
+[7 齿轮 + 轮毂 - 轴孔] {'valid': True, 'bbox': [-32.0, -31.893324, -0.0, 32.0, 31.893324, 20.0], 'volume': 35483.5692, 'solids': 1, 'faces': 185, 'edges': 546, 'surface_types': {'Cylinder': 62, 'SurfaceOfExtrusion': 120, 'Plane': 3}}，用时 1.7 秒
+[7 齿轮轴线与齿位] (x, 0, 6) 的点分类={26.0: 'TopAbs_IN', 29.0: 'TopAbs_IN', 31.9: 'TopAbs_IN', 32.1: 'TopAbs_OUT'}（+x 方向正对一个齿）
+[7 齿条] {'module': 2, 'n_teeth': 10}: {'valid': False, 'bbox': [-31.415927, -2.5, 0.0, 31.415927, 2.0, 6.0], 'volume': 1223.209, 'solids': 1, 'faces': 44, 'edges': 126, 'surface_types': {'Plane': 44}}
+[7 齿条] {'module': 2, 'n_teeth': 10, 'rack_height': 10}: {'valid': False, 'bbox': [-31.415927, -2.5, 0.0, 31.415927, 2.0, 10.0], 'volume': 2038.6817, 'solids': 1, 'faces': 44, 'edges': 126, 'surface_types': {'Plane': 44}}
+[7 齿条减孔] {'valid': False, 'bbox': [-31.415927, -2.5, 0.0, 31.415927, 2.0, 10.0], 'volume': 2036.9994, 'solids': 1, 'faces': 49, 'edges': 141, 'surface_types': {'Plane': 46, 'Cylinder': 3}}
+[7 齿条并料] union_rsolid(齿条, 方块) 在 60 秒内没有返回（在单独的进程里试过两次，glue=True 也一样），这里不再运行
+
+==== 多视角渲染 ====
+[9 渲染 iso] view='iso' 文件=True 大小=19963 用时 0.0 秒
+[9 渲染 front] view=(0, -90) 文件=True 大小=11091 用时 0.0 秒
+[9 渲染 top] view=(90, 0) 文件=True 大小=10984 用时 0.0 秒
+[9 渲染 right] view=(0, 0) 文件=True 大小=11208 用时 0.0 秒
+[9 渲染 preset-front] view='front' 文件=True 大小=10882 用时 0.0 秒
+[9 渲染 preset-top] view='top' 文件=True 大小=10744 用时 0.0 秒
+[9 渲染 preset-right] view='right' 文件=True 大小=11081 用时 0.0 秒
+[9 渲染目录] C:\Users\18258\AppData\Local\Temp\cad-probe2-views-2sy1h334
