@@ -28,3 +28,11 @@ run_timeout_s = 60        # 运行一次模型的超时（秒）
 max_build_failures = 3    # 每轮用户消息内建模失败的次数上限
 max_tool_calls = 40       # 每轮用户消息内工具调用的次数上限
 sessions_dir = "sessions" # 会话目录放哪里；路径含中文导致问题时改成纯英文路径
+# 第二版的流程开关和上限（下面是默认值，要改就去掉行首的 #）：
+# staged = true                  # 分阶段流程；关掉就退回 1.2 版的单阶段流程
+# mutation_check = true          # 终检时做参数扰动验证（每个用户参数改掉 20% 重建，看检查能不能发现）
+# visual_review = true           # 看图审查（计划 2 才实现）
+# cases = true                   # 规划时参考案例库里的相似零件
+# max_tool_calls_per_stage = 25  # 分阶段时，每个阶段的工具调用上限
+# max_tool_calls_total = 200     # 分阶段时，每轮用户消息的工具调用总上限（max_tool_calls 只在关掉分阶段时用）
+# cases_dir = "cases"            # 用户自己保存的案例放在哪里

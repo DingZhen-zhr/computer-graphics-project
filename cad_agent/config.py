@@ -8,6 +8,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Literal
 
+from cad_agent.gates import Gates
 from cad_agent.llm.client import Pricing
 
 
@@ -50,6 +51,10 @@ class Config:
     pricing: Pricing | None = None
     clarify: PhaseOverride = field(default_factory=PhaseOverride)
     modeling: PhaseOverride = field(default_factory=PhaseOverride)
+    gates: Gates = field(default_factory=Gates)
+    max_tool_calls_per_stage: int = 25   # 分阶段时每个阶段的工具调用上限
+    max_tool_calls_total: int = 200      # 分阶段时每轮的工具调用总上限（max_tool_calls 只在关掉分阶段时用）
+    cases_dir: Path = field(default_factory=lambda: Path("cases"))
 
     def api_key(self) -> str:
         key = os.environ.get(self.api_key_env, "").strip()
@@ -72,13 +77,21 @@ class Config:
 _SCHEMA: dict[str, dict[str, type | tuple[type, ...]]] = {
     "llm": {"base_url": str, "model": str, "api_key_env": str, "temperature": (int, float),
             "extra_body": dict, "pricing": dict, "clarify": dict, "modeling": dict},
-    "agent": {"run_timeout_s": (int, float), "max_build_failures": int, "max_tool_calls": int, "sessions_dir": str},
+    "agent": {"run_timeout_s": (int, float), "max_build_failures": int, "max_tool_calls": int, "sessions_dir": str,
+              "staged": bool, "mutation_check": bool, "visual_review": bool, "cases": bool,
+              "max_tool_calls_per_stage": int, "max_tool_calls_total": int, "cases_dir": str},
 }
+_GATE_KEYS = ("staged", "mutation_check", "visual_review", "cases")
+_POSITIVE_KEYS = ("max_tool_calls_per_stage", "max_tool_calls_total")
 _OVERRIDE_KEYS: dict[str, type | tuple[type, ...]] = {"model": str, "temperature": (int, float), "extra_body": dict, "pricing": dict}
 _PRICING_KEYS = ("input_hit", "input_miss", "output")
 
 
 def _check_type(section: str, key: str, value: object, typ: type | tuple[type, ...]) -> None:
+    if typ is bool:
+        if not isinstance(value, bool):
+            raise ConfigError(f"[{section}] 的 {key} 应该是 true 或 false，收到 {value!r}")
+        return
     if isinstance(value, bool) or not isinstance(value, typ):
         raise ConfigError(f"[{section}] 的 {key} 类型不对，收到 {value!r}")
 
@@ -137,6 +150,12 @@ def load_config(path: Path) -> Config:
             raise ConfigError(f"配置文件 {path} 的 [llm] 里缺少 {required}")
     if "sessions_dir" in values:
         values["sessions_dir"] = Path(values["sessions_dir"])
+    if "cases_dir" in values:
+        values["cases_dir"] = Path(values["cases_dir"])
+    for key in _POSITIVE_KEYS:
+        if key in values and values[key] <= 0:
+            raise ConfigError(f"[agent] 的 {key} 应该是正整数，收到 {values[key]!r}")
+    values["gates"] = Gates(**{k: values.pop(k) for k in _GATE_KEYS if k in values})
     if "pricing" in values:
         values["pricing"] = _parse_pricing("llm.pricing", values["pricing"])
     for phase in ("clarify", "modeling"):

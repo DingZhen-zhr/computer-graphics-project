@@ -138,3 +138,41 @@ def test_bad_new_sections(tmp_path, extra, hint):
 def test_extra_body_must_be_a_table(tmp_path):
     with pytest.raises(ConfigError, match="extra_body"):
         load_config(write(tmp_path, BASE + "extra_body = 3\n"))
+
+
+# ---- 第二版计划 1 Task 2：开关与分阶段的上限 ----
+
+from cad_agent.gates import Gates  # noqa: E402
+
+BASE_LLM = '[llm]\nbase_url = "http://x"\nmodel = "m"\n'
+
+
+def test_config_defaults_have_gates_on(tmp_path):
+    c = load_config(write(tmp_path, BASE_LLM))
+    assert c.gates == Gates()
+    assert (c.max_tool_calls_per_stage, c.max_tool_calls_total) == (25, 200)
+    assert c.cases_dir == Path("cases")
+
+
+def test_config_reads_gates(tmp_path):
+    c = load_config(write(tmp_path, BASE_LLM + '[agent]\nstaged = false\nmutation_check = false\nmax_tool_calls_per_stage = 10\n'
+                                    'max_tool_calls_total = 120\ncases_dir = "我的案例"\n'))
+    assert c.gates == Gates(staged=False, mutation_check=False, visual_review=True, cases=True)
+    assert (c.max_tool_calls_per_stage, c.max_tool_calls_total) == (10, 120)
+    assert c.cases_dir == Path("我的案例")
+    c2 = load_config(write(tmp_path, BASE_LLM + '[agent]\nvisual_review = false\ncases = false\n'))
+    assert c2.gates == Gates(staged=True, mutation_check=True, visual_review=False, cases=False)
+
+
+def test_config_bad_gate_type(tmp_path):
+    with pytest.raises(ConfigError) as e:
+        load_config(write(tmp_path, BASE_LLM + '[agent]\nstaged = "yes"\n'))
+    assert "staged" in str(e.value) and "应该是" in str(e.value)
+
+
+@pytest.mark.parametrize("key", ["max_tool_calls_per_stage", "max_tool_calls_total"])
+@pytest.mark.parametrize("value", [0, -3])
+def test_config_limits_must_be_positive(tmp_path, key, value):
+    with pytest.raises(ConfigError) as e:
+        load_config(write(tmp_path, BASE_LLM + f'[agent]\n{key} = {value}\n'))
+    assert key in str(e.value)

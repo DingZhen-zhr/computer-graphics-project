@@ -265,3 +265,9 @@
   5. **齿条 `make_spur_rack_rsolid` 在 SCA 2.2.7 里做出的实体无效**（`valid=False`），和方块合并会卡住超过 60 秒。这会影响 Task 14 的 `gear-rack` 案例，到 Task 14 再处理。
   6. 多视角：正视 `(0, -90)`、俯视 `(90, 0)`、右视 `(0, 0)`，和预设 "front"/"top"/"right" 相同。
 - 说明：速查表补充里每一行 `例：` 代码都另外拼成特征、用真实沙盒跑过一遍（草图 L 形、先圆角再抽壳、减内腔、扫掠、齿轮加轮毂，都 `ok`，尺寸和体积与笔记一致）。标准件函数在 `scad.std.gear` 下、文档不在 `api_names()` 的目录里，所以测试里对 `scad.std.<模块>.<函数>` 改为到 stdlib 文档目录里核对函数名（检查没有放松）。
+
+## 第二版 计划 1 Task 2：开关与配置 —— 完成
+
+- 做了什么：新文件 `cad_agent/gates.py`（`Gates` 四个开关，`Gates.legacy()` 全关）；`Config` 新增 `gates`、`max_tool_calls_per_stage`（25）、`max_tool_calls_total`（200）、`cases_dir`（`cases`），都从 `[agent]` 读；开关写成别的类型时报"应该是 true 或 false"，两个上限写 0 或负数时报"应该是正整数"，信息里都有键名；`config.example.toml` 的 `[agent]` 里用注释写出这几项和默认值。
+- 测试数量：新增 10 个（`test_gates.py` 3 个，含一个"开关不可改"；`test_config.py` 7 个，上限那条按两个键 × 两个值参数化），全部测试 526 个全部通过。旧的 `test_load_example` 原样通过（新项在示例里是注释，读出来就是默认值）。
+- 说明：没有偏离。旧的类型错误信息（"类型不对"）没有改，只有新加的布尔开关用新的说法。
