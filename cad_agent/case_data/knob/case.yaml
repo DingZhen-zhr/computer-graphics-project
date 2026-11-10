@@ -1,0 +1,176 @@
+title: 防滑旋钮
+tags:
+- 旋钮
+- 圆周阵列
+- 圆角
+- 倒角
+request: 做一个旋钮：圆柱形，侧面一圈防滑槽，顶边倒圆角，底边倒角，底下有轴孔
+brief:
+  part:
+    name: 旋钮
+    purpose: 装在电位器的轴上
+  params:
+  - name: knob_d
+    value: 40
+    unit: mm
+    source: user
+    note: 外径
+  - name: knob_h
+    value: 20
+    unit: mm
+    source: user
+    note: 高
+  - name: groove_n
+    value: 12
+    unit: '1'
+    source: user
+    note: 防滑槽个数
+  - name: groove_w
+    value: 3
+    unit: mm
+    source: user
+    note: 防滑槽的宽和深
+  - name: fillet_r
+    value: 3
+    unit: mm
+    source: user
+    note: 顶边圆角半径；底边倒角取它的三分之一
+  - name: bore_d
+    value: 6
+    unit: mm
+    source: user
+    note: 轴孔直径，深度是高的一半
+  features:
+  - 旋钮主体
+  - 轴孔，从底面往上
+  - 防滑槽，侧面一圈
+  - 顶边圆角和底边倒角
+  relations:
+  - 轴孔在旋钮主体底面中心，不打穿顶面
+  - 防滑槽在旋钮主体侧面的中间一段，不碰顶边和底边
+  - 顶边圆角和底边倒角在旋钮主体的上下外棱
+  open_questions: []
+  confirmed: true
+plan:
+- title: 主体和轴孔
+  done_when: 有一个圆柱，底面中心有盲孔
+- title: 防滑槽
+  done_when: 侧面中间一段有一圈均布的防滑槽
+- title: 圆角和倒角
+  done_when: 顶边倒圆角，底边倒角
+features:
+- slug: body
+  role: build
+  stage: s1
+  code: |
+    body = scad.make_cylinder_rsolid(radius=knob_d / 2, height=knob_h, bottom_face_center=(0, 0, 0))
+- slug: bore
+  role: subtract
+  stage: s1
+  code: |
+    _b = scad.make_cylinder_rsolid(radius=bore_d / 2, height=knob_h / 2 + 1, bottom_face_center=(0, 0, -1))
+    bore = scad.cut_rsolid(body, _b, skip_non_intersecting=False)
+- slug: grooves
+  role: pattern
+  stage: s2
+  code: |
+    _g = scad.make_box_rsolid(width=2 * groove_w, height=groove_w, depth=knob_h / 2, bottom_face_center=(knob_d / 2, 0, knob_h / 4))
+    _gs = scad.radial_pattern_rsolidlist(shape=_g, center=(0, 0, 0), axis=(0, 0, 1), count=groove_n, total_rotation_angle=360)
+    grooves = scad.cut_rsolid(bore, _gs, skip_non_intersecting=False)
+- slug: top-round
+  role: modify
+  stage: s3
+  code: |
+    _top = ql.edges().where(ql.and_(ql.prop("geom.type", "==", "CIRCLE"), ql.prop("geom.center.z", ">=", knob_h - 0.1))).exactly(1)
+    top_round = scad.fillet_rsolid(solid=grooves, edges=_top, radius=fillet_r)
+- slug: bottom-chamfer
+  role: modify
+  stage: s3
+  code: |
+    _bot = ql.edges().where(ql.and_(ql.prop("geom.type", "==", "CIRCLE"), ql.prop("geom.center.z", "<=", 0.1), ql.prop("geom.length", ">=", 3.14159 * knob_d - 1))).exactly(1)
+    bottom_chamfer = scad.chamfer_rsolid(solid=top_round, edges=_bot, distance=fillet_r / 3)
+checks:
+- id: size-x
+  type: bbox
+  axis: x
+  expected: knob_d
+  stage: s1
+- id: size-z
+  type: bbox
+  axis: z
+  expected: knob_h
+  stage: s1
+- id: bore-center
+  type: point_outside
+  point:
+  - 0
+  - 0
+  - 1
+  stage: s1
+- id: bore-wall
+  type: point_inside
+  point:
+  - bore_d / 2 + 0.3
+  - 0
+  - 1
+  stage: s1
+- id: bore-top
+  type: point_inside
+  point:
+  - 0
+  - 0
+  - knob_h / 2 + 0.3
+  stage: s1
+- id: groove-count
+  type: count
+  kind: faces
+  expected: groove_n
+  stage: s2
+  where:
+  - - geom.type
+    - ==
+    - PLANE
+  - - geom.normal.z
+    - <=
+    - -0.99
+  - - geom.center.z
+    - '>='
+    - knob_h * 3 / 4 - 0.1
+  - - geom.center.z
+    - <=
+    - knob_h * 3 / 4 + 0.1
+- id: groove-in
+  type: point_outside
+  point:
+  - knob_d / 2 - groove_w + 0.3
+  - 0
+  - knob_h / 2
+  stage: s2
+- id: groove-bottom
+  type: point_inside
+  point:
+  - knob_d / 2 - groove_w - 0.3
+  - 0
+  - knob_h / 2
+  stage: s2
+- id: fillet-body
+  type: point_inside
+  point:
+  - knob_d / 2 - fillet_r + (fillet_r - 0.2) * cos(radians(45))
+  - 0
+  - knob_h - fillet_r + (fillet_r - 0.2) * sin(radians(45))
+  stage: s3
+- id: fillet-corner
+  type: point_outside
+  point:
+  - knob_d / 2 - 0.3
+  - 0
+  - knob_h - 0.3
+  stage: s3
+- id: chamfer-corner
+  type: point_outside
+  point:
+  - knob_d / 2 - 0.3
+  - 0
+  - 0.3
+  stage: s3

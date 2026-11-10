@@ -610,6 +610,18 @@ rack = scad.std.gear.make_spur_rack_rsolid(module=2, n_teeth=10, rack_height=10)
 - 签名 `make_spur_rack_rsolid(module, n_teeth=10, pressure_angle=20.0, rack_height=6.0)`。齿形在 XY 平面里，沿 z 拉伸 `rack_height`；x 方向长 n_teeth×π×module（62.83），y 方向只有齿高（−2.5 到 2.0，即齿根 1.25m、齿顶 1m），**没有齿条的背板**。
 - **踩到的坑：SCA 2.2.7 生成的齿条 `valid=False`**（`BRepCheck_Analyzer` 也判定无效），三组参数（m2 z10、m1 z5、m2.5 z12 h8）都一样。减孔（`cut_rsolid`）能算出来，但结果仍然无效；和一个方块 `union_rsolid`（默认和 `glue=True` 都试了）在 60 秒内不返回。所以齿条**不能**用来做必须通过"实体有效"检查的零件。要做齿条时得另想办法（比如用第 18 节的草图画齿形再拉伸），这个写法还没有实测，用之前要先探测。
 
+内齿圈（第二版计划 1 Task 14 补测，偏离 D13）：
+
+```python
+ring = scad.std.gear.make_spur_ring_gear_rsolid(n_teeth=teeth_n, module=gear_m, gear_height=ring_h, rim_thickness=2.5 * gear_m)
+```
+
+- 签名 `make_spur_ring_gear_rsolid(n_teeth, module, pressure_angle=20.0, gear_height=6.0, rim_thickness=3.0, backlash=0.0, *, addendum_factor=1.0, clearance_factor=0.25)`。模数 2、齿数 40、齿宽 8、轮缘厚 5：**实体有效**（`valid=True`、1 个实体），约 1.7 秒；轴线是 z 轴，z 从 0 到 8；包围盒 x、y 都是 ±47.5。
+- 尺寸：齿顶（齿尖朝里）半径 = 模数 ×（齿数 − 2）/ 2 = 38；齿根半径 = 模数 ×（齿数 + 2.5）/ 2 = 42.5；外圈半径 = 齿根半径 + 轮缘厚 = 47.5。
+- 齿的位置：**+x 方向正对一个齿**：(38.2, 0, 4)、(40, 0, 4) 在材料里，(37.5, 0, 4) 在材料外；转半个齿距（4.5°）的方向是齿槽：半径 38.2~42 都在材料外，42.8 才进入轮缘。
+- 面：81 个圆柱面（40 个齿顶面、40 个齿根面、1 个外圆柱面 2πrh = 2387.6）、80 个 SurfaceOfExtrusion（齿廓）、2 个平面。
+- 能直接和一个套在外圈上的圆环（外径 120、内径 86，内孔边落在轮缘里）`union_rsolid`，结果有效，0.4 秒；再用圆周阵列减 6 个 φ6 孔，有效。
+
 ## 22. 多视角渲染
 
 `render_screenshot_rpath(body, path, view=...)` 的 `view` 用 `(仰角, 方位角)`，实测用一块 +x、+y 角上带立柱的不对称零件认方向：

@@ -90,3 +90,10 @@
 - 实际情况：一次 build 可以先通过 s1、再在 s2 失败（s2 也写好了时），或者通过最后一个阶段、但终检没过（缺检查或参数没被约束）。这时那次 build 的返回里有模型接下来必须改的内容（哪条检查没过、实测数值、哪些参数没被约束、hint），而小结的格式（提示词文档第 4 节）里没有这些；快照又要到下一轮才更新。照计划立刻折叠，模型在这一轮里就看不到失败原因了，只能瞎改。
 - 怎么改：只在最近一次 build 的结果是"新通过了阶段、停在一个还没写的阶段"（`reason == "not_ready"`）时折叠；其他情况先不折叠，通过的阶段记下来，等下一次干净地停下时一起写进小结（只写那时仍是"已通过"的阶段，按计划里的顺序）。小结的文字格式不变，测试 `test_passed_stage_is_folded`、`test_fold_keeps_prefix_stable_inside_a_stage` 都照计划写、照常通过；`test_gate_failure_goes_back_to_model` 能在第 4 次调用模型时看到终检没过的 build 返回，就是靠这一条。stage 日志在 build 当时就写，不受折叠时机影响。
 - 影响：只影响 Task 10 的折叠时机，没有改任何接口和原文。
+
+## D13（第二版计划 1 Task 14）自带案例 gear-rack 换成 ring-gear（内齿圈）
+
+- 原计划：Task 14 的 8 个自带案例里有 `gear-rack`：标准件直齿条加两个安装孔，示范"标准件"。
+- 实际情况：Task 1 探测（笔记第 21 节）发现 SCA 2.2.7 的 `make_spur_rack_rsolid` 做出的齿条 `valid=False`（三组参数都一样，`BRepCheck_Analyzer` 也判无效），减孔后仍无效，和方块 `union_rsolid` 60 秒内不返回；Task 14 补测 `make_helical_rack_rsolid` 也是 `valid=False`。用它做的案例过不了"实体有效"这条必做检查，不是我们能修的。
+- 怎么改：这是计划修订，由写计划的规划会话决定（选项 A），不是执行时自己定的。案例换成 `ring-gear`「内齿圈：标准件内齿圈加外圈上一圈安装孔」，做法仍是"标准件"（`make_spur_ring_gear_rsolid`，实测有效，写法补进笔记第 21 节）；它和评测任务的直齿轮不是同一个零件。没选的两种：自己用草图画齿条齿形（和提示词"标准件不要自己画齿形"冲突）、换成斜齿轮（离评测的直齿轮太近）。
+- 影响：计划 1 Task 14 的 id 表那一行已同步修改；`tests/test_builtin_cases.py::test_there_are_eight_builtin_cases` 的 id 集合用 `ring-gear` 代替 `gear-rack`，`test_builtin_cases_are_not_benchmark_tasks` 照常要过，断言没有放松。

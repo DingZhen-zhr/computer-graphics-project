@@ -1,0 +1,159 @@
+title: 带法兰的内齿圈
+tags:
+- 内齿圈
+- 标准件
+- 法兰
+- 圆周阵列
+request: 做一个内齿圈，外面套一圈法兰，法兰上一圈安装孔
+brief:
+  part:
+    name: 内齿圈
+    purpose: 行星减速器的外齿圈，用法兰固定在壳体上
+  params:
+  - name: gear_m
+    value: 2
+    unit: mm
+    source: user
+    note: 模数
+  - name: teeth_n
+    value: 40
+    unit: '1'
+    source: user
+    note: 齿数
+  - name: ring_h
+    value: 8
+    unit: mm
+    source: user
+    note: 齿宽，法兰同厚
+  - name: flange_d
+    value: 120
+    unit: mm
+    source: user
+    note: 法兰外径
+  - name: hole_d
+    value: 6
+    unit: mm
+    source: user
+    note: 安装孔直径
+  - name: hole_n
+    value: 6
+    unit: '1'
+    source: user
+    note: 安装孔个数
+  features:
+  - 内齿圈
+  - 法兰，套在内齿圈外圈上
+  - 安装孔，在法兰上一圈
+  relations:
+  - 法兰套在内齿圈的外圈上，和内齿圈同轴、同厚，内孔边落在轮缘里
+  - 安装孔均布在法兰上，孔心在轮缘外圆和法兰外圆的正中
+  open_questions: []
+  confirmed: true
+plan:
+- title: 内齿圈
+  done_when: 有一个标准件内齿圈，轴线是 z 轴
+- title: 法兰
+  done_when: 内齿圈外面套着同厚的法兰
+- title: 安装孔
+  done_when: 法兰上有一圈均布的安装孔
+features:
+- slug: ring
+  role: build
+  stage: s1
+  code: |
+    ring = scad.std.gear.make_spur_ring_gear_rsolid(n_teeth=teeth_n, module=gear_m, gear_height=ring_h, rim_thickness=2.5 * gear_m)
+- slug: flange
+  role: add
+  stage: s2
+  code: |
+    _disc = scad.make_cylinder_rsolid(radius=flange_d / 2, height=ring_h, bottom_face_center=(0, 0, 0))
+    _inner = scad.make_cylinder_rsolid(radius=gear_m * (teeth_n + 3) / 2, height=ring_h + 2, bottom_face_center=(0, 0, -1))
+    _band = scad.cut_rsolid(_disc, _inner, skip_non_intersecting=False)
+    flange = scad.union_rsolid(ring, _band)
+- slug: mount-holes
+  role: pattern
+  stage: s3
+  code: |
+    _pcd_r = (gear_m * (teeth_n + 2.5) / 2 + 2.5 * gear_m + flange_d / 2) / 2
+    _hole = scad.make_cylinder_rsolid(radius=hole_d / 2, height=ring_h + 2, bottom_face_center=(_pcd_r, 0, -1))
+    _holes = scad.radial_pattern_rsolidlist(shape=_hole, center=(0, 0, 0), axis=(0, 0, 1), count=hole_n, total_rotation_angle=360)
+    mount_holes = scad.cut_rsolid(flange, _holes, skip_non_intersecting=False)
+checks:
+- id: size-z
+  type: bbox
+  axis: z
+  expected: ring_h
+  stage: s1
+- id: rim-size
+  type: bbox
+  axis: x
+  expected: 2 * (gear_m * (teeth_n + 2.5) / 2 + 2.5 * gear_m)
+  stage: s1
+  holds: here_only
+- id: tooth-tip
+  type: point_inside
+  point:
+  - gear_m * (teeth_n - 2) / 2 + 0.3
+  - 0
+  - ring_h / 2
+  stage: s1
+- id: tooth-free
+  type: point_outside
+  point:
+  - gear_m * (teeth_n - 2) / 2 - 0.3
+  - 0
+  - ring_h / 2
+  stage: s1
+- id: tooth-gap
+  type: point_outside
+  point:
+  - gear_m * (teeth_n + 2) / 2 * cos(radians(180 / teeth_n))
+  - gear_m * (teeth_n + 2) / 2 * sin(radians(180 / teeth_n))
+  - ring_h / 2
+  stage: s1
+- id: size-x
+  type: bbox
+  axis: x
+  expected: flange_d
+  stage: s2
+- id: size-y
+  type: bbox
+  axis: y
+  expected: flange_d
+  stage: s2
+- id: flange-edge
+  type: point_inside
+  point:
+  - flange_d / 2 - 0.3
+  - 0
+  - ring_h / 2
+  stage: s2
+- id: hole-count
+  type: count
+  kind: faces
+  expected: hole_n
+  stage: s3
+  where:
+  - - geom.type
+    - ==
+    - CYLINDER
+  - - geom.area
+    - '>='
+    - pi * hole_d * ring_h * 0.95
+  - - geom.area
+    - <=
+    - pi * hole_d * ring_h * 1.05
+- id: hole-center
+  type: point_outside
+  point:
+  - (gear_m * (teeth_n + 2.5) / 2 + 2.5 * gear_m + flange_d / 2) / 2
+  - 0
+  - ring_h / 2
+  stage: s3
+- id: hole-edge
+  type: point_inside
+  point:
+  - (gear_m * (teeth_n + 2.5) / 2 + 2.5 * gear_m + flange_d / 2) / 2 + hole_d / 2 + 0.3
+  - 0
+  - ring_h / 2
+  stage: s3

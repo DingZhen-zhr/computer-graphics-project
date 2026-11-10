@@ -1,0 +1,162 @@
+title: 电机座
+tags:
+- 电机座
+- 加强筋
+- 立板
+- 布尔合并
+request: 做一个电机座：底板一端立一块带大孔的板，两边各一块三角筋
+brief:
+  part:
+    name: 电机座
+    purpose: 把小电机固定在底板上
+  params:
+  - name: base_l
+    value: 80
+    unit: mm
+    source: user
+    note: 底板长（x 方向）
+  - name: base_w
+    value: 60
+    unit: mm
+    source: user
+    note: 底板宽（y 方向），立板同宽
+  - name: base_t
+    value: 6
+    unit: mm
+    source: user
+    note: 底板厚，立板也是这个厚度
+  - name: plate_h
+    value: 60
+    unit: mm
+    source: user
+    note: 立板从桌面算起的总高
+  - name: motor_d
+    value: 30
+    unit: mm
+    source: user
+    note: 立板上电机孔的直径
+  - name: rib_t
+    value: 5
+    unit: mm
+    source: user
+    note: 加强筋厚
+  features:
+  - 底板
+  - 立板，在底板 -x 端
+  - 加强筋，两侧各一块
+  - 电机孔，在立板上
+  relations:
+  - 立板的下端和底板的 -x 端重叠，外侧面和底板端面平齐，不是叠在底板上面
+  - 加强筋贴着底板顶面和立板内侧面，外侧面和底板的两条长边平齐
+  - 电机孔在立板上，轴线沿 x，孔心在立板露出底板那一段的中间高度
+  open_questions: []
+  confirmed: true
+plan:
+- title: 底板和立板
+  done_when: 底板一端立着同宽的立板
+- title: 加强筋
+  done_when: 立板两侧各有一块三角筋
+- title: 电机孔
+  done_when: 立板上有贯通的电机孔
+features:
+- slug: base
+  role: build
+  stage: s1
+  code: |
+    base = scad.make_box_rsolid(width=base_l, height=base_w, depth=base_t, bottom_face_center=(0, 0, 0))
+- slug: upright
+  role: add
+  stage: s1
+  code: |
+    _u = scad.make_box_rsolid(width=base_t, height=base_w, depth=plate_h, bottom_face_center=(-base_l / 2 + base_t / 2, 0, 0))
+    upright = scad.union_rsolid(base, _u)
+- slug: ribs
+  role: add
+  stage: s2
+  code: |
+    _leg = (plate_h - base_t) / 2
+    _x0 = -base_l / 2 + base_t
+    _wire = scad.make_polyline_rwire(points=[(_x0, 0, base_t), (_x0 + _leg, 0, base_t), (_x0, 0, base_t + _leg)], closed=True)
+    _profile = scad.make_face_from_wire_rface(wire=_wire, normal=(0, -1, 0))
+    _rib = scad.extrude_rsolid(profile=_profile, direction=(0, 1, 0), distance=rib_t)
+    _r1 = scad.translate_shape(shape=_rib, vector=(0, base_w / 2 - rib_t, 0))
+    _r2 = scad.translate_shape(shape=_rib, vector=(0, -base_w / 2, 0))
+    ribs = scad.union_rsolid(upright, _r1, _r2)
+- slug: motor-hole
+  role: subtract
+  stage: s3
+  code: |
+    _h = scad.make_cylinder_rsolid(radius=motor_d / 2, height=base_t + 2, bottom_face_center=(-base_l / 2 - 1, 0, (base_t + plate_h) / 2), axis=(1, 0, 0))
+    motor_hole = scad.cut_rsolid(ribs, _h, skip_non_intersecting=False)
+checks:
+- id: size-x
+  type: bbox
+  axis: x
+  expected: base_l
+  stage: s1
+- id: size-y
+  type: bbox
+  axis: y
+  expected: base_w
+  stage: s1
+- id: size-z
+  type: bbox
+  axis: z
+  expected: plate_h
+  stage: s1
+- id: plate-front
+  type: point_outside
+  point:
+  - -base_l / 2 + base_t + 0.3
+  - 0
+  - base_t + 10
+  stage: s1
+- id: plate-in
+  type: point_inside
+  point:
+  - -base_l / 2 + base_t - 0.3
+  - 0
+  - base_t + 10
+  stage: s1
+- id: base-top
+  type: point_outside
+  point:
+  - 10
+  - 0
+  - base_t + 0.3
+  stage: s1
+- id: rib-in
+  type: point_inside
+  point:
+  - -base_l / 2 + base_t + 3
+  - base_w / 2 - rib_t / 2
+  - base_t + 3
+  stage: s2
+- id: rib-side
+  type: point_outside
+  point:
+  - -base_l / 2 + base_t + 3
+  - base_w / 2 - rib_t - 0.2
+  - base_t + 3
+  stage: s2
+- id: rib-tip
+  type: point_outside
+  point:
+  - -base_l / 2 + base_t + (plate_h - base_t) / 2 + 0.5
+  - base_w / 2 - rib_t / 2
+  - base_t + 0.3
+  stage: s2
+- id: motor-center
+  type: point_outside
+  point:
+  - -base_l / 2 + base_t / 2
+  - 0
+  - (base_t + plate_h) / 2
+  stage: s3
+- id: motor-wall
+  type: point_inside
+  point:
+  - -base_l / 2 + base_t / 2
+  - motor_d / 2 + 0.3
+  - (base_t + plate_h) / 2
+  stage: s3

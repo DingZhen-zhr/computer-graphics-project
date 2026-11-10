@@ -1,0 +1,148 @@
+title: 圆角收纳盒
+tags:
+- 收纳盒
+- 抽壳
+- 圆角
+- 薄壁
+request: 做一个桌面收纳盒，敞口，外面四条竖边是圆角
+brief:
+  part:
+    name: 收纳盒
+    purpose: 放文具
+  params:
+  - name: tray_l
+    value: 120
+    unit: mm
+    source: user
+    note: 长（x 方向）
+  - name: tray_w
+    value: 80
+    unit: mm
+    source: user
+    note: 宽（y 方向）
+  - name: tray_h
+    value: 40
+    unit: mm
+    source: user
+    note: 高
+  - name: wall
+    value: 2
+    unit: mm
+    source: user
+    note: 壁厚和底厚
+  - name: corner_r
+    value: 10
+    unit: mm
+    source: user
+    note: 外竖边圆角半径
+  features:
+  - 盒体，上面敞口
+  - 外竖边圆角
+  relations:
+  - 外竖边圆角在盒体的四条竖边上，先做圆角再抽壳，内壁跟着带圆角
+  open_questions: []
+  confirmed: true
+plan:
+- title: 外形和圆角
+  done_when: 有一个外竖边带圆角的实心块
+- title: 抽壳
+  done_when: 顶面敞开，挖成壁厚 wall 的薄壁盒
+features:
+- slug: block
+  role: build
+  stage: s1
+  code: |
+    block = scad.make_box_rsolid(width=tray_l, height=tray_w, depth=tray_h, bottom_face_center=(0, 0, 0))
+- slug: outer-round
+  role: modify
+  stage: s1
+  code: |
+    _vert = ql.edges().where(ql.and_(ql.prop("geom.type", "==", "LINE"), ql.prop("geom.center.z", ">=", tray_h / 2 - 0.1), ql.prop("geom.center.z", "<=", tray_h / 2 + 0.1))).exactly(4)
+    outer_round = scad.fillet_rsolid(solid=block, edges=_vert, radius=corner_r)
+- slug: shell
+  role: modify
+  stage: s2
+  code: |
+    _top = ql.faces().where(ql.and_(ql.prop("geom.type", "==", "PLANE"), ql.prop("geom.normal.z", ">=", 0.99)))
+    shell = scad.shell_rsolid(solid=outer_round, faces_to_remove=_top, thickness=wall)
+checks:
+- id: size-x
+  type: bbox
+  axis: x
+  expected: tray_l
+  stage: s1
+- id: size-y
+  type: bbox
+  axis: y
+  expected: tray_w
+  stage: s1
+- id: size-z
+  type: bbox
+  axis: z
+  expected: tray_h
+  stage: s1
+- id: outer-corners
+  type: count
+  kind: faces
+  expected: 4
+  stage: s1
+  where:
+  - - geom.type
+    - ==
+    - CYLINDER
+  - - geom.area
+    - '>='
+    - pi / 2 * corner_r * tray_h * 0.95
+  - - geom.area
+    - <=
+    - pi / 2 * corner_r * tray_h * 1.05
+- id: corner-cut
+  type: point_outside
+  point:
+  - tray_l / 2 - 0.5
+  - tray_w / 2 - 0.5
+  - tray_h / 2
+  stage: s1
+- id: corner-body
+  type: point_inside
+  point:
+  - tray_l / 2 - corner_r + (corner_r - 0.2) * cos(radians(45))
+  - tray_w / 2 - corner_r + (corner_r - 0.2) * sin(radians(45))
+  - tray_h / 2
+  stage: s1
+- id: solid
+  type: point_inside
+  point:
+  - 0
+  - 0
+  - tray_h / 2
+  stage: s1
+  holds: here_only
+- id: wall-x
+  type: point_outside
+  point:
+  - -(tray_l / 2 - wall - 0.2)
+  - 0
+  - tray_h / 2
+  stage: s2
+- id: wall-in
+  type: point_inside
+  point:
+  - -(tray_l / 2 - wall / 2)
+  - 0
+  - tray_h / 2
+  stage: s2
+- id: floor-top
+  type: point_outside
+  point:
+  - 0
+  - 0
+  - wall + 0.2
+  stage: s2
+- id: floor-in
+  type: point_inside
+  point:
+  - 0
+  - 0
+  - wall - 0.3
+  stage: s2

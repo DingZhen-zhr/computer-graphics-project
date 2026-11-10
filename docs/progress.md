@@ -345,3 +345,11 @@
 - 验收数字：六个任务、十二组验收**全部按计划的数字一次通过**，没有改任何数字，也没有放宽容差；旧模型卡住的集合和计划写的完全一致（轴承座 out-6；电池盒 out-3、out-4；直齿轮 in-5、out-5；散热器 fin-tops、in-3、out-6；三通 out-7；支架臂 size-z、in-5、in-6、out-4）。齿顶圆实测 64（笔记第 21 节），不需要记偏离。
 - 终检扰动：每个任务的终检都通过，参与扰动的参数全部是 constrained，没有 unbuildable。散热器有 16 个参数、三通 14 个、支架臂 18 个，超过 12 个上限，终检按需求单顺序跳过最后 4 / 2 / 6 个（散热器：hole_x、mount_y、pin_d、pin_depth；三通：top_bolt_d、top_bolt_pcd；支架臂：hole_d、cb_d、cb_depth、hole1_x、hole2_x、hole2_y）；另加的测试把它们挪到前面单独扰动，也全部被检查约束。
 - 说明：计划要求 `run.py` 的 `main` 造智能体时传 `gates` 和案例库；`main` 是通过 `cli.build_agent` 造智能体的，而 `build_agent` 的这两项改动在 Task 15 的接口里，所以放到 Task 15 一起做（`main` 不用另写一份），这里没有改 `main`。为了让数字测试先失败，写完 YAML 后临时把它们挪走跑了一遍红灯，再挪回来补上 `run.py`。没有偏离。
+
+## 第二版 计划 1 Task 14：八个自带案例 —— 完成
+
+- 做了什么：`cad_agent/case_data/` 下 8 个案例：`mounting-plate`（四角孔安装板：矩形面拉伸、先做一个孔再两次线性阵列、中心孔）、`pulley`（V 带轮：XZ 截面绕 z 轴旋转、轴孔）、`tray`（圆角收纳盒：先竖边圆角再抽壳）、`motor-mount`（电机座：底板、立板、两侧三角筋、电机孔，写了位置关系）、`cam-plate`（凸轮板：草图里直线加两段圆弧围成轮廓再拉伸、轴孔）、`ring-gear`（带法兰的内齿圈：标准件内齿圈、法兰、安装孔圆周阵列）、`pull-handle`（弯管拉手：直—弯—直—弯—直的路径扫掠、两个安装座）、`knob`（防滑旋钮：盲孔、侧面一圈防滑槽圆周阵列、顶边圆角和底边倒角放在最后）。每个 5~6 个参数（都是用户参数）、2~3 个阶段、每阶段至少 2 条检查、4 个标签、一句用户口吻的需求，有两个以上组成部分的都写了 relations。`tests/test_builtin_cases.py`。
+- 测试数量：新增 18 个（`test_there_are_eight_builtin_cases`、8 条 `test_case_shape`、8 条 `test_case_builds_and_passes_gates`（真实 SCA，`advance` 到 complete，终检 `Gates()` 通过，另外要求没有跳过、没有无法扰动的参数）、`test_builtin_cases_are_not_benchmark_tasks`），全部测试 775 个全部通过（8 分 21 秒）。
+- 偏离：D13。计划里的 `gear-rack`（标准件直齿条）做不出来：SCA 2.2.7 的两个齿条函数做出的实体都无效、和别的实体合并会卡住。停下来问了写计划的规划会话，它决定（选项 A）换成 `ring-gear` 内齿圈，仍示范"标准件"。内齿圈先探测、写进笔记第 21 节再用；计划 Task 14 的 id 表和测试的 id 集合已同步改，`test_builtin_cases_are_not_benchmark_tasks` 照常通过，断言没放松。这个决定是规划会话做的计划修订，用户本人还没有表态。
+- 扰动验证报 unconstrained 时改的是检查：`tray` 的圆角半径改成 12 后，抽壳出来的内壁圆角面积恰好落进原来 ±5% 的窗口边上，`corner_r` 被判为没约束，于是补了一条圆角平分线上的点检查（`corner-body`）。`pull-handle` 第一阶段只有弯管、从 z=5 开始，原来写的整体高度检查放错了阶段，改成第一阶段 here_only 的弯管高度加第二阶段的整体高度。
+- 说明：案例的 YAML 由一个临时生成脚本写出（代码用 YAML 的字面块，便于阅读），脚本没有放进仓库；YAML 本身就是案例的唯一来源。

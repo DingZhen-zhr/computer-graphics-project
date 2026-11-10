@@ -1,0 +1,119 @@
+title: V 带轮
+tags:
+- 带轮
+- 旋转
+- V 形槽
+- 截面
+request: 做一个 V 带轮，外圈有一道 V 形槽，中间有轴孔
+brief:
+  part:
+    name: V 带轮
+    purpose: 电机通过 V 带传动
+  params:
+  - name: pulley_d
+    value: 60
+    unit: mm
+    source: user
+    note: 外径
+  - name: pulley_w
+    value: 16
+    unit: mm
+    source: user
+    note: 轮宽（轴向）
+  - name: groove_w
+    value: 10
+    unit: mm
+    source: user
+    note: V 槽在外圆上的开口宽度
+  - name: groove_depth
+    value: 6
+    unit: mm
+    source: user
+    note: V 槽深度
+  - name: bore_d
+    value: 12
+    unit: mm
+    source: user
+    note: 轴孔直径
+  features:
+  - 轮体，外圈带 V 形槽
+  - 轴孔
+  relations:
+  - 轴孔沿轮体的轴线贯通
+  open_questions: []
+  confirmed: true
+plan:
+- title: 轮体
+  done_when: 画截面绕 z 轴旋转一圈，得到外圈带 V 形槽的轮体
+- title: 轴孔
+  done_when: 中间有贯通的轴孔
+features:
+- slug: wheel
+  role: build
+  stage: s1
+  code: |
+    _r = pulley_d / 2
+    _pts = [(0, 0, 0), (_r, 0, 0), (_r, 0, pulley_w / 2 - groove_w / 2), (_r - groove_depth, 0, pulley_w / 2), (_r, 0, pulley_w / 2 + groove_w / 2), (_r, 0, pulley_w), (0, 0, pulley_w)]
+    _wire = scad.make_polyline_rwire(points=_pts, closed=True)
+    _profile = scad.make_face_from_wire_rface(wire=_wire, normal=(0, -1, 0))
+    wheel = scad.revolve_rsolid(profile=_profile, axis=(0, 0, 1), angle=360, origin=(0, 0, 0))
+- slug: bore
+  role: subtract
+  stage: s2
+  code: |
+    _b = scad.make_cylinder_rsolid(radius=bore_d / 2, height=pulley_w + 2, bottom_face_center=(0, 0, -1))
+    bore = scad.cut_rsolid(wheel, _b, skip_non_intersecting=False)
+checks:
+- id: size-x
+  type: bbox
+  axis: x
+  expected: pulley_d
+  stage: s1
+- id: size-z
+  type: bbox
+  axis: z
+  expected: pulley_w
+  stage: s1
+- id: groove
+  type: point_outside
+  point:
+  - pulley_d / 2 - groove_depth + 0.5
+  - 0
+  - pulley_w / 2
+  stage: s1
+- id: groove-bottom
+  type: point_inside
+  point:
+  - pulley_d / 2 - groove_depth - 0.3
+  - 0
+  - pulley_w / 2
+  stage: s1
+- id: groove-side
+  type: point_inside
+  point:
+  - pulley_d / 2 - 0.3
+  - 0
+  - pulley_w / 2 + groove_w / 2 + 0.3
+  stage: s1
+- id: solid-center
+  type: point_inside
+  point:
+  - 0
+  - 0
+  - pulley_w / 2
+  stage: s1
+  holds: here_only
+- id: bore-center
+  type: point_outside
+  point:
+  - 0
+  - 0
+  - pulley_w / 2
+  stage: s2
+- id: bore-wall
+  type: point_inside
+  point:
+  - bore_d / 2 + 0.3
+  - 0
+  - pulley_w / 4
+  stage: s2

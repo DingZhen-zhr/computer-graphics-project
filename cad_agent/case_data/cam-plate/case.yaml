@@ -1,0 +1,113 @@
+title: 凸轮板
+tags:
+- 凸轮
+- 草图
+- 圆弧
+- 拉伸
+request: 做一块凸轮板：大头和小头都是圆弧，用两条直线连起来，大头圆心处有轴孔
+brief:
+  part:
+    name: 凸轮板
+    purpose: 推动一个顶杆往复运动
+  params:
+  - name: big_r
+    value: 25
+    unit: mm
+    source: user
+    note: 大头圆弧半径，圆心在原点（轴孔中心）
+  - name: small_r
+    value: 12
+    unit: mm
+    source: user
+    note: 小头圆弧半径
+  - name: cam_d
+    value: 40
+    unit: mm
+    source: user
+    note: 大小两个圆心的距离，小头在 +x 方向
+  - name: cam_t
+    value: 8
+    unit: mm
+    source: user
+    note: 板厚
+  - name: bore_d
+    value: 10
+    unit: mm
+    source: user
+    note: 轴孔直径
+  features:
+  - 板，大头小头都是圆弧
+  - 轴孔，在大头圆心
+  relations:
+  - 轴孔在板的大头圆心处，贯通板厚
+  open_questions: []
+  confirmed: true
+plan:
+- title: 轮廓
+  done_when: 草图画出的凸轮轮廓拉伸成板
+- title: 轴孔
+  done_when: 大头圆心处有贯通的轴孔
+features:
+- slug: cam
+  role: build
+  stage: s1
+  code: |
+    _s = scad.make_sketch_rsketch("cam_profile", plane="XY")
+    for _pid, _x, _y in (("a", 0, -big_r), ("b", cam_d, -small_r), ("c", cam_d, small_r), ("d", 0, big_r), ("o1", 0, 0), ("o2", cam_d, 0)):
+        _s = scad.add_point_rsketch(_s, _pid, _x, _y)
+    _s = scad.add_line_rsketch(_s, "ab", "a", "b")
+    _s = scad.add_arc_rsketch(_s, "bc", "b", "c", "o2")
+    _s = scad.add_line_rsketch(_s, "cd", "c", "d")
+    _s = scad.add_arc_rsketch(_s, "da", "d", "a", "o1")
+    _face = scad.make_face_from_sketch_rface(_s)
+    cam = scad.extrude_rsolid(profile=_face, direction=(0, 0, 1), distance=cam_t)
+- slug: bore
+  role: subtract
+  stage: s2
+  code: |
+    _b = scad.make_cylinder_rsolid(radius=bore_d / 2, height=cam_t + 2, bottom_face_center=(0, 0, -1))
+    bore = scad.cut_rsolid(cam, _b, skip_non_intersecting=False)
+checks:
+- id: size-x
+  type: bbox
+  axis: x
+  expected: big_r + cam_d + small_r
+  stage: s1
+- id: size-y
+  type: bbox
+  axis: y
+  expected: 2 * big_r
+  stage: s1
+- id: size-z
+  type: bbox
+  axis: z
+  expected: cam_t
+  stage: s1
+- id: small-end
+  type: point_inside
+  point:
+  - cam_d + small_r - 0.3
+  - 0
+  - cam_t / 2
+  stage: s1
+- id: small-beyond
+  type: point_outside
+  point:
+  - cam_d
+  - small_r + 0.3
+  - cam_t / 2
+  stage: s1
+- id: bore-center
+  type: point_outside
+  point:
+  - 0
+  - 0
+  - cam_t / 2
+  stage: s2
+- id: bore-wall
+  type: point_inside
+  point:
+  - -(bore_d / 2 + 0.3)
+  - 0
+  - cam_t / 2
+  stage: s2

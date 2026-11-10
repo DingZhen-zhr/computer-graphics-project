@@ -1,0 +1,135 @@
+title: 弯管拉手
+tags:
+- 拉手
+- 扫掠
+- 弯管
+- 安装座
+request: 做一个抽屉拉手：圆棒弯成门字形，两条腿下面各有一个圆形安装座
+brief:
+  part:
+    name: 拉手
+    purpose: 装在抽屉面板上
+  params:
+  - name: span
+    value: 100
+    unit: mm
+    source: user
+    note: 两条腿中心线的距离（x 方向）
+  - name: grip_h
+    value: 40
+    unit: mm
+    source: user
+    note: 握杆中心线离桌面的高度
+  - name: rod_d
+    value: 10
+    unit: mm
+    source: user
+    note: 圆棒直径
+  - name: bend_r
+    value: 12
+    unit: mm
+    source: user
+    note: 拐弯处中心线的弯曲半径
+  - name: seat_d
+    value: 18
+    unit: mm
+    source: user
+    note: 安装座直径
+  - name: seat_h
+    value: 6
+    unit: mm
+    source: user
+    note: 安装座高度
+  features:
+  - 弯管，门字形
+  - 安装座，两条腿下面各一个
+  relations:
+  - 弯管两条腿的下端插进安装座，和安装座同轴
+  open_questions: []
+  confirmed: true
+plan:
+- title: 弯管
+  done_when: 圆截面沿直—弯—直—弯—直的路径扫出门字形弯管
+- title: 安装座
+  done_when: 两条腿下面各有一个圆形安装座
+features:
+- slug: handle
+  role: build
+  stage: s1
+  code: |
+    _c = math.cos(math.radians(45))
+    _x1, _x2 = -span / 2, span / 2
+    _z0, _z1 = seat_h - 1, grip_h - bend_r
+    _e1 = scad.make_segment_redge(start=(_x1, 0, _z0), end=(_x1, 0, _z1))
+    _e2 = scad.make_three_point_arc_redge(start=(_x1, 0, _z1), middle=(_x1 + bend_r - bend_r * _c, 0, _z1 + bend_r * _c), end=(_x1 + bend_r, 0, grip_h))
+    _e3 = scad.make_segment_redge(start=(_x1 + bend_r, 0, grip_h), end=(_x2 - bend_r, 0, grip_h))
+    _e4 = scad.make_three_point_arc_redge(start=(_x2 - bend_r, 0, grip_h), middle=(_x2 - bend_r + bend_r * _c, 0, _z1 + bend_r * _c), end=(_x2, 0, _z1))
+    _e5 = scad.make_segment_redge(start=(_x2, 0, _z1), end=(_x2, 0, _z0))
+    _path = scad.make_wire_from_edges_rwire(edges=[_e1, _e2, _e3, _e4, _e5])
+    _profile = scad.make_circle_rface(center=(_x1, 0, _z0), radius=rod_d / 2, normal=(0, 0, 1))
+    handle = scad.sweep_rsolid(profile=_profile, path=_path)
+- slug: seats
+  role: add
+  stage: s2
+  code: |
+    _s1 = scad.make_cylinder_rsolid(radius=seat_d / 2, height=seat_h, bottom_face_center=(-span / 2, 0, 0))
+    _s2 = scad.make_cylinder_rsolid(radius=seat_d / 2, height=seat_h, bottom_face_center=(span / 2, 0, 0))
+    seats = scad.union_rsolid(handle, _s1, _s2)
+checks:
+- id: size-x-rod
+  type: bbox
+  axis: x
+  expected: span + rod_d
+  stage: s1
+  holds: here_only
+- id: rod-height
+  type: bbox
+  axis: z
+  expected: grip_h + rod_d / 2 - seat_h + 1
+  stage: s1
+  holds: here_only
+- id: grip
+  type: point_inside
+  point:
+  - 0
+  - 0
+  - grip_h + rod_d / 2 - 0.3
+  stage: s1
+- id: grip-top
+  type: point_outside
+  point:
+  - 0
+  - 0
+  - grip_h + rod_d / 2 + 0.3
+  stage: s1
+- id: bend-inner
+  type: point_outside
+  point:
+  - -span / 2 + bend_r - (bend_r - rod_d / 2 - 0.3) * cos(radians(45))
+  - 0
+  - grip_h - bend_r + (bend_r - rod_d / 2 - 0.3) * sin(radians(45))
+  stage: s1
+- id: size-x
+  type: bbox
+  axis: x
+  expected: span + seat_d
+  stage: s2
+- id: size-z
+  type: bbox
+  axis: z
+  expected: grip_h + rod_d / 2
+  stage: s2
+- id: seat-in
+  type: point_inside
+  point:
+  - span / 2 + seat_d / 2 - 0.3
+  - 0
+  - seat_h / 2
+  stage: s2
+- id: seat-top
+  type: point_outside
+  point:
+  - span / 2 + seat_d / 2 - 0.5
+  - 0
+  - seat_h + 0.3
+  stage: s2
