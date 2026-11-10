@@ -54,6 +54,7 @@ class Feature:
     slug: str
     role: str
     code: str
+    stage: str = ""   # 分阶段时归属的阶段编号；旧流程是空文字
 
     @property
     def var(self) -> str:
@@ -94,6 +95,16 @@ class FeatureList:
                 return
         raise NotebookError(f"找不到特征 {before}，无法把 {f.slug} 插到它前面")
 
+    def insert(self, f: Feature, index: int) -> None:
+        """把新特征插到第 index 个位置（分阶段时用）；已有同名 slug 时抛 NotebookError。"""
+        _check_slug_role(f)
+        if any(old.slug == f.slug for old in self._items):
+            raise NotebookError(f"已经有特征 {f.slug}，不能再插入一个同名的", f.slug)
+        self._items.insert(index, f)
+
+    def in_stage(self, stage_id: str) -> list[Feature]:
+        return [f for f in self._items if f.stage == stage_id]
+
     def remove(self, slug: str) -> None:
         for i, old in enumerate(self._items):
             if old.slug == slug:
@@ -102,11 +113,11 @@ class FeatureList:
         raise NotebookError(f"没有特征 {slug}，无法删除")
 
     def to_list(self) -> list[dict]:
-        return [{"slug": f.slug, "role": f.role, "code": f.code} for f in self._items]
+        return [{"slug": f.slug, "role": f.role, "code": f.code, **({"stage": f.stage} if f.stage else {})} for f in self._items]
 
     @classmethod
     def from_list(cls, raw: list[dict]) -> "FeatureList":
-        return cls([Feature(d["slug"], d["role"], d["code"]) for d in raw])
+        return cls([Feature(d["slug"], d["role"], d["code"], d.get("stage", "")) for d in raw])
 
 
 @dataclass

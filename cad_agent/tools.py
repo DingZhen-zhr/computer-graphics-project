@@ -16,6 +16,7 @@ from cad_agent.agent.api_docs import api_names, lookup_api, normalize_api_name
 from cad_agent.brief import Brief, BriefError
 from cad_agent.checks.spec import CheckSpecError, missing_coverage, parse_checks, parse_where
 from cad_agent.notebook import Feature, FeatureList, NotebookError, render_notebook
+from cad_agent.plan import Plan
 from cad_agent.sandbox import execute
 from cad_agent.sandbox.execute import RunResult
 from cad_agent.sandbox.guard import check_code
@@ -33,6 +34,8 @@ class Workspace:
     last_run: RunResult | None = None
     awaiting_confirmation: bool = False
     last_build_content: str | None = None   # 上次 build 返回给模型的 JSON 原文；_build 和 _build_without_run 都要设
+    plan: Plan | None = None                 # 分阶段计划；旧流程一直是 None
+    probes_used: int = 0                     # 当前阶段已经用了几次 probe
 
 
 @dataclass

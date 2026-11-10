@@ -14,7 +14,8 @@ from typing import Any, Mapping
 CHECK_TYPES = {"bbox", "count", "angle", "point_inside", "point_outside", "distance", "volume"}
 MANDATORY_IDS = ("valid", "single_solid", "positive_volume")
 ID_RE = re.compile(r"^[a-z][a-z0-9_-]*$")
-KNOWN_KEYS = {"id", "type", "axis", "kind", "where", "a", "b", "point", "expected", "op", "tol", "rel_tol"}
+KNOWN_KEYS = {"id", "type", "axis", "kind", "where", "a", "b", "point", "expected", "op", "tol", "rel_tol", "stage", "holds"}
+HOLDS = ("from_here", "here_only")  # 分阶段时：从这个阶段起一直成立 / 只在这个阶段结束时成立
 COUNT_OPS = ("==", ">=", "<=")
 WHERE_OPS = ("==", "!=", ">=", "<=", ">", "<")
 GEOM_PATHS = (
@@ -142,6 +143,8 @@ class Check:
     tol: float | None
     op: str
     refs: set[str] = field(default_factory=set)
+    stage: str | None = None      # 分阶段时从哪个阶段开始成立；旧流程没有
+    holds: str = "from_here"
 
 
 @dataclass
@@ -257,6 +260,12 @@ def _parse_one(item: Any, idx: int, params: set[str]) -> Check:
     unknown = sorted(set(item) - KNOWN_KEYS)
     if unknown:
         raise CheckSpecError(f"{ctx.label}里有不认识的字段 {'、'.join(unknown)}；可用字段：{'、'.join(sorted(KNOWN_KEYS))}")
+    stage = item.get("stage")
+    if stage is not None and not isinstance(stage, str):
+        raise CheckSpecError(f"{ctx.label}的 stage 必须是阶段编号文字，如 s1，收到 {stage!r}")
+    holds = item.get("holds", "from_here")
+    if holds not in HOLDS:
+        raise CheckSpecError(f"{ctx.label}的 holds 只能是 {'、'.join(HOLDS)}，收到 {holds!r}")
     ctype = item.get("type")
     if ctype not in CHECK_TYPES:
         raise CheckSpecError(f"{ctx.label}的 type {ctype!r} 不对（缺少 type 或写错了），只能是：{'、'.join(sorted(CHECK_TYPES))}")
@@ -295,7 +304,7 @@ def _parse_one(item: Any, idx: int, params: set[str]) -> Check:
     else:  # volume
         expected = ctx.expr(_need(item, "expected", ctx), "expected")
         tol, op = _tol(item, ctx, "rel_tol", DEFAULT_TOL["volume"]), _op(item, ctx, None)
-    return Check(cid, ctype, args, expected, tol, op, ctx.refs)
+    return Check(cid, ctype, args, expected, tol, op, ctx.refs, stage, holds)
 
 
 def parse_where(raw: Any, param_names: set[str]) -> list[list]:

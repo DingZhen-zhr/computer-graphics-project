@@ -277,3 +277,9 @@
 - 做了什么：`Brief.relations`（默认空）、`Brief.require_relations`（默认假，不参与比较、不写进 `to_dict`）；`PATCH_KEYS` 末尾加 `relations`；`feature_name()`；`Brief.missing_relations()`；`to_dict` 只在有位置关系时写 `relations`（紧跟 `features`），`from_dict` 读回；`render_text` 在"组成部分"之后列"位置关系："；`apply_patch` 整体替换 `relations`，必须是非空文字数组，有变化时确认状态清零、变化行写"位置关系有改动"。`ToolBox._request_confirmation` 在缺位置关系时用计划里的原文拒绝；`_update_brief` 的返回在缺的时候多一个 `relations_missing`。
 - 测试数量：新增 15 个（`tests/test_brief_relations.py`，含坏值的 5 种参数化、"不要求位置关系时请确认照旧"），全部测试 541 个全部通过。旧的 `test_brief.py`、`test_tools.py` 原样通过。
 - 说明：没有偏离。计划里说"确认之后改了它，确认状态清零（和 features 的规则相同）"，但现有代码里改 `features` 并不会清确认（只有待问问题、建议参数改动会清）；这里照设计文档 3.2"确认之后再改 relations，确认状态清零"只对 `relations` 清零，`features` 的规则不动（旧测试不改）。另外 `PATCH_KEYS` 加了 `relations` 以后，旧流程的 `update_brief` 也能接受这个键（旧流程的工具说明里没有它，模型不会传；"未知字段"报错里列出的可用字段多了一个），这是计划要求的接口，旧测试都通过。
+
+## 第二版 计划 1 Task 4：计划、阶段归属、阶段选取 —— 完成
+
+- 做了什么：新文件 `cad_agent/plan.py`（`Stage`、`Plan`、`PlanError`、`revise`，`MAX_STAGES = 12`；提示词文档 7.3 里 set_plan 的两条报错原文放在这里的常量 `PLAN_LOCKED`、`STAGE_HAS_FEATURES`，因为 `plan.py` 不能依赖工具层，Task 6 的 `messages.py` 直接引用它们）；`cad_agent/staged/select.py`（`features_upto`、`checks_for_stage`、`final_checks`、`stage_ready`、`insert_index`）；`Feature.stage`（默认空，`to_list` 只在非空时写）、`FeatureList.insert`、`FeatureList.in_stage`；`checks/spec.py` 的 `HOLDS`、`Check.stage`、`Check.holds`，`KNOWN_KEYS` 加了 `stage`、`holds`；`Workspace.plan`、`Workspace.probes_used`。
+- 测试数量：新增 26 个（`test_plan.py` 18 个，含 10 种坏写法的参数化；`test_select.py` 8 个，另加 `in_stage`/`insert` 和 `Workspace` 新字段的默认值），全部测试 567 个全部通过。旧的 `test_notebook.py`、`test_check_spec.py` 原样通过。
+- 说明：没有偏离。两处计划没写到、由我定的细节：没写 `stage` 的检查或特征按第一个阶段算；`stage` 写了计划里没有的编号时，选取时跳过它（`set_checks` 会先拦下不存在的阶段，所以正常不会出现）。
