@@ -311,3 +311,10 @@
 - 测试数量：新增 24 个（`test_mutation.py` 12 个、`test_final_gate.py` 7 个、`test_staged_build.py` 加 2 个、`test_final_gate_sca.py` 3 个），全部测试 653 个全部通过。
 - 真实 SCA 的结果（设计文档成功标准 3）：壁厚写死的小盒子，终检结果 `unconstrained == ["wall"]`，另外三个尺寸都是 `constrained`；唯一用到孔径的检查期望值是 `hole_d * 0 + 80` 的板，结果 `unconstrained == ["hole_d"]`；同一块板照速查表"孔径"一条写检查，两个参数都是 `constrained`、终检通过。三条一共 6.9 秒。
 - 说明：没有偏离。一处由我定的细节：改后的参数拼不成 notebook（理论上不会发生，参数值不影响拼装）时也当作"这个方向建不出来"。
+
+## 第二版 计划 1 Task 9：probe 与 read_reference —— 完成
+
+- 做了什么：`cad_agent/references.py`（10 篇白名单、`HEAD_CHARS = 3000`、`SECTION_CHARS = 6000`、`RefError`、`read_reference`；只按白名单的名字拼路径，`../SKILL` 之类得到"没有叫……的文档"）；`references_index.md` 逐字取自提示词文档第 2 节；`cad_agent/staged/extras.py`（`PROBE_LIMIT = 10`、`probe_tool`、`read_reference_tool`）接进 `StagedTools`；`load_system_prompt(staged=False)`：旧流程逐字不变，分阶段是 `system_v2.md`、`references_index.md`、`sca_cheatsheet.md`、`sca_cheatsheet_more.md` 四段。
+- 测试数量：新增 13 个（`test_references.py` 6 个、`test_staged_extras.py` 7 个，比计划多了"probe 出错时 error 用 build 的格式"），全部测试 666 个全部通过。
+- 偏离：D11。SCA 安装包里没有任何一节超过 6000 字符（`ql-playbook` 最长的一节约 3216 字符），计划里"最长一节被截断"的断言不可能成立；测试改为先确认真实上限下不截断，再用 `monkeypatch` 调小上限验证截断写法，没有放松检查。
+- 计划没写到、由我定的细节：probe 每真正跑一次沙盒就计一次（包括 probe 代码自己抛异常的那次），没过静态检查、拼不成 notebook 的不计；不给 section 时开头一段直接截到 3000 字符、不加省略行（计划要求"不超过 3000 字符"），`truncated` 照实写。

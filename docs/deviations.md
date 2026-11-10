@@ -75,3 +75,11 @@
 - 实际情况：Task 1 探测（笔记第 17 节）发现，`simplecadapi.inspect.brep` 的检视函数在 notebook 里一律报 `RuntimeError: simplecadapi.inspect.brep tools cannot run inside an active GraphSession`，probe 代码运行在 notebook 里，所以第 4 节的写法在 probe 里用不了。官方文档 `geometric-validation.md` 也写明检视函数只能在 GraphSession 之外用。
 - 怎么改：probe 里量尺寸改用笔记第 17 节实测过的写法：体积 `model.get_volume()`，包围盒取 `ql.vertices().resolve(model)` 全部顶点坐标的范围（平面围成的零件是准的）。`test_probe_prints_facts` 照这个写，断言（输出里有 `78`、`error is None`）不变。速查表补充的"分阶段时的写法"一节多写一条这个用法，提醒模型不要在 probe 里用检视函数。计划 1 Task 5 的测试描述已同步改成"写法取自笔记第 17 节"。
 - 影响：只影响 Task 5 的这一条测试的 probe 代码；接口不变。
+
+## D11（第二版计划 1 Task 9）`test_long_section_truncated` 找不到超过 6000 字符的小节
+
+- 原计划：`test_long_section_truncated`：对 `ql-playbook` 里最长的一节，`len(text) <= 6000 + len("
+…（后面的内容省略）")` 且 `truncated` 为真。
+- 实际情况：SCA 2.2.7 安装包里的 `ql-playbook.md` 共 20537 字符、12 个二级小节，最长的一节（Pattern A）只有约 3216 字符；白名单 10 篇里最长的一节是 `failure-and-repair` 的 Failure classes，约 5678 字符，也不到 6000。所以按真实上限读任何一节都不会截断，"`truncated` 为真"这条断言不可能成立。
+- 怎么改：接口和上限（`SECTION_CHARS = 6000`）都不变。测试改成两步：先按真实上限读最长的一节，断言没有截断、长度不超过 6000；再用 `monkeypatch` 把 `SECTION_CHARS` 临时调成 1000，断言 `truncated` 为真、长度不超过 1000 加末尾那一行、以"…（后面的内容省略）"结尾、开头和完整内容一致。截断逻辑照样被检查到，没有放松。
+- 影响：只影响这一条测试。

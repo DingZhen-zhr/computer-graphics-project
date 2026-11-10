@@ -21,17 +21,17 @@ if TYPE_CHECKING:
     from cad_agent.tools import ToolBox
 
 Handler = Callable[[dict], ToolOutcome]
-NOT_READY = "这个工具还没有接上"  # build、probe、read_reference 由后面的任务接上
 
 
 class StagedTools:
     def __init__(self, box: "ToolBox") -> None:
         from cad_agent.staged.build import build_tool  # build.py 要用到这里的东西，放在这里导入
+        from cad_agent.staged.extras import probe_tool, read_reference_tool
 
         self.box = box
         self.build: Handler = lambda args: build_tool(box)
-        self.probe: Handler = lambda args: _err(NOT_READY)
-        self.read_reference: Handler = lambda args: _err(NOT_READY)
+        self.probe: Handler = lambda args: probe_tool(box, args)
+        self.read_reference: Handler = lambda args: read_reference_tool(box, args)
 
     @property
     def ws(self):  # noqa: ANN201 - Workspace，避免循环导入不写类型

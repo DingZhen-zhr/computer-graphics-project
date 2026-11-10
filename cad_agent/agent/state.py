@@ -11,8 +11,13 @@ PROMPT_DIR = Path(__file__).parent / "prompts"
 SNAPSHOT_TITLE = "【当前状态（程序生成，不是用户说的话）】"
 
 
-def load_system_prompt() -> str:
-    """系统提示词全文，末尾接上 SCA 常用写法速查表。"""
+V2_PARTS = ("system_v2.md", "references_index.md", "sca_cheatsheet.md", "sca_cheatsheet_more.md")
+
+
+def load_system_prompt(staged: bool = False) -> str:
+    """系统提示词全文。旧流程：system.md 接速查表（和 1.2 版逐字相同）；分阶段：V2_PARTS 四段，各段之间空一行。"""
+    if staged:
+        return "\n\n".join((PROMPT_DIR / n).read_text(encoding="utf-8").rstrip("\n") for n in V2_PARTS) + "\n"
     system = (PROMPT_DIR / "system.md").read_text(encoding="utf-8").rstrip("\n")
     sheet = (PROMPT_DIR / "sca_cheatsheet.md").read_text(encoding="utf-8").rstrip("\n")
     return system + "\n\n" + sheet + "\n"
