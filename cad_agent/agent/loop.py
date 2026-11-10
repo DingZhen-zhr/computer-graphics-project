@@ -21,6 +21,7 @@ from cad_agent.agent.context import Context, with_warning
 from cad_agent.agent.counters import _Counters
 from cad_agent.agent.delivery import delivery_text, export_version, failure_text
 from cad_agent.agent.staged_hooks import StagedHooks
+from cad_agent.cases import Case, pick_cases, render_cases
 from cad_agent.agent.state import load_system_prompt, render_snapshot
 from cad_agent.config import Config
 from cad_agent.llm.client import LLM, LLMError, LLMReply, ToolCall
@@ -62,8 +63,10 @@ def _raw_arguments(tc: ToolCall) -> str:
 
 
 class Agent:
-    def __init__(self, llm: LLM, toolbox: ToolBox, session: Session, config: Config, modeling_llm: LLM | None = None) -> None:
+    def __init__(self, llm: LLM, toolbox: ToolBox, session: Session, config: Config, modeling_llm: LLM | None = None, *,
+                 cases: list[Case] | None = None) -> None:
         self.llm, self.toolbox, self.session, self.config = llm, toolbox, session, config
+        self.cases = list(cases or [])   # 案例库（分阶段且开关 cases 打开时，规划那一轮挑相似的给模型）
         self.modeling_llm = modeling_llm  # 建模阶段（需求单已确认）用的模型；没有就一直用 llm
         self.toolbox.max_build_failures = config.max_build_failures
         self.staged = toolbox.gates.staged
@@ -92,7 +95,7 @@ class Agent:
         # 阶段在一轮开始、处理完确认之后决定，这一轮内不换模型（换了缓存就断了）
         phase = "modeling" if self.ws.brief.can_build()[0] else "clarify"
         llm = self.modeling_llm if phase == "modeling" and self.modeling_llm is not None else self.llm
-        self.context.start_turn(content, render_snapshot(self.ws, self.staged))
+        self.context.start_turn(content, self._snapshot())
         if self.hooks is not None:
             self.hooks.begin_turn()
         self.session.log("user", text=text, sent_as=content, phase=phase)
@@ -119,6 +122,16 @@ class Agent:
             ended = self._run_tools(reply, c)
             if ended is not None:
                 return ended
+
+    def _snapshot(self) -> str:
+        """本轮的快照。分阶段、开着案例库、需求单可以建模但还没有计划时，后面接上相似的参考案例。"""
+        snap = render_snapshot(self.ws, self.staged)
+        if self.staged and self.toolbox.gates.cases and self.ws.brief.can_build()[0] and self.ws.plan is None:
+            picked = pick_cases(self.ws.brief, self.cases)
+            if picked:
+                self.session.log("cases", ids=[c.id for c in picked])
+                snap += "\n\n" + render_cases(picked)
+        return snap
 
     @staticmethod
     def _assistant_message(reply: LLMReply) -> dict:

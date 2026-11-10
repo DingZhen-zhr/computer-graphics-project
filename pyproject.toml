@@ -21,7 +21,7 @@ include = ["cad_agent*"]
 exclude = ["tests*", "benchmarks*", "scripts*"]
 
 [tool.setuptools.package-data]
-cad_agent = ["agent/prompts/*.md"]
+cad_agent = ["agent/prompts/*.md", "case_data/*/case.yaml"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

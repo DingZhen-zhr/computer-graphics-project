@@ -325,3 +325,9 @@
 - 测试数量：新增 23 个（`test_snapshot_v2.py` 6 个、`test_staged_loop.py` 17 个，比计划多了：快照的排布、没做扰动时交付文字没有那一行、当前阶段写好时纯文字结束会兜底 build），全部测试 689 个全部通过。旧的 `test_loop.py`、`test_session.py`、`test_web.py` 原样通过。
 - 偏离：D12（折叠时机：最近一次 build 失败或终检没过时先不折叠，免得模型看不到要改的内容）。
 - 计划没写到、由我定的细节：`set_plan` 成功时当前阶段的工具调用计数清零（设计文档"规划和终检各按一个阶段算"）；阶段通过时清零，所以终检也是新的一份；达到每阶段上限而当时没有当前阶段（还没计划，或全部通过在做终检）时，用旧流程"这一轮工具调用已经达到上限"的原文、数字写每阶段上限。
+
+## 第二版 计划 1 Task 11：案例库 —— 完成
+
+- 做了什么：`cad_agent/cases.py`（`BUILTIN_DIR`、`TAG_BONUS`、`THRESHOLD`、`MAX_CASE_CHARS`、`CaseError`、`Case`、`load_case`、`load_cases`、`score`、`pick_cases`、`render_cases`、`save_case`、`case_workspace`，另加检索用的 `query_text`）：`case.yaml` 的七个键都要有，计划用 `revise` 校验，特征和检查的 `stage` 必须在计划里，出错信息带文件位置；相似度是去掉空白和标点后的相邻二字组 Jaccard 加标签命中；渲染照提示词文档第 5 节，每个案例一段最多 3000 字符；`save_case` 只收计划全部通过的工作区，目录名 `user-<时间>`、重名加序号。`Agent.__init__` 加仅限关键字的 `cases`；分阶段、开关 `cases` 打开、需求单可以建模且还没有计划时，在快照后面接上挑中的案例，写 `cases` 日志。`pyproject.toml` 的 `package-data` 加 `case_data/*/case.yaml`。
+- 测试数量：新增 19 个（`test_cases.py` 17 个，其中坏案例 6 种参数化，另加"坏 YAML / 没有文件""空白和标点不影响分数"；`test_staged_loop.py` 加 2 个：规划那一轮注入、开关关掉或旧流程时不注入），全部测试 708 个全部通过。
+- 说明：没有偏离。`save_case` 的接口里没有一句话需求，`request` 取需求单的用途，没有用途时取零件名，再没有就用标题。自带案例目录 `case_data/` 由 Task 14 建，现在不存在时 `load_cases` 只读用户案例。写测试时一个坏案例的测试改了共用的检查字典，导致别的测试顺序相关地失败，已在测试里改成先复制。

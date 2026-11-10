@@ -243,3 +243,44 @@ def test_legacy_agent_is_unchanged(tmp_path):
     kinds = {r["kind"] for r in log_rows(session)}
     assert "stage" not in kinds and "gate" not in kinds
     assert not (session.dir / "plan.json").exists()
+
+
+# ---------------------------------------------------------------- 案例库（Task 11）
+
+from test_cases import make_case  # noqa: E402
+
+CASE_HEAD = "【参考案例（程序生成，只供参考；尺寸和结构以需求单为准）】"
+
+
+def l_bracket_case():
+    return make_case("l-plate", title="L 形支架", tags=("支架", "立板"), request="做一个 L 形支架", features_brief=("底板", "立板"))
+
+
+def test_cases_are_injected_at_planning(tmp_path):
+    cases = [l_bracket_case(), make_case("hook", title="挂钩", tags=("挂钩",), request="墙上的挂钩", features_brief=("钩子",))]
+    ws = Workspace(staged_brief(), FeatureList(), [])
+    llm = ScriptedLLM([PLAN, LLMReply("先这样", [], {}), LLMReply("好", [], {})])
+    session = Session(tmp_path / "sessions")
+    agent = Agent(llm, ToolBox(ws, run_job=StageRunner(), gates=Gates(mutation_check=False, visual_review=False)),
+                  session, Config(base_url="http://x", model="m"), cases=cases)
+    agent.handle_user("开始规划")
+    first = llm.calls[0][1]["content"]
+    snap, said = first.split("\n\n【用户说】\n")
+    assert said == "开始规划" and CASE_HEAD in snap
+    assert snap.index(CASE_HEAD) > snap.index("计划：") and "\n\n" + CASE_HEAD + "\n== L 形支架 ==" in snap
+    assert "挂钩" not in snap
+    assert [r["ids"] for r in log_rows(session) if r["kind"] == "cases"] == [["l-plate"]]
+    agent.handle_user("继续")   # 已经有计划：不再给案例
+    assert CASE_HEAD not in llm.calls[-1][-1]["content"]
+
+
+def test_cases_off_or_legacy_means_no_cases(tmp_path):
+    for gates in (Gates(mutation_check=False, visual_review=False, cases=False), Gates.legacy()):
+        ws = Workspace(staged_brief(), FeatureList(), [])
+        llm = ScriptedLLM([LLMReply("好", [], {})])
+        session = Session(tmp_path / f"s{int(gates.staged)}")
+        agent = Agent(llm, ToolBox(ws, run_job=StageRunner(), gates=gates), session, Config(base_url="http://x", model="m"),
+                      cases=[l_bracket_case()])
+        agent.handle_user("开始")
+        assert CASE_HEAD not in llm.calls[0][1]["content"]
+        assert not [r for r in log_rows(session) if r["kind"] == "cases"]
