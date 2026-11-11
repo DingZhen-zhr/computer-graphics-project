@@ -488,3 +488,10 @@
   4. 审查换了一家服务时，费用仍按基础设置的价目表算，可能不准。
   5. 计划要求的最后一步整体复查，这次是我自己对整个分支做的（检查了 Review Focus 的 6 条各有测试覆盖、代码文件都不超过 300 行、没有打印 key 的地方），没有另外请一个独立的复查者，比独立复查弱。
   6. 只在这台 Windows 11 上跑过，Mac 没有验证。
+
+## 第二版 计划 3 Task 1：删除公网隧道 —— 完成
+
+- 做了什么：按设计文档第 8 节删掉公网隧道实时体验整套：`start_public.bat`、`scripts/go_public.py`、`cad_agent/web/pool.py`、`site/live.json`；`python -m cad_agent.web` 去掉 `--public`、`--budget`、`--max-busy`；服务端去掉访问密码、登录接口、`/api/health`、共用花费上限和多访客；`LiveApp` 去掉 `budget`、`can_start`；导出脚本不再保留 `live.json`；页面去掉登录框、"开始实时体验"入口、测试额度显示（演示站的输入框说明改成"这是一次真实会话的回放，只能看。"）；README 删掉"公网实时体验"一节；`.gitignore` 的 `tools/` 留着；`site/` 用 `.venv\Scripts\python -m cad_agent.web.export demo\phone_stand site` 重新导出。
+- 测试：照计划只删了 8 条（`test_password_gate`、`test_budget_stops_new_messages`、`test_main_public_needs_password_and_pricing`、`test_public_launcher_and_gitignore`、`test_each_visitor_gets_their_own_session`、`test_too_many_busy_visitors_wait`、`test_visitor_limit_and_health`、`test_export_keeps_live_json`）和只给它们用的三个小函数（`login`、`make_pool`、`cookie_call`），新加 `test_public_mode_is_gone`，先运行看到它失败，再改代码。全部测试 905 个通过（912 − 8 + 1），用时约 10 分钟。
+- 偏离 D15：three.js 原样文件的一句代码注释里有 "budget"，测试跳过 `vendor/`；argparse 自带的英文报错换成"不认识的参数"。
+- 提醒：`tools\cloudflared.exe` 不在仓库里（`.gitignore` 忽略了 `tools/`），以后用不到了，可以自己删掉。

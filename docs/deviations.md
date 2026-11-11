@@ -108,3 +108,9 @@
   1. `temperature` 参数照收，保存在实例上，但不放进请求体；笔记里写明原因。
   2. `AnthropicLLM` 自己记住最近几次回复的原始内容块（按这次回复里工具调用的 id 记）；转换消息时，`tool_calls` 的 id 和记下的某次回复完全一致的 assistant 消息，换成那次回复的全部原始块（思考块、文字块、工具调用块，原样）。对不上的（比如从日志恢复的会话）照计划的规则转换。模块级的 `to_anthropic_messages` 不变，只做计划写的转换。
 - 影响：只影响计划 2 Task 4；没有用真实接口验证过（笔记第 8 节）。
+
+## D15（第二版计划 3 Task 1）`test_public_mode_is_gone` 搜关键词时跳过 three.js
+- 原计划：`cad_agent/web/` 和 `site/` 下的文件里搜不到 `password`、`live.json`、`budget` 这三个词。
+- 实际情况：`static/vendor/three/three.module.js`（three.js r160 原样，第三方文件）第 20610 行有一句代码注释 `(not to blow over maxLights budget)`，和公网隧道无关；这个文件不能改。
+- 怎么改：测试跳过 `vendor/` 目录下的第三方文件，其余文件照计划搜。另外 argparse 自带的报错是英文，`python -m cad_agent.web` 的参数解析器把 "unrecognized arguments" 换成"不认识的参数"，让计划写的那句提示成立。
+- 影响：只影响这一条测试；后面的任务不受影响。

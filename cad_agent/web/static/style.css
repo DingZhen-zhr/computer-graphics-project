@@ -93,11 +93,6 @@ img { display: block; max-width: 100%; }
 .pill strong { color: var(--ink); font-weight: 600; font-variant-numeric: tabular-nums; }
 .pill.replay { background: var(--ink); color: #fff; }
 .pill.replay .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--mark); }
-.btn-live {
-  height: 28px; padding: 0 14px; border-radius: 999px; background: var(--mark); color: #fff; font-size: 12px; font-weight: 600;
-  display: inline-flex; align-items: center; text-decoration: none; white-space: nowrap; transition: background .2s var(--ease);
-}
-.btn-live:hover { background: #C62722; }
 .btn-ghost {
   height: 28px; padding: 0 12px; border-radius: 999px; border: 1px solid var(--hairline); background: var(--bg);
   font-size: 12px; transition: background .2s var(--ease), border-color .2s var(--ease);
@@ -299,13 +294,6 @@ img { display: block; max-width: 100%; }
 .compare-pick { font-size: 12px; color: var(--ink-2); margin-top: 10px; }
 
 /* 访问密码 */
-.login { position: fixed; inset: 0; z-index: 30; display: grid; place-items: center; background: rgba(245, 245, 247, .92); backdrop-filter: blur(16px); }
-.login-card { width: min(360px, calc(100vw - 32px)); padding: 32px; border-radius: 22px; background: var(--bg); box-shadow: 0 0 0 1px var(--hairline); display: flex; flex-direction: column; gap: 12px; }
-.login-card h2 { font: 600 24px/1.2 var(--font-display); letter-spacing: -.02em; margin: 4px 0 0; }
-.login-card p { margin: 0; font-size: 13px; }
-.login-card input { height: 44px; padding: 0 14px; border-radius: var(--r-md); border: 1px solid var(--hairline); font: inherit; }
-.login-card input:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
-.login-error { min-height: 18px; font-size: 13px; color: var(--fail); }
 
 /* 提示条 */
 .toast {
@@ -350,4 +338,3 @@ img { display: block; max-width: 100%; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
 }
-.login-card .btn { justify-content: center; }

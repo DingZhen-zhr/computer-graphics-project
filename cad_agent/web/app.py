@@ -26,7 +26,7 @@ from cad_agent.session import Session
 from cad_agent.web.events import fold
 
 VERSION_NAME_RE = re.compile(r"^v\d+$")
-BUSY, EMPTY, READ_ONLY, OK, ACCEPTED, OVER_BUDGET, CROWDED = 409, 400, 403, 200, 202, 402, 429
+BUSY, EMPTY, READ_ONLY, OK, ACCEPTED = 409, 400, 403, 200, 202
 
 
 # ---------------------------------------------------------------- 有人在听的会话
@@ -134,12 +134,9 @@ class _Base:
 class LiveApp(_Base):
     mode = "live"
 
-    def __init__(self, make_agent: Callable[[], tuple[Agent, Session]], model_name: str, budget: Any = None,
-                 can_start: Callable[[], bool] | None = None) -> None:
+    def __init__(self, make_agent: Callable[[], tuple[Agent, Session]], model_name: str) -> None:
         super().__init__(model_name)
         self._make_agent = make_agent
-        self.budget = budget        # 公网测试时共用的花费上限（pool.Budget）；到了就不再接新消息
-        self.can_start = can_start  # 公网测试时限制同时在跑的人数；返回 False 就请这个人稍等
         self._idle = threading.Event()
         self._idle.set()
         self._start_session()
@@ -181,9 +178,7 @@ class LiveApp(_Base):
 
     def _work(self, text: str) -> None:
         try:
-            turn = self.agent.handle_user(text)
-            if self.budget is not None:
-                self.budget.add(turn.cost)
+            self.agent.handle_user(text)
         except Exception as e:  # noqa: BLE001 - 演示时出任何错，页面都不能卡死，服务也不能退出
             traceback.print_exc(file=sys.stderr)
             message = f"处理这条消息时出了意外错误（{type(e).__name__}）：{e}。需求单和模型都还在，可以再发一次，或者开一个新会话。"
@@ -204,10 +199,7 @@ class LiveApp(_Base):
         with self._lock:
             events, view = list(self._events), copy.deepcopy(self._view)
             busy, since, error = self._busy, self._busy_since, self._error
-        snap = self._compose(events, view["brief"], view["checks"], view["facts"], busy, since, error)
-        if self.budget is not None:
-            snap["budget"] = self.budget.view()
-        return snap
+        return self._compose(events, view["brief"], view["checks"], view["facts"], busy, since, error)
 
     def submit(self, text: str) -> int:
         """202 开始处理；400 空消息；409 正在处理上一条。"""
@@ -216,10 +208,6 @@ class LiveApp(_Base):
         with self._lock:
             if self._busy:
                 return BUSY
-            if self.budget is not None and self.budget.exhausted():
-                return OVER_BUDGET
-            if self.can_start is not None and not self.can_start():
-                return CROWDED
             self._busy, self._busy_since, self._error = True, time.monotonic(), None
             self._idle.clear()
         threading.Thread(target=self._work, args=(text.strip(),), daemon=True, name="agent-turn").start()
