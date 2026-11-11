@@ -9,6 +9,7 @@ from typing import Any
 
 from cad_agent.checks.spec import CheckResult
 from cad_agent.notebook import render_notebook
+from cad_agent.review import ReviewResult, review_line
 from cad_agent.session import Session
 from cad_agent.staged.final_gate import GateResult
 from cad_agent.staged.select import final_checks
@@ -48,12 +49,17 @@ def mutation_line(gate: GateResult) -> str | None:
     return f"参数扰动验证：{n} 个用户参数都被检查约束。"
 
 
-def delivery_text(version: Path, checks: list[CheckResult], changes: list[str], repairs: int, gate: GateResult | None = None) -> str:
+def delivery_text(version: Path, checks: list[CheckResult], changes: list[str], repairs: int, gate: GateResult | None = None,
+                  *, review: ReviewResult | None = None, review_skipped: str | None = None) -> str:
+    """交付给用户看的文字。review、review_skipped 都是 None 时（旧流程、关掉看图审查时）和以前逐字相同。"""
     head = f"已交付 {version.name}" + (f"（建模中自动修复了 {repairs} 次）" if repairs else "") + "。"
     rows = ["| 检查 | 结果 | 实测 | 期望 |", "|---|---|---|---|"]
     rows += [f"| {r.id} | {'通过' if r.passed else '没通过'} | {_fmt(r.measured)} | {_fmt(r.expected)} |" for r in checks]
     lines = [head, f"检查结果（共 {len(checks)} 项，全部通过）：", *rows]
     line = mutation_line(gate) if gate is not None else None
+    if line:
+        lines.append(line)
+    line = review_line(review, review_skipped)
     if line:
         lines.append(line)
     if changes:

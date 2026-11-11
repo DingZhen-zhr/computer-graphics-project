@@ -445,3 +445,20 @@
 - 做了什么：新文件 `cad_agent/llm/vision.py`：`image_part`、`text_part`、`tiny_test_image`（只用标准库生成的 64×64 PNG，左半红、右半蓝，每次字节都一样）、`VISION_QUESTION`（原文照抄 F）、`test_vision`（不带工具发一条带图的 user 消息；回答里同时有"红""蓝"或 red、blue 算能识图；`LLMError` 时返回不能识图和原因的前 80 个字符，不抛异常；三句返回文字照抄 F）、`redact_images`。`Session.log` 写日志前用 `redact_images` 把图片块换成"图片 <字节数> 字节"，所以任何地方都不会把图片的 base64 写进日志。`OpenAICompatLLM` 不用改（原样发出）；`AnthropicLLM` 在 Task 4 里已经会把 `image_url` 转成 `image` 块。
 - 测试数量：新增 11 个（计划列的 8 个，多加了 `VISION_QUESTION` 逐字比对、日志脱敏遇到不合法的图片数据不崩（2 个））。先跑确认失败（模块不存在），再实现。全部测试通过（903 个）。
 - 说明：`test_vision` 这个函数名以 test 开头，加了 `__test__ = False`，免得被 pytest 当成测试。**识图测试没有用真实模型跑过**；它会花用户自己的钱，按设计只在用户点"测试识图"时运行（界面是计划 3 的事）。
+
+## 第二版 计划 2 Task 6：看图审查 —— 完成
+
+- 做了什么：
+  - 沙盒：`run_job(..., render_views=目录)`；子进程在检查全部通过后用 `render_screenshot_rpath` 的预设名渲染 `iso`、`front`、`top`、`right` 四张图（笔记第 22 节），某一张失败只是少这一张，原因放进 `RunResult.view_errors`；`RunResult.view_paths` 是渲染出来的视角 → 图片路径。没给 `render_views` 时 job.json 和以前完全一样。
+  - `cad_agent/review.py`：`VIEWS`、`MAX_REVIEW_ROUNDS = 2`、`ReviewItem`、`ReviewResult`、`review_targets`、`review_messages`、`parse_review`、`run_review`、`objection_note`，以及交付文字那一行的 `review_line`。审查者提示词 `agent/prompts/reviewer.md`（照抄 A）、工具说明 `agent/prompts/submit_review.json`（照抄 C），user 文字照抄 B，退回意见照抄 D，交付文字照抄 E；测试都是直接从计划文件里取原文逐行比对。
+  - 主循环（新文件 `agent/review_step.py`，交付那一段也搬了过去，`loop.py` 保持在 300 行以内）：分阶段、build 可以交付时，开关 `visual_review` 关着 → 照常交付，`review.json` 是 `{"skipped": "已关闭"}`，交付文字不加任何内容；`review_llm` 是 `None` → `{"skipped": "模型不能识图"}`，交付文字加"未做看图审查（模型不能识图）。"；否则渲染到 `review/round-<n>/`，一张都没渲染出来 → 跳过（"没有渲染出图片"）；审查调用 `LLMError` → 跳过（"审查调用失败"），日志记 `review_error`；审查用量计入本轮，日志写 `{"kind": "review", "round", "passed", ...}`；没通过且是第 1 轮 → 不交付，`build_failures += 1`，意见作为 user 消息放进上下文，本轮继续（到失败上限就以 `failed` 结束）；第 2 轮仍不通过 → 照常交付，交付文字和 `review.json` 带上异议。审查轮数在每次交付之后、每条新的用户消息开始时清零。旧流程完全不经过这一步。
+  - `Agent.__init__` 加仅限关键字的 `review_llm`；`cli.build_agent`、网页的 `build_live_agent` 用新函数 `make_review_llm(config, key)` 造它（分阶段、`visual_review` 开着、`config.vision` 为真才造；审查另用一家服务时 key 从那家的环境变量取），沙盒要去掉的 key 变量名也加上审查那家的（`secret_env_names`）。
+  - `pyproject.toml` 的 `package-data` 加 `agent/prompts/*.json`；`config.example.toml` 的注释补上 `kind`、`vision`、`[llm.review]`，改掉"计划 2 才实现"的旧说法。
+- 测试数量：新增 30 个（`test_review.py` 16 个，其中 `test_render_views_real` 标记 `sca`；`test_review_loop.py` 14 个）。计划列的之外，多加了缺一张图时的标题写法、只渲染出两张时照样审查、审查图片不进日志、审查退回正好到失败上限、`make_review_llm` 什么时候造、命令行组装时传进去。先跑确认失败（模块不存在），再实现。全部测试通过（903 个，含 `sca`）。
+- 由我定的细节（Ruling）：
+  1. **退回意见放在这次回复的全部工具结果之后**才进上下文（不是 build 一返回就加）：OpenAI 写法要求工具结果紧跟在调用之后，中间插一条 user 消息会被接口拒绝。
+  2. 图片目录 `review/round-<n>` 的 n 用整个会话的渲染次数编号，免得第二次交付的图把第一次的盖掉；同一次交付里就是 round-1、round-2。
+  3. 审查模型没有调用 `submit_review`、格式不对时，按计划每一项都是"看不出"；这时没有"不符合"，所以算通过，交付文字写"通过（0 项符合，N 项看不出）"，不会写成"全部符合"。
+  4. `review.json` 在审查过时是 `{"items", "overall", "passed", "rounds"}`；日志里的 `review` 行另带审查那一次的用量和费用。
+  5. 审查退回正好到失败上限时，`failed` 的文字是新写的（列出异议），计划没给原文。
+- **没有用真实模型验证**：看图审查在真模型上效果如何（会不会误报、DeepSeek 以外的模型能不能看懂这四张图）完全没有数据；只用假审查模型走通了流程，四视图渲染用真实 SCA 测过。

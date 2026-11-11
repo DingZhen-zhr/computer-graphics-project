@@ -50,6 +50,8 @@ class RunResult:
     stl_path: Path | None = None   # 网页预览用的 STL；导出失败时是 None，原因在 stl_error 里
     stl_error: str | None = None
     probe_output: str | None = None  # 只有 probe 模式才有：probe 打印的内容（已截断）
+    view_paths: dict[str, Path] = field(default_factory=dict)   # 给了 render_views 时：渲染出来的视角 → 图片路径
+    view_errors: dict[str, str] = field(default_factory=dict)   # 没渲染出来的视角 → 原因
 
 
 def _kill_tree(proc: subprocess.Popen) -> None:
@@ -103,10 +105,12 @@ def run_job(
     timeout_s: float = 60,
     secret_names: Iterable[str] = (),
     should_stop: Callable[[], bool] | None = None,
+    render_views: Path | None = None,
 ) -> RunResult:
     """在独立子进程里运行 notebook 并测量。exports 的文件会复制到调用方给的路径。
 
     给了 should_stop 时每 0.2 秒看一次，为真就结束子进程树，返回 error 类型为 Stopped 的结果。
+    给了 render_views 时，检查通过后渲染 iso、front、top、right 四张图，复制到这个目录（看图审查用）。
     """
     started = time.monotonic()
     workdir = Path(tempfile.mkdtemp(prefix="cad-agent-", dir=work_root()))   # 系统临时目录带中文时改用纯英文目录
@@ -125,6 +129,7 @@ def run_job(
             "render_png": render_png is not None,
             "export_stl": export_stl is not None,
             "timeout_s": timeout_s,
+            **({"render_views": True} if render_views is not None else {}),
         }
         job_path = workdir / "job.json"
         job_path.write_text(json.dumps(job, ensure_ascii=False), encoding="utf-8")
@@ -161,11 +166,13 @@ def run_job(
         step_path = _copy_out(workdir / "model.step", export_step) if export_step is not None and res["step"] else None
         png_path = _copy_out(workdir / "view.png", render_png) if render_png is not None and res["png"] else None
         stl_path = _copy_out(workdir / "model.stl", export_stl) if export_stl is not None and res.get("stl") else None
+        view_paths = {name: _copy_out(workdir / "views" / f"{name}.png", Path(render_views) / f"{name}.png")
+                      for name in res.get("views") or []} if render_views is not None else {}
         return RunResult(
             ok=res["error"] is None and all(c.passed for c in checks),
             error=res["error"], values=res["values"], checks=checks, facts=res["facts"], query=res["query"],
             step_path=step_path, png_path=png_path, duration_s=time.monotonic() - started, timed_out=bool(res["timed_out"]),
-            stl_path=stl_path, stl_error=res.get("stl_error"),
+            stl_path=stl_path, stl_error=res.get("stl_error"), view_paths=view_paths, view_errors=res.get("view_errors") or {},
             probe_output=truncate_probe(res.get("probe_output") or "") if mode == "probe" else None,
         )
     finally:

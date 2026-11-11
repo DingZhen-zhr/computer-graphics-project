@@ -5,6 +5,8 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
+
 from cad_agent.config import Config, Phase
 from cad_agent.llm.client import LLM, OpenAICompatLLM
 
@@ -22,3 +24,20 @@ def make_llm(config: Config, phase: Phase, api_key: str) -> LLM:
         temperature=settings.temperature, extra_body=settings.extra_body, pricing=settings.pricing,
     )
 
+
+def secret_env_names(config: Config) -> tuple[str, ...]:
+    """沙盒子进程里要去掉的 key 变量名：基础的，加上审查另用的（如果不同）。"""
+    review_env = config.endpoint("review")[2]
+    return (config.api_key_env,) + ((review_env,) if review_env != config.api_key_env else ())
+
+
+def make_review_llm(config: Config, base_key: str) -> LLM | None:
+    """看图审查用的模型：分阶段、开关 visual_review 打开、审查用的模型能识图时才造，否则是 None（不审查）。
+
+    审查另用一家服务时，key 从那家的环境变量取；没设时抛 ConfigError（中文）。
+    """
+    if not (config.gates.staged and config.gates.visual_review and config.vision):
+        return None
+    review_env = config.endpoint("review")[2]
+    key = base_key if review_env == config.api_key_env else replace(config, api_key_env=review_env).api_key()
+    return make_llm(config, "review", key)

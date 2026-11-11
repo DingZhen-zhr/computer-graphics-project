@@ -24,7 +24,7 @@ from cad_agent.agent.loop import Agent
 from cad_agent.brief import Brief
 from cad_agent.cases import load_cases
 from cad_agent.config import Config, ConfigError, load_config
-from cad_agent.llm.factory import make_llm
+from cad_agent.llm.factory import make_llm, make_review_llm, secret_env_names
 from cad_agent.notebook import FeatureList
 from cad_agent.tools import ToolBox, Workspace
 from cad_agent.web.app import LiveApp, LiveSession, ReplayApp
@@ -39,11 +39,12 @@ MIN_PASSWORD = 6
 def build_live_agent(config: Config) -> tuple[Agent, LiveSession]:
     """和 cli.build_agent 的组装方式一样，只是会话换成 LiveSession（有人在听）。没有 API key 时抛 ConfigError。"""
     key = config.api_key()
-    toolbox = ToolBox(Workspace(Brief(), FeatureList(), []), timeout_s=config.run_timeout_s, secret_names=(config.api_key_env,),
+    toolbox = ToolBox(Workspace(Brief(), FeatureList(), []), timeout_s=config.run_timeout_s, secret_names=secret_env_names(config),
                       gates=config.gates)
     session = LiveSession(config.sessions_dir)
     cases, problems = load_cases(config.cases_dir)
-    agent = Agent(make_llm(config, "clarify", key), toolbox, session, config, modeling_llm=make_llm(config, "modeling", key), cases=cases)
+    agent = Agent(make_llm(config, "clarify", key), toolbox, session, config, modeling_llm=make_llm(config, "modeling", key), cases=cases,
+                  review_llm=make_review_llm(config, key))
     agent.case_problems = problems
     _, info = cli._banner(config, session)
     session.log("startup", **cli.startup_info(agent, info))  # 作业要求记录软件和模型版本

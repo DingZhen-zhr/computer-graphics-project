@@ -157,12 +157,33 @@ def _run(job: dict, out: dict[str, Any]) -> None:
         out["error"] = {"cell": None, "type": "ExportError", "message": f"导出失败（{type(e).__name__}）：{summarize_exception(e)}"}
         return
 
+    if job.get("render_views") and all(c["passed"] for c in out["checks"]):
+        _render_views(solid, workdir, out)
+
     if job.get("export_stl"):  # STL 只给网页预览用，导出失败不算交付失败，只把原因带回去
         try:
             exporter.export_product_package_to_stl(cap.package, workdir / "model.stl")
             out["stl"] = True
         except Exception as e:  # noqa: BLE001
             out["stl_error"] = f"STL 导出失败（{type(e).__name__}）：{summarize_exception(e)}"
+
+
+REVIEW_VIEWS = ("iso", "front", "top", "right")   # 看图审查的四个视角，预设名的写法见笔记第 22 节
+
+
+def _render_views(solid: Any, workdir: Path, out: dict[str, Any]) -> None:
+    """检查全部通过后渲染四张图；某一张失败只是少这一张，原因带回去，不算运行失败。"""
+    import simplecadapi as scad
+
+    views_dir = workdir / "views"
+    views_dir.mkdir(exist_ok=True)
+    out["views"], out["view_errors"] = [], {}
+    for name in REVIEW_VIEWS:
+        try:
+            scad.render_screenshot_rpath(solid, str(views_dir / f"{name}.png"), view=name)
+            out["views"].append(name)
+        except Exception as e:  # noqa: BLE001 - 一张图渲染失败不影响别的，原因交回父进程
+            out["view_errors"][name] = f"{type(e).__name__}：{summarize_exception(e)}"
 
 
 def _json_default(o: Any) -> Any:

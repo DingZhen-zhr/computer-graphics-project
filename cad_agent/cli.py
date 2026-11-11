@@ -17,7 +17,7 @@ from cad_agent.agent.loop import Agent
 from cad_agent.brief import Brief
 from cad_agent.cases import load_cases
 from cad_agent.config import Config, ConfigError, load_config
-from cad_agent.llm.factory import make_llm
+from cad_agent.llm.factory import make_llm, make_review_llm, secret_env_names
 from cad_agent.notebook import FeatureList
 from cad_agent.session import Session
 from cad_agent.tools import ToolBox, Workspace
@@ -34,11 +34,12 @@ HELP = """可用命令：
 def build_agent(config: Config) -> tuple[Agent, Session]:
     """按配置组装智能体。没有设置 API key 时抛 ConfigError（此时还不会创建会话目录）。"""
     key = config.api_key()
-    toolbox = ToolBox(Workspace(Brief(), FeatureList(), []), timeout_s=config.run_timeout_s, secret_names=(config.api_key_env,),
+    toolbox = ToolBox(Workspace(Brief(), FeatureList(), []), timeout_s=config.run_timeout_s, secret_names=secret_env_names(config),
                       gates=config.gates)
     session = Session(config.sessions_dir)
     cases, problems = load_cases(config.cases_dir)
-    agent = Agent(make_llm(config, "clarify", key), toolbox, session, config, modeling_llm=make_llm(config, "modeling", key), cases=cases)
+    agent = Agent(make_llm(config, "clarify", key), toolbox, session, config, modeling_llm=make_llm(config, "modeling", key), cases=cases,
+                  review_llm=make_review_llm(config, key))
     agent.case_problems = problems
     return agent, session
 

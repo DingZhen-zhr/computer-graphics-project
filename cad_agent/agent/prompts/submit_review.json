@@ -1,0 +1,23 @@
+{
+  "name": "submit_review",
+  "description": "提交审查结论。清单里的每一项都要有一条，target 原样照抄清单里的文字。",
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "items": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "target": {"type": "string", "description": "清单里的原文"},
+            "verdict": {"type": "string", "enum": ["match", "mismatch", "unreviewable"], "description": "match：符合；mismatch：不符合；unreviewable：看不出"},
+            "reason": {"type": "string", "description": "一句话：在哪张图上看到了什么"}
+          },
+          "required": ["target", "verdict", "reason"]
+        }
+      },
+      "overall": {"type": "string", "description": "一句话的总体印象"}
+    },
+    "required": ["items", "overall"]
+  }
+}

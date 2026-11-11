@@ -18,9 +18,10 @@ from cad_agent.agent.automation import (AUTO_BUILD_NOTE, AUTO_BUILD_PREFIX, SKIP
                                         should_auto_build, should_auto_confirm, should_build_before_reply, staged_build_ready)
 from cad_agent.agent.context import Context, with_warning
 from cad_agent.agent.counters import _Counters
-from cad_agent.agent.delivery import delivery_text, export_version, failure_text
+from cad_agent.agent.delivery import failure_text
 from cad_agent.agent.staged_hooks import StagedHooks
 from cad_agent.cases import Case, pick_cases, render_cases
+from cad_agent.agent.review_step import ReviewDecision, ReviewStep, deliver, review_then_deliver
 from cad_agent.agent.state import load_system_prompt, render_snapshot
 from cad_agent.config import Config
 from cad_agent.agent.turn import (AFFIRMATIVE, CONFIRMED_MESSAGE, STOPPED_TEXT, AgentTurn, Kind, _raw_arguments,  # noqa: F401
@@ -33,11 +34,14 @@ from cad_agent.tools import ToolBox, ToolOutcome, Workspace
 
 class Agent:
     def __init__(self, llm: LLM, toolbox: ToolBox, session: Session, config: Config, modeling_llm: LLM | None = None, *,
-                 cases: list[Case] | None = None) -> None:
+                 cases: list[Case] | None = None, review_llm: LLM | None = None) -> None:
         self.llm, self.toolbox, self.session, self.config = llm, toolbox, session, config
         self.cases = list(cases or [])   # 案例库（分阶段且开关 cases 打开时，规划那一轮挑相似的给模型）
         self.case_problems: list[str] = []   # 读案例库时跳过的案例和原因（由组装智能体的地方填，写进启动日志）
         self.modeling_llm = modeling_llm  # 建模阶段（需求单已确认）用的模型；没有就一直用 llm
+        self.review_llm = review_llm      # 看图审查用的模型（能识图时才有）；None 就不审查
+        self.review_step = ReviewStep(self)
+        self._review_note: str | None = None   # 审查退回的意见：等这次回复的工具都执行完再放进上下文
         self.toolbox.max_build_failures = config.max_build_failures
         self.staged = toolbox.gates.staged
         self.hooks = StagedHooks(self) if self.staged else None   # 旧流程没有它，行为和 1.2 版逐字相同
@@ -62,6 +66,8 @@ class Agent:
     # ---------------------------------------------------------------- 一轮
     def handle_user(self, text: str) -> AgentTurn:
         self._stop.clear()
+        self.review_step.reset()
+        self._review_note = None
         self.toolbox.begin_turn()
         c = _Counters()
         content = text
@@ -155,7 +161,14 @@ class Agent:
             ended = self._after_tool(tc, outcome, reply, c)
             if ended is not None:
                 return ended  # 本轮结束时整轮都折叠掉，本次回复里后面没执行的调用不会再发给模型
+        self._flush_review_note()
         return self._after_reply(reply, calls, before, c)
+
+    def _flush_review_note(self) -> None:
+        """看图审查退回的意见放在工具结果后面（OpenAI 写法要求工具结果紧跟在调用之后）。"""
+        if self._review_note is not None:
+            self.context.append({"role": "user", "content": self._review_note})
+            self._review_note = None
 
     def _after_reply(self, reply: LLMReply, calls: list[tuple[str, bool]], before, c: _Counters) -> AgentTurn | None:
         """一次回复里的工具全部执行完、本轮还没结束时：程序代模型按按钮（C1 自动请确认、C2 自动重建）。"""
@@ -189,6 +202,8 @@ class Agent:
         self.session.log("tool", name="build", args={}, content=sent, end_turn=False, deliverable=outcome.deliverable,
                          duration_s=round(time.monotonic() - started, 3), auto=True)
         ended = self._after_tool(ToolCall(call_id, "build", {}), outcome, reply, c)
+        if ended is None:
+            self._flush_review_note()
         if ended is None and self.hooks is not None:
             self.hooks.maybe_fold()
         return ended
@@ -206,8 +221,10 @@ class Agent:
         if tc.name == "build" and outcome.build is not None:
             self._log_build(outcome)
             if outcome.deliverable:
-                return self._deliver(c)
-            if self.toolbox.build_failures >= self.config.max_build_failures:
+                ended = self._deliver(c) if not self.staged else self._review_then_deliver(c)
+                if ended is not None:
+                    return ended
+            elif self.toolbox.build_failures >= self.config.max_build_failures:
                 return self._end("failed", failure_text(self.toolbox, outcome), c)
         if outcome.end_turn:
             lead = reply.content.strip() + "\n\n" if reply.content.strip() else ""
@@ -239,18 +256,11 @@ class Agent:
         )
 
     # ---------------------------------------------------------------- 交付
-    def _deliver(self, c: _Counters) -> AgentTurn:
-        gate = self.toolbox.last_gate if self.staged else None
-        extra = {"extra_json": {"gate": gate.to_dict(), "plan": self.ws.plan.to_list()},
-                 "stages_src": self.toolbox.stage_dir} if gate is not None else {}
-        exported = export_version(self.toolbox, self.session, self._pending_changes, **extra)
-        if isinstance(exported, str):
-            return self._end("failed", exported, c)
-        version, checks = exported
-        changes, self._pending_changes = self._pending_changes, []
-        text = delivery_text(version, checks, changes, self.toolbox.build_failures, gate=gate)
-        extra = {"passed": sum(1 for r in checks if r.passed), "total": len(checks), "changes": changes}
-        return self._end("delivered", text, c, version_dir=version, extra=extra)
+    def _review_then_deliver(self, c: _Counters) -> AgentTurn | None:
+        return review_then_deliver(self, c)
+
+    def _deliver(self, c: _Counters, decision: ReviewDecision | None = None) -> AgentTurn:
+        return deliver(self, c, decision)
 
     # ---------------------------------------------------------------- 结束一轮
     def _save(self) -> None:

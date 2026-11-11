@@ -7,6 +7,8 @@ model = "deepseek-chat"
 api_key_env = "DEEPSEEK_API_KEY"        # 存放 key 的环境变量名
 temperature = 0.2
 # extra_body = {}   # 可选：原样作为请求的 extra_body 发给接口（比如关掉思考的厂商参数）；代码里不认识里面的任何内容
+# kind = "openai"   # 可选：openai（OpenAI 兼容接口，默认）或 anthropic（Claude 官方接口，未用真实接口验证）
+# vision = false    # 可选：看图审查用的模型能不能识图；不能（默认）就不做看图审查
 
 # 下面三段都是可选的，默认不写。
 #
@@ -19,6 +21,7 @@ temperature = 0.2
 # [llm.modeling]    # 建模阶段（需求单已确认）用的设置；可以改的项同上
 #                   # 覆盖段里写了 extra_body 就整体替换 [llm] 里的，不合并；没写覆盖段的阶段直接用 [llm]。
 #                   # 模拟用户（评测用）只用 [llm]。
+# [llm.review]      # 看图审查用的设置；除了上面几项，还能写 base_url、kind、api_key_env，让审查走另一家能看图的服务
 #
 # 示例保持默认（两个阶段用同一个模型，不透传额外参数）。"澄清阶段关掉思考"（[llm.clarify] 里写
 # extra_body = {thinking = {type = "disabled"}}）能把费用再压低，但成功率没有保住，实验结果见 docs/results-v1.1.md。
@@ -31,7 +34,7 @@ sessions_dir = "sessions" # 会话目录放哪里；路径含中文导致问题�
 # 第二版的流程开关和上限（下面是默认值，要改就去掉行首的 #）：
 # staged = true                  # 分阶段流程；关掉就退回 1.2 版的单阶段流程
 # mutation_check = true          # 终检时做参数扰动验证（每个用户参数改掉 20% 重建，看检查能不能发现）
-# visual_review = true           # 看图审查（计划 2 才实现）
+# visual_review = true           # 看图审查：交付前渲染四张图另请一个模型审查；只在 [llm] vision = true 时才做
 # cases = true                   # 规划时参考案例库里的相似零件
 # max_tool_calls_per_stage = 25  # 分阶段时，每个阶段的工具调用上限
 # max_tool_calls_total = 200     # 分阶段时，每轮用户消息的工具调用总上限（max_tool_calls 只在关掉分阶段时用）
