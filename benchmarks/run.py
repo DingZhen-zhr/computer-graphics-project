@@ -1,4 +1,5 @@
-"""跑评测：python -m benchmarks.run [--set dev|holdout|all] [--repeat N] [--tasks 任务名 ...] [--config config.toml]
+"""跑评测：python -m benchmarks.run [--set dev|holdout|all|medium|hard|v2] [--repeat N] [--tasks 任务名 ...]
+                                 [--config config.toml] [--budget 元] [--cases on|off]
 
 每个任务：模拟用户（一个手里拿着“隐藏需求”的大模型）和智能体对话，从一句话需求走到交付，再走完各条修改请求；
 每次交付后，用任务文件里人工写的验收检查，对交付版本的 model.py 重新测量。
@@ -16,7 +17,8 @@ from typing import Callable
 
 import yaml
 
-from benchmarks.compare import COST_FMT, SECONDS_FMT, CALLS_FMT, TOKEN_FMT, fmt, success_text, task_means, total_row
+from benchmarks.report import (LENGTH_TYPES, SKIPPED_TEXT, SUMMARY_HEADER, TABLE_HEADER, is_skipped,  # noqa: F401 - 测试从这里导入
+                               max_dimension_deviation, render_results_md, render_summary_md)
 from benchmarks.sim_user import SimUser
 from cad_agent.checks.spec import MANDATORY_IDS, CheckSpecError, parse_checks
 from cad_agent.cli import build_agent
@@ -35,9 +37,6 @@ TASK_SETS: dict[str, list[str]] = {
     "medium": MEDIUM_TASKS, "hard": HARD_TASKS, "v2": ALL_TASKS + HOLDOUT_TASKS + MEDIUM_TASKS + HARD_TASKS,
 }
 DEFAULT_MAX_USER_TURNS = 12
-LENGTH_TYPES = ("bbox", "distance")  # “尺寸偏差”只统计以 mm 为单位的长度类检查
-TABLE_HEADER = "任务 | 成功 | 修复次数 | 耗时(s) | 模型调用 | token | 最大尺寸偏差"
-SUMMARY_HEADER = "| 任务 | 成功 | 平均费用(元) | 平均耗时(s) | 平均模型调用 | 平均输入 | 其中命中缓存 | 平均输出 | 其中思考 |"
 
 
 # ---------------------------------------------------------------- 任务文件
@@ -157,74 +156,30 @@ def run_task(task: dict, make_agent: Callable[[Path], object], sim_user: SimUser
     }
 
 
-# ---------------------------------------------------------------- 汇总
-
-
-def max_dimension_deviation(result: dict) -> float | None:
-    """所有长度类验收（bbox、distance）里偏差绝对值的最大值，单位 mm；没有就是 None。"""
-    devs = [abs(a["deviation"]) for s in result["stages"] for a in s["acceptance"]
-            if a.get("type") in LENGTH_TYPES and a["deviation"] is not None]
-    return max(devs) if devs else None
-
-
-def _num(v: float | None) -> str:
-    return "-" if v is None else f"{v:.4f}".rstrip("0").rstrip(".")
-
-
-def render_summary_md(results: list[dict]) -> str:
-    """按任务汇总的表：成功次数 / 遍数，以及各项平均值；最后一行"合计"是各任务平均值相加。缺字段的格显示 -。"""
-    means = task_means(results)
-    lines = [SUMMARY_HEADER, "|---|---|---|---|---|---|---|---|---|"]
-    for label, m in [*means.items(), ("合计", total_row(means))]:
-        cells = [success_text(m), fmt(m["cost"], COST_FMT), fmt(m["duration_s"], SECONDS_FMT), fmt(m["llm_calls"], CALLS_FMT)]
-        cells += [fmt(m[key], TOKEN_FMT) for key in ("prompt_tokens", "cached_tokens", "completion_tokens", "reasoning_tokens")]
-        lines.append(f"| {label} | " + " | ".join(cells) + " |")
-    return "\n".join(lines) + "\n"
-
-
-def _label(result: dict) -> str:
-    return f"{result['task']}#{result['run']}" if "run" in result else result["task"]
-
-
-def render_results_md(results: list[dict]) -> str:
-    lines = ["# 评测结果", "", f"| {TABLE_HEADER} |", "|---|---|---|---|---|---|---|"]
-    for r in results:
-        dev = max_dimension_deviation(r)
-        lines.append(f"| {_label(r)} | {'是' if r['success'] else '否'} | {r['repairs']} | {r['duration_s']:.1f} | "
-                     f"{r['llm_calls']} | {r['tokens']} | {'-' if dev is None else f'{dev:.3g} mm'} |")
-    for r in results:
-        lines += ["", f"## {_label(r)}", ""]
-        if r.get("error"):
-            lines += [f"运行中断：{r['error']}", ""]
-        for s in r["stages"]:
-            state = f"已交付 {s.get('version', '')}" if s["delivered"] else ("跳过" if s.get("skipped") else f"未交付（{s.get('reason', '')}）")
-            lines += [f"### {s['stage']}（{state}）", ""]
-            if s.get("error"):
-                lines += [f"验收运行出错：{s['error'].get('message', '')}", ""]
-            if s["acceptance"]:
-                lines += ["| 验收项 | 期望 | 实测 | 偏差 | 结果 |", "|---|---|---|---|---|"]
-                lines += [f"| {a['id']} | {_num(a['expected'])} | {_num(a['measured'])} | {_num(a['deviation'])} | {'通过' if a['passed'] else '没通过'} |"
-                          for a in s["acceptance"]]
-                lines.append("")
-    return "\n".join(lines) + "\n"
-
-
 def run_benchmarks(names: list[str], make_agent: Callable[[Path], object], make_sim_user: Callable[[str], SimUser],
                    results_dir: Path, *, run_job: Callable = execute.run_job, print_fn: Callable[..., None] = print,
-                   repeat: int = 1) -> list[dict]:
+                   repeat: int = 1, budget: float | None = None) -> list[dict]:
     """依次跑各个任务，每个任务跑 repeat 遍；某一遍意外崩溃只记一条失败，不影响其余的。每跑完一遍就写一次结果文件。
 
     repeat == 1：目录是 results_dir/<任务名>，结果里没有 "run"（和第一版一样）。
     repeat > 1：目录是 results_dir/<任务名>-<r>，结果里有 "run": r（r 从 1 开始）。
     results.md = 汇总表 + 各遍的明细。
+    budget（元）：每跑完一遍，把这一遍的费用（智能体的加上模拟用户的）累加；累计达到上限后不再开始新的一遍，
+    没跑的记成 {"task", "skipped_for_budget": true}，结果文件照常写出，最后打印一行已花费和上限。
     """
     results_dir = Path(results_dir)
     results_dir.mkdir(parents=True, exist_ok=True)
     results: list[dict] = []
+    spent = 0.0
     for name in names:
         task = load_task(name)
         for r in range(1, repeat + 1):
             label = name if repeat == 1 else f"{name}#{r}"
+            if budget is not None and spent >= budget:
+                results.append({"task": name, "skipped_for_budget": True, **({"run": r} if repeat > 1 else {})})
+                print_fn(f"== 任务 {label}：{SKIPPED_TEXT} ==")
+                _write_results(results_dir, results)
+                continue
             print_fn(f"== 开始任务 {label} ==")
             out_dir = results_dir / (name if repeat == 1 else f"{name}-{r}")
             try:
@@ -236,9 +191,25 @@ def run_benchmarks(names: list[str], make_agent: Callable[[Path], object], make_
                 result["run"] = r
             results.append(result)
             print_fn(f"== 任务 {label}：{'成功' if result['success'] else '没有成功'} ==")
-            (results_dir / "results.json").write_text(json.dumps(results, ensure_ascii=False, indent=1), encoding="utf-8")
-            (results_dir / "results.md").write_text(render_summary_md(results) + "\n" + render_results_md(results), encoding="utf-8")
+            if budget is not None:
+                spent += _run_cost(result, label, print_fn)
+            _write_results(results_dir, results)
+    if budget is not None:
+        print_fn(f"已花费 ¥{spent:.2f}，上限 ¥{budget:.2f}")
     return results
+
+
+def _run_cost(result: dict, label: str, print_fn: Callable[..., None]) -> float:
+    """这一遍的费用：智能体的加上模拟用户的。算不出来（某次调用没有用量）的部分按 0 计，并提示一句。"""
+    parts = [result.get("cost"), result.get("sim_cost")]
+    if any(p is None for p in parts):
+        print_fn(f"注意：任务 {label} 有一部分调用没有算出费用，按 0 计入花费上限")
+    return sum(p for p in parts if p is not None)
+
+
+def _write_results(results_dir: Path, results: list[dict]) -> None:
+    (results_dir / "results.json").write_text(json.dumps(results, ensure_ascii=False, indent=1), encoding="utf-8")
+    (results_dir / "results.md").write_text(render_summary_md(results) + "\n" + render_results_md(results), encoding="utf-8")
 
 
 def main(argv: list[str] | None = None, print_fn: Callable[..., None] = print) -> int:
@@ -250,6 +221,9 @@ def main(argv: list[str] | None = None, print_fn: Callable[..., None] = print) -
     parser.add_argument("--tasks", nargs="+", default=[], help="直接指定要跑的任务；给了就以它为准，不看 --set")
     parser.add_argument("--config", default="config.toml", help="配置文件路径，默认 config.toml")
     parser.add_argument("--out", default=str(Path(__file__).parent / "results"), help="结果目录，默认 benchmarks/results")
+    parser.add_argument("--budget", type=float, default=None, metavar="元",
+                        help="花费上限（元）：累计到这个数就不再开始新任务；必须先在配置里填价目表")
+    parser.add_argument("--cases", choices=("on", "off"), default="on", help="规划时用不用案例库，默认 on；off 用来做对照")
     args = parser.parse_args(argv)
 
     if args.repeat < 1:
@@ -267,6 +241,15 @@ def main(argv: list[str] | None = None, print_fn: Callable[..., None] = print) -
     except (ValueError, ConfigError) as e:
         print_fn(str(e))
         return 1
+    if args.budget is not None:
+        if config.pricing is None:
+            print_fn("用 --budget 之前，请先在配置文件的 [llm.pricing] 里照模型服务的价目页填好价目表，否则算不出花了多少钱")
+            return 2
+        if args.budget <= 0:
+            print_fn(f"--budget 要大于 0，收到 {args.budget:g}")
+            return 2
+    if args.cases == "off":
+        config = replace(config, gates=replace(config.gates, cases=False))
 
     def make_agent(root: Path):
         return build_agent(replace(config, sessions_dir=root / "sessions"))[0]
@@ -275,7 +258,7 @@ def main(argv: list[str] | None = None, print_fn: Callable[..., None] = print) -
         return SimUser(make_llm(config, "base", key), hidden_spec)
 
     results_dir = Path(args.out) / datetime.now().strftime("%Y%m%d-%H%M%S")
-    results = run_benchmarks(names, make_agent, make_sim_user, results_dir, print_fn=print_fn, repeat=args.repeat)
+    results = run_benchmarks(names, make_agent, make_sim_user, results_dir, print_fn=print_fn, repeat=args.repeat, budget=args.budget)
     print_fn("\n" + render_summary_md(results) + "\n" + render_results_md(results))
     print_fn(f"结果已保存到 {results_dir}")
     return 0

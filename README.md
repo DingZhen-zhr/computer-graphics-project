@@ -40,7 +40,7 @@ python -m venv .venv
 .venv\Scripts\python -m pip install -e ".[dev]"
 ```
 
-这会装好 `simplecadapi[editor,verify]==2.2.7`、`openai`、`pyyaml` 和测试用的 `pytest`。所有命令都用 `.venv\Scripts\python`，不要往系统 Python 里装包。
+这会装好 `simplecadapi[editor,verify]==2.2.7`、`openai`、`anthropic`（Claude 官方接口）、`keyring`（系统钥匙串）、`pyyaml` 和测试用的 `pytest`。所有命令都用 `.venv\Scripts\python`，不要往系统 Python 里装包。
 
 ## 配置模型
 
@@ -62,6 +62,11 @@ python -m venv .venv
      [llm.clarify]
      extra_body = {thinking = {type = "disabled"}}
      ```
+
+   - `kind`（写在 `[llm]` 里）：`openai`（默认，OpenAI 兼容接口）或 `anthropic`（Claude 官方接口）。**Claude 适配层只经过假服务端的单元测试，未用真实接口验证**（接口细节见 `docs/llm-api-notes.md` 第 8 节）。
+   - `vision`（写在 `[llm]` 里，默认 `false`）：看图审查用的模型能不能识图。为 `true` 且分阶段流程、`[agent] visual_review` 都开着时，交付前会渲染四张图，另发一次只带图和需求单的审查调用。
+   - `[llm.review]`：看图审查单独用的模型；除了上面那几项，还可以写 `base_url`、`kind`、`api_key_env`，让审查走另一家服务（比如建模用 DeepSeek、审查用一个能看图的模型）。
+   - 各家服务的地址和建议的模型名查过官方文档，写在 `cad_agent/providers.toml` 和 `docs/llm-api-notes.md` 第 9 节；除 DeepSeek 外都没有用真实接口验证过。
 
 2. **API key 只放在环境变量里，不写进任何文件。** 在 PowerShell 里这样设置（把引号里换成你自己的 key；只对当前这个终端窗口有效）：
 
@@ -128,6 +133,21 @@ sessions/20261109-153000/
 ```
 
 结果写到 `benchmarks/results/<时间>/results.json` 和 `results.md`：`results.md` 开头是按任务汇总的表（成功次数 / 遍数、平均费用、平均耗时、平均模型调用、平均输入和其中命中缓存、平均输出和其中思考），后面是每一遍的明细。费用按 `config.toml` 里的 `[llm.pricing]` 算，没填价目表时费用显示 `-`。评测会调用真实的大模型，需要先设置好 API key，会产生费用。
+
+另外两个参数：
+
+- `--budget <元>`：花费上限。每跑完一个任务，把这个任务的费用（智能体的加上模拟用户的）累加起来，累计到上限后就不再开始新任务；正在跑的那个任务会跑完，所以实际花费可能比上限略多一点。没跑的任务在结果里记成"因预算跳过"，已经跑完的结果照常写出，最后打印一行 `已花费 ¥…，上限 ¥…`。**必须先在配置里填好 `[llm.pricing]`**，否则直接报错退出（返回码 2）。
+- `--cases on|off`：规划时用不用案例库，默认 `on`。`off` 用来做"有案例库 / 无案例库"的对照。
+
+### ¥15 以内的评测套餐
+
+```powershell
+.venv\Scripts\python -m benchmarks.run --config config.toml --set v2 --repeat 1 --budget 15
+```
+
+- 这条命令**会调用真实的大模型，会花钱**（简单 5 个、中等 3 个、困难 3 个任务各跑 1 遍，开着案例库）。什么时候运行，由你自己决定；开发和测试过程中都没有运行过它。
+- 跑之前先在 `config.toml` 的 `[llm.pricing]` 里照模型服务的价目页填好价目表。
+- 结果出来之前，不能说第二版的成功率是多少：现在的测试只证明"关卡按设计工作、流程表达得了这些零件"，不证明"真模型做得好"。
 
 两次评测结果的前后对比（Markdown 表和总费用之比）：
 
