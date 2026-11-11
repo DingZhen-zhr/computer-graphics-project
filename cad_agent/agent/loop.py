@@ -9,11 +9,10 @@ build 全部通过（程序自动交付）、或者触发失败上限。
 from __future__ import annotations
 
 import json
-import re
+import threading
 import time
-from dataclasses import dataclass
 from pathlib import Path
-from typing import Literal
+from typing import Callable
 
 from cad_agent.agent.automation import (AUTO_BUILD_NOTE, AUTO_BUILD_PREFIX, SKIPPED_BUILD_MESSAGE, brief_shape, has_error,
                                         should_auto_build, should_auto_confirm, should_build_before_reply, staged_build_ready)
@@ -24,42 +23,12 @@ from cad_agent.agent.staged_hooks import StagedHooks
 from cad_agent.cases import Case, pick_cases, render_cases
 from cad_agent.agent.state import load_system_prompt, render_snapshot
 from cad_agent.config import Config
-from cad_agent.llm.client import LLM, LLMError, LLMReply, ToolCall
+from cad_agent.agent.turn import (AFFIRMATIVE, CONFIRMED_MESSAGE, STOPPED_TEXT, AgentTurn, Kind, _raw_arguments,  # noqa: F401
+                                  is_affirmative)
+from cad_agent.llm.client import LLM, LLMError, LLMReply, LLMStopped, ToolCall
 from cad_agent.notebook import NotebookError, render_notebook
 from cad_agent.session import Session
 from cad_agent.tools import ToolBox, ToolOutcome, Workspace
-
-Kind = Literal["reply", "question", "confirm", "delivered", "failed"]
-AFFIRMATIVE = {"y", "yes", "ok", "确认", "可以", "没问题", "好", "对", "行"}
-_EDGE_PUNCT = re.compile(r"^[\W_]+|[\W_]+$")
-CONFIRMED_MESSAGE = "（用户已确认需求单）"
-
-
-def is_affirmative(text: str) -> bool:
-    """去掉首尾空白和标点后，整句必须恰好在 AFFIRMATIVE 里；“可以，但角度改成 70”不算。"""
-    return _EDGE_PUNCT.sub("", text.strip()).lower() in AFFIRMATIVE
-
-
-@dataclass
-class AgentTurn:
-    kind: Kind
-    text: str
-    version_dir: Path | None = None
-    repairs: int = 0
-    llm_calls: int = 0
-    tokens: int = 0
-    prompt_tokens: int = 0
-    completion_tokens: int = 0
-    cached_tokens: int = 0
-    reasoning_tokens: int = 0
-    cost: float | None = None   # 本轮每次调用都有 cost 时才是总和，否则 None（本轮没有成功的调用也是 None）
-
-
-def _raw_arguments(tc: ToolCall) -> str:
-    """放回对话历史里的参数文本：解析失败的保留模型原文，其余重新序列化。"""
-    if set(tc.arguments) == {"__raw__"}:
-        return str(tc.arguments["__raw__"])
-    return json.dumps(tc.arguments, ensure_ascii=False)
 
 
 class Agent:
@@ -78,6 +47,13 @@ class Agent:
         self.context = Context(self.system_prompt)  # 发给模型的消息：旧轮折叠，本轮开头一张快照，轮内只追加
         self._pending_changes: list[str] = []  # 上次交付以来需求单的变化行
         self._auto_builds = 0                  # 程序自动重建的次数，给日志里的 id 编号
+        self.on_delta: Callable[[str], None] | None = None   # 界面设置；有文字片段时调用（设了才用流式请求）
+        self._stop = threading.Event()         # 用户要求停止；每轮开始时清掉
+        self.toolbox.should_stop = self._stop.is_set   # 沙盒运行中也能停
+
+    def request_stop(self) -> None:
+        """线程安全：置停止标志。主循环在每次模型调用、每个片段、每次工具调用之前检查，沙盒子进程会被结束。"""
+        self._stop.set()
 
     @property
     def ws(self) -> Workspace:
@@ -85,6 +61,7 @@ class Agent:
 
     # ---------------------------------------------------------------- 一轮
     def handle_user(self, text: str) -> AgentTurn:
+        self._stop.clear()
         self.toolbox.begin_turn()
         c = _Counters()
         content = text
@@ -103,8 +80,12 @@ class Agent:
         built_before_reply = False  # 纯文字结束前的兜底 build，每轮最多一次
 
         while True:
+            if self._stop.is_set():
+                return self._end("stopped", STOPPED_TEXT, c)
             try:
-                reply = llm.chat(self.context.messages(), self.toolbox.schemas())
+                reply = self._chat(llm)
+            except LLMStopped:
+                return self._end("stopped", STOPPED_TEXT, c)   # 这条没说完的回复不进历史
             except LLMError as e:
                 return self._end("failed", f"模型调用失败：{e}。需求单和已经写好的特征都还在，可以稍后再发一次。", c)
             c.add(reply)
@@ -123,6 +104,12 @@ class Agent:
             ended = self._run_tools(reply, c)
             if ended is not None:
                 return ended
+
+    def _chat(self, llm: LLM) -> LLMReply:
+        """调用模型。界面设了 on_delta 时用流式并带上停止检查；没设时调用方式和以前逐字相同。"""
+        if self.on_delta is None:
+            return llm.chat(self.context.messages(), self.toolbox.schemas())
+        return llm.chat(self.context.messages(), self.toolbox.schemas(), on_delta=self.on_delta, should_stop=self._stop.is_set)
 
     def _snapshot(self) -> str:
         """本轮的快照。分阶段、开着案例库、需求单可以建模但还没有计划时，后面接上相似的参考案例。"""
@@ -150,6 +137,8 @@ class Agent:
         calls: list[tuple[str, bool]] = []
         errored = False
         for tc in reply.tool_calls:
+            if self._stop.is_set():   # 停止：后面的调用不执行，已经执行的效果保留
+                return self._end("stopped", STOPPED_TEXT, c)
             c.tool_calls += 1
             c.stage_tool_calls += 1
             started = time.monotonic()

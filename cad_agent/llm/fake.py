@@ -3,8 +3,11 @@
 from __future__ import annotations
 
 import copy
+from typing import Callable
 
-from cad_agent.llm.client import LLMReply, ToolCall
+from cad_agent.llm.client import LLMReply, LLMStopped, ToolCall
+
+DELTA_CHARS = 4  # 有 on_delta 时，回复的文字按每 4 个字符一段送出
 
 
 def scripted_call(name: str, args: dict | None = None, content: str = "", *more: tuple[str, dict]) -> LLMReply:
@@ -26,7 +29,9 @@ class ScriptedLLM:
         self.calls: list[list[dict]] = []
         self.tool_lists: list[list[dict]] = []
 
-    def chat(self, messages: list[dict], tools: list[dict]) -> LLMReply:
+    def chat(self, messages: list[dict], tools: list[dict], *,
+             on_delta: Callable[[str], None] | None = None,
+             should_stop: Callable[[], bool] | None = None) -> LLMReply:
         self.calls.append(copy.deepcopy(messages))
         self.tool_lists.append(copy.deepcopy(tools))
         if not self.replies:
@@ -34,4 +39,11 @@ class ScriptedLLM:
         nxt = self.replies.pop(0)
         if isinstance(nxt, Exception):
             raise nxt
+        if on_delta is not None:
+            for i in range(0, len(nxt.content), DELTA_CHARS):
+                if should_stop is not None and should_stop():
+                    raise LLMStopped()
+                on_delta(nxt.content[i:i + DELTA_CHARS])
+        if should_stop is not None and should_stop():
+            raise LLMStopped()
         return nxt

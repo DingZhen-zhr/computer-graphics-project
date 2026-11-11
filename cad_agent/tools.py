@@ -56,6 +56,7 @@ class ToolBox(LegacyTools):
         self.stage_dir: Path | None = None     # 分阶段时各阶段 STL 放哪里（主循环设成会话目录下的 stages）
         self.last_advance: Advance | None = None   # 上次分阶段 build 的推进结果
         self.last_gate: GateResult | None = None   # 上次终检的结果
+        self.should_stop: Callable[[], bool] | None = None   # 主循环设；不为 None 时每次 run_job 都带上它
         self.run_job = run_job
         self.timeout_s = timeout_s
         self.secret_names = tuple(secret_names)
@@ -75,6 +76,25 @@ class ToolBox(LegacyTools):
             ws.brief.require_relations = True
             self._specs, self._names, self._pre_confirm = TOOL_SPECS_V2, list(TOOL_NAMES_V2), list(PRE_CONFIRM_TOOLS_V2)
             self._handlers = StagedTools(self).handlers()
+
+    # ---- 运行沙盒 ----
+    @property
+    def run_job(self) -> Callable[..., RunResult]:
+        """沙盒运行函数。设了 should_stop 时自动带上它（分阶段和旧流程所有调用 run_job 的地方都经过这里）；
+        没设时就是原来的函数本身，调用方式和以前逐字相同。"""
+        raw, stop = self._run_job, self.should_stop
+        if stop is None:
+            return raw
+
+        def with_stop(*args: Any, **kwargs: Any) -> RunResult:
+            kwargs.setdefault("should_stop", stop)
+            return raw(*args, **kwargs)
+
+        return with_stop
+
+    @run_job.setter
+    def run_job(self, fn: Callable[..., RunResult]) -> None:
+        self._run_job = fn
 
     # ---- 对外接口 ----
     def begin_turn(self) -> None:

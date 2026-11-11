@@ -14,7 +14,7 @@ import tempfile
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Iterable, Literal
+from typing import Callable, Iterable, Literal
 
 from cad_agent.checks.spec import CheckResult
 from cad_agent.notebook import RenderedNotebook
@@ -23,6 +23,10 @@ from cad_agent.sandbox.guard import clean_env
 GRACE_S = 30  # 子进程里除了运行模型，还要跑检查、导出、截图，所以外层超时比 timeout_s 多留一点
 PROBE_OUTPUT_LIMIT = 2000  # probe 打印的内容最多返回这么多字符
 PROBE_TAIL = "\n…（后面的输出省略）"
+
+
+STOP_POLL_S = 0.2  # 给了 should_stop 时，每隔这么久看一次要不要停
+STOPPED_ERROR = {"cell": None, "type": "Stopped", "message": "已按你的要求停止"}
 
 
 def truncate_probe(text: str) -> str:
@@ -55,6 +59,29 @@ def _kill_tree(proc: subprocess.Popen) -> None:
         proc.kill()
 
 
+def _wait(proc: subprocess.Popen, limit_s: float, should_stop: Callable[[], bool] | None) -> tuple[str, str]:
+    """等子进程结束。返回 (结局, stderr)，结局是 done、timeout、stopped 之一；后两种已经结束了进程树。"""
+    if should_stop is None:
+        try:
+            _, stderr = proc.communicate(timeout=limit_s)
+            return "done", stderr
+        except subprocess.TimeoutExpired:
+            _kill_tree(proc)
+            proc.communicate()
+            return "timeout", ""
+    deadline = time.monotonic() + limit_s
+    while True:
+        try:
+            _, stderr = proc.communicate(timeout=max(min(STOP_POLL_S, deadline - time.monotonic()), 0.01))
+            return "done", stderr
+        except subprocess.TimeoutExpired:
+            outcome = "stopped" if should_stop() else "timeout" if time.monotonic() >= deadline else None
+            if outcome is not None:
+                _kill_tree(proc)
+                proc.communicate()
+                return outcome, ""
+
+
 def _copy_out(src: Path, dst: Path) -> Path:
     dst.parent.mkdir(parents=True, exist_ok=True)
     shutil.copyfile(src, dst)
@@ -74,8 +101,12 @@ def run_job(
     export_stl: Path | None = None,
     timeout_s: float = 60,
     secret_names: Iterable[str] = (),
+    should_stop: Callable[[], bool] | None = None,
 ) -> RunResult:
-    """在独立子进程里运行 notebook 并测量。exports 的文件会复制到调用方给的路径。"""
+    """在独立子进程里运行 notebook 并测量。exports 的文件会复制到调用方给的路径。
+
+    给了 should_stop 时每 0.2 秒看一次，为真就结束子进程树，返回 error 类型为 Stopped 的结果。
+    """
     started = time.monotonic()
     workdir = Path(tempfile.mkdtemp(prefix="cad-agent-"))
     try:
@@ -106,11 +137,11 @@ def run_job(
             cmd, cwd=workdir, env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
             text=True, encoding="utf-8", errors="replace", creationflags=flags,
         )
-        try:
-            _, stderr = proc.communicate(timeout=timeout_s + GRACE_S)
-        except subprocess.TimeoutExpired:
-            _kill_tree(proc)
-            proc.communicate()
+        outcome, stderr = _wait(proc, timeout_s + GRACE_S, should_stop)
+        if outcome == "stopped":
+            return RunResult(ok=False, error=dict(STOPPED_ERROR), duration_s=time.monotonic() - started,
+                             probe_output="" if mode == "probe" else None)
+        if outcome == "timeout":
             return RunResult(
                 ok=False, timed_out=True, duration_s=time.monotonic() - started,
                 error={"cell": None, "type": "TimeoutError", "message": f"运行超过 {timeout_s:g} 秒被终止"},

@@ -128,7 +128,11 @@
 12. **`max_tokens`**：参考文档里它是唯一没标"optional"的数值参数（另两个必填是 `model`、`messages`），按必填处理。[M]
 13. **`temperature`**：思考文档写明，Opus 5.5、Sonnet 5.5、Haiku 5.5 等新模型上非默认的 `temperature`、`top_p`、`top_k` 一律 400；从 API 版本 `2026-10-21` 起，**带上 `temperature` 就 400，不论取值、不论模型**。[T] 所以适配层不发 `temperature`（构造参数保留，只是不用，见偏离 D14）。
 14. **限流和服务端错误的状态码**：400 `invalid_request_error`、401 `authentication_error`、402 `billing_error`、403 `permission_error`、404 `not_found_error`、409 `conflict_error`、413 `request_too_large`、429 `rate_limit_error`、500 `api_error`、504 `timeout_error`、529 `overloaded_error`。错误体是 `{"type": "error", "error": {"type", "message"}, "request_id"}`。官方 SDK 默认对连接错误、408、409、429、5xx 重试两次。[E] 适配层和 `OpenAICompatLLM` 一样自己重试（429 和 5xx、连接错误、超时重试；401、403 和其他 4xx 不重试），SDK 自带的重试关掉。
-15. **请求头**：`x-api-key`、`anthropic-version`（由 SDK 自动带上）。默认地址 `https://api.anthropic.com`。[E 里的 curl 示例]
+15. **请求头**：文档的 curl 示例用 `x-api-key` 和 `anthropic-version`。[E] 已装的 anthropic 2.8.0 实际用 `Authorization: Bearer <key>` 带 key（`anthropic/_client.py` 的 `_api_key_auth`），`anthropic-version` 自动带上；这两种写法服务端是否都接受，**未用真实接口验证**，适配层交给 SDK 处理，不自己写请求头。默认地址 `https://api.anthropic.com`。另外：流式读到一半连接断开时，SDK 不把底层的 `httpx2` 异常包装成 `APIConnectionError`（假服务端测试里看到的），适配层两种都按网络错误重试。
+
+16. **适配层的实现**（`cad_agent/llm/anthropic_client.py`、`anthropic_convert.py`，计划 2 Task 4）：照上面 15 条写；缓存标记加在系统提示词末尾和本轮快照那条 user 消息末尾（共 2 个，不到 4 个的上限）；用量换算是 `prompt_tokens = input_tokens + cache_read_input_tokens + cache_creation_input_tokens`、`cached_tokens = cache_read_input_tokens`、`reasoning_tokens = 0`；费用里缓存写入按"没命中"的单价算（实际是 1.25 倍，所以会略微偏低）。
+
+**本适配层只经过假服务端测试，未用真实接口验证。**
 
 ## 9. 各服务的地址和模型名（查文档）
 

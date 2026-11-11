@@ -395,3 +395,18 @@
   3. 识图：只有 OpenAI 和 Claude 的文档写明"当前模型都能看图"，标 `yes`；GLM、Kimi、通义的默认模型能不能看图文档没写清楚，DeepSeek 文档里带图片的模型已下线，这四个都标 `unknown`（按不能处理）。
   4. 除 DeepSeek 外，各服务的地址和模型名都没有用真实接口验证过（笔记第 9 节写明了）。
 - 说明：`providers.toml` 是在跑那条测试之前写的，没有先看到测试失败，这是我做事顺序上的疏忽；测试本身照计划写，断言没有放松。
+
+## 第二版 计划 2 Task 2：逐字输出与停止 —— 完成
+
+- 做了什么：
+  - `LLM.chat` 加两个可选参数 `on_delta`、`should_stop`，新异常 `LLMStopped`（不是 `LLMError`，不重试），常量 `RESET_DELTA = "\x00"`，约定写进 `LLM` 的文档注释。`OpenAICompatLLM`：两个都不传时走原来的非流式请求，请求体一个字节没变（有测试比对整份请求体）；任意一个不为 `None` 时发 `stream=True` 和 `stream_options={"include_usage": True}`，片段在新文件 `llm/openai_stream.py` 里拼回（文字、工具调用的名字和参数、最后一个片段的用量）；思考内容不交给 `on_delta`。流式中途出错照原规则重试（1 秒、2 秒，共 3 次），重试前若已送出过片段就先送 `"\x00"`；流里来的错误事件也按"输出途中出错"重试。
+  - `ScriptedLLM`：有 `on_delta` 时按每 4 个字符一段送出，送每段前检查 `should_stop`。
+  - `run_job` 加 `should_stop`：给了就每 0.2 秒看一次，为真就结束子进程树，返回 `error = {"cell": None, "type": "Stopped", "message": "已按你的要求停止"}`，临时目录照常删掉。
+  - `ToolBox.should_stop`：`run_job` 改成属性，设了 `should_stop` 时自动带上它，所以分阶段、旧流程、终检扰动、参数直改里所有调用 `run_job` 的地方都不用改；没设时就是原来的函数，调用参数和以前逐字相同。
+  - 主循环：`Kind` 加 `"stopped"`；`Agent.on_delta`、`Agent.request_stop()`（`threading.Event`）；每轮开始清标志；每次调用模型前、每个工具调用前检查；`LLMStopped` 时这条没说完的回复不进历史；本轮以 `stopped` 结束，文字是 `已停止。已经写下的内容都保留着，可以接着说。`，照常保存状态、折叠本轮、写日志。
+  - `loop.py` 加了这些会超过 300 行，所以把 `Kind`、`AgentTurn`、`is_affirmative` 等搬到新文件 `agent/turn.py`，仍可从 `cad_agent.agent.loop` 导入。
+- 测试数量：新增 17 个（`test_streaming.py` 11 个、`test_stop.py` 6 个；计划列的 13 个之外，多加了"每次都断开时报 LLMError""只给 should_stop 也走流式""ScriptedLLM 能被停""ToolBox 只在设了时才传 should_stop"）。先运行确认失败（`LLMStopped` 导入不到），再实现。全部测试通过（见下面"说明"）。
+- 由我定的细节（Ruling）：
+  1. **主循环只在界面设了 `on_delta` 时才给 `chat` 传这两个参数**；没设时（命令行、评测脚本、现有网页）调用方式和以前完全一样。原因：计划要求"不传时请求逐字相同"，而 `test_web.py` 里的假模型只接受 `chat(messages, tools)` 两个参数，计划又说旧测试一条不改。代价：没设 `on_delta` 的调用方点停止时，要等这次模型调用返回后才停（工具调用之间、沙盒运行中照样能停）。计划 3 的桌面端会设 `on_delta`。
+  2. 计划的 `test_stop_during_llm_call` 写"这条回复没有进历史"：本轮结束时上下文会照常折叠出一条 assistant 消息（停止的那句话），所以测试断言的是"没说完的那条回复的文字不在上下文和日志里"。
+- 说明：Task 2、3 是一起写完后跑的全量测试（831 个全部通过，含 `sca`，约 9 分半），然后把两个任务的改动分开提交；`loop.py`、`execute.py` 里混有后面任务的改动，Task 2 的提交只暂存了它自己的那部分，并把暂存区单独导出跑了相关的非 `sca` 测试（244 个通过；唯一失败的 `test_committed_site_is_up_to_date` 是导出目录里换行符和源文件不同造成的，工作区里这条是通过的）。
