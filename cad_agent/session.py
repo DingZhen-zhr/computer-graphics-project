@@ -44,6 +44,44 @@ class Session:
                 n += 1
         self.dir = candidate
 
+    @classmethod
+    def open(cls, path: Path) -> "Session":
+        """打开已有的会话目录，不新建；目录不存在抛 FileNotFoundError。"""
+        path = Path(path)
+        if not path.is_dir():
+            raise FileNotFoundError(f"没有这个会话目录：{path}")
+        obj = cls.__new__(cls)
+        obj.dir = path
+        return obj
+
+    def read_log(self) -> list[dict]:
+        """读 log.jsonl；坏掉的行（不是 JSON、不是对象、没有 kind）跳过。"""
+        try:
+            text = (self.dir / "log.jsonl").read_text(encoding="utf-8")
+        except FileNotFoundError:
+            return []
+        rows = []
+        for line in text.splitlines():
+            try:
+                row = json.loads(line)
+            except ValueError:
+                continue
+            if isinstance(row, dict) and isinstance(row.get("kind"), str):
+                rows.append(row)
+        return rows
+
+    def meta(self) -> dict:
+        """读 meta.json（标题、创建和更新时间）；没有或读不出来时返回 {}。"""
+        try:
+            data = json.loads((self.dir / "meta.json").read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            return {}
+        return data if isinstance(data, dict) else {}
+
+    def set_meta(self, **fields: Any) -> None:
+        """合并写入 meta.json。"""
+        _write_json(self.dir / "meta.json", {**self.meta(), **fields})
+
     def log(self, kind: str, **data: Any) -> None:
         """往 log.jsonl 追加一行；自动加上 ts 和 kind。图片块只记"图片 <字节数> 字节"，不记内容。"""
         row = {"ts": _now().isoformat(timespec="milliseconds"), "kind": kind, **redact_images(data)}

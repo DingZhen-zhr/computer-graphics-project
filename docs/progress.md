@@ -505,3 +505,9 @@
   关掉窗口后进程正常退出（返回 0，从启动到退出共 14 秒）。所以不需要退到只做 `--browser`。
 - 做了什么：新包 `cad_agent/desk/`；`static/css/tokens.css`（浅色写在 `:root`，深色写在 `:root[data-theme="dark"]`，`data-theme="system"` 时用 `prefers-color-scheme` 选；颜色值逐个照抄计划；另加了一个计划没列的 `--paper-2`，是比底色深一点的纸色，给悬停和选中行用）；`static/css/base.css`（重置、14px 正文、三种按钮、输入框、2px 强调色焦点描边、小节标题的尺寸线、状态文字、减少动态效果）；`pyproject.toml` 加依赖 `pywebview>=6.2`，`package-data` 加 `desk/static/**/*`、`desk/demo_data/**/*`。
 - 测试：`tests/test_desk_style.py` 8 个（计划的 6 个，另加"跟随系统时用深色那一套"和"基础样式里有三种按钮、小节标题、状态文字"两个），先运行看到 8 个全部失败，再写样式。全部测试 913 个通过。两套配色对比度实测：浅色 正文 15.27、次要 5.0、强调 5.88、通过 5.66、不通过 5.79；深色 12.38、7.02、10.04、8.49、6.34。
+
+## 第二版 计划 3 Task 3：从会话目录恢复 —— 完成
+
+- 做了什么：`Session.open`（不新建，目录不存在抛 `FileNotFoundError`）、`read_log`（坏行、不是对象、没有 kind 的都跳过）、`meta`、`set_meta`；`Context.restore`；新文件 `cad_agent/agent/resume.py`：`load_workspace`、`past_turns`、`resume_agent`。旧会话（没有 `plan.json` 但有特征）按计划造一个"整体 / 零件完成"的单阶段计划，特征和检查都归 `s1`，有版本时标成已通过。`resume_agent` 之后 `awaiting_confirmation` 看最后一轮是不是 `confirm`；分阶段时需求单打开 `require_relations`（和 ToolBox 造工作区时一样）；看图审查的图片目录 `review/round-<n>` 接着已有的编号，不覆盖。
+- 计划的 Files 里写了改 `loop.py`，实际不用改：恢复只需要换工作区和上下文，`Agent` 的接口够用。
+- 测试：`tests/test_resume.py` 10 个（计划的 7 个，另加"目录不存在报错""空会话读出空工作区""restore 拷贝了传入的列表"3 个），先运行看到因为没有 `resume` 模块而全部失败，再实现。全部测试 923 个通过。

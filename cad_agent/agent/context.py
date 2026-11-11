@@ -53,6 +53,10 @@ class Context:
         self._current: list[dict] = []      # 本轮已发生的 assistant / tool 消息
         self._fold_at = 0                    # 分阶段时：本轮里上一个折叠点（_current 里的位置）
 
+    def restore(self, past: list[dict]) -> None:
+        """直接设置"之前各轮的折叠版"（从会话目录恢复时用）。"""
+        self._past = [dict(m) for m in past]
+
     def start_turn(self, user_content: str, snapshot: str) -> None:
         self._raw_user = user_content
         self._turn_user = {"role": "user", "content": f"{snapshot}\n\n{USER_HEADER}\n{user_content}"}
