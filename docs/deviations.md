@@ -97,3 +97,14 @@
 - 实际情况：Task 1 探测（笔记第 21 节）发现 SCA 2.2.7 的 `make_spur_rack_rsolid` 做出的齿条 `valid=False`（三组参数都一样，`BRepCheck_Analyzer` 也判无效），减孔后仍无效，和方块 `union_rsolid` 60 秒内不返回；Task 14 补测 `make_helical_rack_rsolid` 也是 `valid=False`。用它做的案例过不了"实体有效"这条必做检查，不是我们能修的。
 - 怎么改：这是计划修订，由写计划的规划会话决定（选项 A），不是执行时自己定的。案例换成 `ring-gear`「内齿圈：标准件内齿圈加外圈上一圈安装孔」，做法仍是"标准件"（`make_spur_ring_gear_rsolid`，实测有效，写法补进笔记第 21 节）；它和评测任务的直齿轮不是同一个零件。没选的两种：自己用草图画齿条齿形（和提示词"标准件不要自己画齿形"冲突）、换成斜齿轮（离评测的直齿轮太近）。
 - 影响：计划 1 Task 14 的 id 表那一行已同步修改；`tests/test_builtin_cases.py::test_there_are_eight_builtin_cases` 的 id 集合用 `ring-gear` 代替 `gear-rack`，`test_builtin_cases_are_not_benchmark_tasks` 照常要过，断言没有放松。
+
+## D14（第二版计划 2 Task 1）Claude 适配层：不发 temperature；工具调用那一轮原样放回思考块
+
+- 原计划：`AnthropicLLM.__init__` 有 `temperature: float = 0.2`（Task 4 的 Interfaces），转换规则里没有提到思考块；内部的 assistant 消息只有 `content` 和 `tool_calls`。
+- 实际情况（查文档，笔记第 8 节第 11、13 条）：
+  1. 新模型（Opus 5.5、Sonnet 5.5、Haiku 5.5 等）上非默认的 `temperature` 一律 400；API 版本 `2026-10-21` 起带上 `temperature` 就 400，不论取值。
+  2. Claude 5 系列默认开着思考；工具调用那一轮里，assistant 消息的思考块必须原样放回，不能改、不能只放一部分。内部的 OpenAI 写法没有地方放思考块，照计划转换会丢掉它们。
+- 怎么改：接口一字不改。
+  1. `temperature` 参数照收，保存在实例上，但不放进请求体；笔记里写明原因。
+  2. `AnthropicLLM` 自己记住最近几次回复的原始内容块（按这次回复里工具调用的 id 记）；转换消息时，`tool_calls` 的 id 和记下的某次回复完全一致的 assistant 消息，换成那次回复的全部原始块（思考块、文字块、工具调用块，原样）。对不上的（比如从日志恢复的会话）照计划的规则转换。模块级的 `to_anthropic_messages` 不变，只做计划写的转换。
+- 影响：只影响计划 2 Task 4；没有用真实接口验证过（笔记第 8 节）。

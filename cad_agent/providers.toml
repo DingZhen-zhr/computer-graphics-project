@@ -1,0 +1,68 @@
+# 模型服务的预设。地址和模型名在 2026-11-11 对照各家官方文档核实，出处见 docs/llm-api-notes.md 第 9 节。
+# 这里不写价格：价格由用户照各家价目页填在设置里，不填就只显示 token 数。
+# kind：openai = OpenAI 兼容接口；anthropic = Claude 官方接口。
+# vision：yes = 官方文档写明这些模型能看图；unknown = 没核实到（按不能处理，可以在设置里点"测试识图"）。
+# models：建议的模型名，第一个是默认；拿不准的不写，由用户自己填。
+
+[[provider]]
+id = "deepseek"
+name = "DeepSeek"
+kind = "openai"
+base_url = "https://api.deepseek.com"
+models = ["deepseek-flash", "deepseek-v4-pro"]
+api_key_env = "DEEPSEEK_API_KEY"
+vision = "unknown"
+
+[[provider]]
+id = "glm"
+name = "智谱 GLM"
+kind = "openai"
+base_url = "https://open.bigmodel.cn/api/paas/v4/"
+models = ["glm-5.3"]
+api_key_env = "ZAI_API_KEY"
+vision = "unknown"
+
+[[provider]]
+id = "kimi"
+name = "Kimi"
+kind = "openai"
+base_url = "https://api.moonshot.cn/v1"
+models = ["kimi-k3.1-pro"]
+api_key_env = "MOONSHOT_API_KEY"
+vision = "unknown"
+
+[[provider]]
+id = "qwen"
+name = "通义千问"
+kind = "openai"
+base_url = "https://dashscope.aliyuncs.com/compatible-mode/v1"
+models = ["qwen-plus"]
+api_key_env = "DASHSCOPE_API_KEY"
+vision = "unknown"
+
+[[provider]]
+id = "openai"
+name = "OpenAI"
+kind = "openai"
+base_url = "https://api.openai.com/v1"
+models = ["gpt-6-astra", "gpt-6.1-sol", "gpt-6.1-terra", "gpt-6-luna"]
+api_key_env = "OPENAI_API_KEY"
+vision = "yes"
+
+[[provider]]
+id = "claude"
+name = "Claude"
+kind = "anthropic"
+base_url = "https://api.anthropic.com"
+models = ["claude-opus-5-5", "claude-sonnet-5-5", "claude-haiku-5-5"]
+api_key_env = "ANTHROPIC_API_KEY"
+vision = "yes"
+
+[[provider]]
+id = "custom"
+name = "自定义地址"
+kind = "openai"
+base_url = ""
+models = []
+api_key_env = "CALIPER_API_KEY"
+vision = "unknown"

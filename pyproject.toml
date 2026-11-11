@@ -11,6 +11,8 @@ dependencies = [
     "simplecadapi[editor,verify]==2.2.7",
     "openai>=1.40",
     "pyyaml>=6",
+    "anthropic>=2.8",
+    "keyring>=25.7",
 ]
 
 [project.optional-dependencies]
@@ -21,7 +23,7 @@ include = ["cad_agent*"]
 exclude = ["tests*", "benchmarks*", "scripts*"]
 
 [tool.setuptools.package-data]
-cad_agent = ["agent/prompts/*.md", "case_data/*/case.yaml"]
+cad_agent = ["agent/prompts/*.md", "case_data/*/case.yaml", "providers.toml"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

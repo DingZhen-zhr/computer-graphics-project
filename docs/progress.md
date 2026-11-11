@@ -379,3 +379,19 @@
   6. 计划规定的接口带来的两处旧流程小变化：旧流程的 `update_brief` 也接受 `relations` 这个键，旧流程的检查项也接受 `stage`、`holds` 两个字段（旧流程的工具说明里没有它们，模型不会传；旧测试全部通过）。
   7. 自带案例的 YAML 是用一个临时脚本生成的，脚本没有放进仓库，以后改案例直接改 YAML。
   8. `CLAUDE.md` 按计划没有改（由写计划的人改）。
+
+## 第二版 计划 2 开工前：拆分 checks/spec.py —— 完成
+
+- 做了什么：`cad_agent/checks/spec.py`（337 行）拆成两个文件：表达式的解析和求值（`CheckSpecError`、`MAX_EXPR_LEN`、`expr_names`、`eval_expr` 和内部的白名单校验）搬到新文件 `cad_agent/checks/expr.py`（115 行），`spec.py` 剩检查项的格式、解析和覆盖规则（236 行），并从 `expr.py` 导入这几个名字，所以 `from cad_agent.checks.spec import …` 的写法全部照旧。行为不变，测试一条没改。
+- 测试：781 个全部通过（含 `sca`）。提交 `ccb3d87`。
+
+## 第二版 计划 2 Task 1：查文档，写笔记和预设 —— 完成
+
+- 做了什么：`docs/llm-api-notes.md` 新增第 8 节（Claude 接口的 15 条，逐条写了出处）和第 9 节（7 个服务的地址、模型名、key 变量名、识图、出处），另在第 2 节补了一条流式请求怎么拿用量；新文件 `cad_agent/providers.toml`（7 个预设，不写价格）和 `tests/test_providers_file.py`；`pyproject.toml` 加依赖 `anthropic>=2.8`、`keyring>=25.7`（当时的最新稳定版，已装好：anthropic 2.8.0、keyring 25.7.0），`package-data` 加 `providers.toml`。全程只查文档，没有调用任何模型接口。
+- 测试数量：新增 2 个（计划写的 `test_providers_file_shape`，另加"文件里没有价格"一条），全部测试 783 个全部通过。
+- 查文档时发现、要提前说的：
+  1. 已装的 anthropic SDK 自动带 `anthropic-version: 2026-10-21`，这个版本起请求里带 `temperature` 就 400；Claude 5 系列默认开着思考，工具调用那一轮的思考块必须原样放回。这两条计划没写到，记为偏离 D14：接口不改，适配层不发 `temperature`、自己记住并放回思考块（Task 4 实现）。
+  2. 通义千问的官方文档现在推荐"业务空间专属域名"（地址里带工作空间 id），预设用的是文档说"当前可继续使用"的共享域名 `https://dashscope.aliyuncs.com/compatible-mode/v1`。
+  3. 识图：只有 OpenAI 和 Claude 的文档写明"当前模型都能看图"，标 `yes`；GLM、Kimi、通义的默认模型能不能看图文档没写清楚，DeepSeek 文档里带图片的模型已下线，这四个都标 `unknown`（按不能处理）。
+  4. 除 DeepSeek 外，各服务的地址和模型名都没有用真实接口验证过（笔记第 9 节写明了）。
+- 说明：`providers.toml` 是在跑那条测试之前写的，没有先看到测试失败，这是我做事顺序上的疏忽；测试本身照计划写，断言没有放松。
