@@ -410,3 +410,19 @@
   1. **主循环只在界面设了 `on_delta` 时才给 `chat` 传这两个参数**；没设时（命令行、评测脚本、现有网页）调用方式和以前完全一样。原因：计划要求"不传时请求逐字相同"，而 `test_web.py` 里的假模型只接受 `chat(messages, tools)` 两个参数，计划又说旧测试一条不改。代价：没设 `on_delta` 的调用方点停止时，要等这次模型调用返回后才停（工具调用之间、沙盒运行中照样能停）。计划 3 的桌面端会设 `on_delta`。
   2. 计划的 `test_stop_during_llm_call` 写"这条回复没有进历史"：本轮结束时上下文会照常折叠出一条 assistant 消息（停止的那句话），所以测试断言的是"没说完的那条回复的文字不在上下文和日志里"。
 - 说明：Task 2、3 是一起写完后跑的全量测试（831 个全部通过，含 `sca`，约 9 分半），然后把两个任务的改动分开提交；`loop.py`、`execute.py` 里混有后面任务的改动，Task 2 的提交只暂存了它自己的那部分，并把暂存区单独导出跑了相关的非 `sca` 测试（244 个通过；唯一失败的 `test_committed_site_is_up_to_date` 是导出目录里换行符和源文件不同造成的，工作区里这条是通过的）。
+
+## 第二版 计划 2 Task 3：数据目录、钥匙串、预设、设置文件 —— 完成
+
+- 做了什么：
+  - `cad_agent/paths.py`：`app_home()`（`CALIPER_HOME` 优先，空白不算；Windows `%LOCALAPPDATA%\Caliper`，没有 `LOCALAPPDATA` 时退回 `~\AppData\Local\Caliper`；Mac `~/Library/Application Support/Caliper`；其他 `~/.caliper`）、`settings_path`、`sessions_dir`、`cases_dir`、`logs_dir`、`is_ascii_path`、`work_root()`。`run_job` 建临时目录时用 `dir=work_root()`。
+  - `cad_agent/keystore.py`：先环境变量后钥匙串（服务名 `caliper`、用户名是预设 id）；`key_hint` 只给"…"加后四位，不到 8 位只给"…"；空白 key 拒收；没有可用钥匙串时 `set_key` 抛中文 `KeyStoreError`，写明可以改用哪个环境变量（变量名从预设里查），`get_key` 返回 `None`；任何失败的报错文字都不转述底层异常（里面可能有 key），并且 `from None` 切断异常链。不退回到明文文件。
+  - `cad_agent/llm/providers.py`：读 `providers.toml`，`get_provider` 不存在时抛中文 `ConfigError`。
+  - `cad_agent/settings.py`：`Settings`、`load_settings`（文件不存在返回默认值；不认识的键、错误的取值都报中文 `ConfigError` 并写明是哪个键）、`save_settings`（自己写 TOML，先写同目录的临时文件再改名）、`to_config`。
+  - `Config` 新增 `kind`、`provider`、`vision`、`review`；`Phase` 加 `"review"`；`PhaseOverride` 加 `base_url`、`kind`、`api_key_env`（只有 `[llm.review]` 能写，`[llm.clarify]` 写了会报不认识的项）；配置文件新增 `[llm] kind`、`[llm] vision`、`[llm.review]`，都不写时和以前相同。
+- 测试数量：新增 32 个（`test_paths.py` 6、`test_keystore.py` 9、`test_settings.py` 17；计划列的之外多加了空白 `CALIPER_HOME`、空白环境变量退回钥匙串、key 前后空格、不认识的预设、带引号和中文的文字往返、保存不留临时文件、取值错误、自定义地址要填地址和模型、配置文件的 `[llm.review]` 等）。钥匙串的测试全部用内存里的假后端，key 都是 `test-key-0000` 这类假值。全部测试 831 个通过（和 Task 2 一起跑的，见 Task 2 的说明）。
+- 由我定的细节（Ruling）：
+  1. `Config` 里没有地方放"审查走哪家服务"，所以加了一个查询方法 `Config.endpoint(phase) -> (接口类型, 地址, key 的变量名)`，只有 `review` 会和基础设置不同；`LLMSettings` 没动（旧测试按位置比较它的 4 个字段）。
+  2. `Config.vision` 的意思定为"看图审查用的那个模型能不能识图"：审查换了一家服务时，`auto` 看的是审查那家的预设。
+  3. 自定义地址（`custom`）或者预设没有模型名时，`to_config` 要求用户填了地址和模型名，否则报中文错误。
+  4. 审查换了一家服务时，价目表仍沿用基础设置的（`Settings` 只有一份价目表），审查那一次的费用可能算得不准；计划 3 的设置页如果要分开填，再加字段。
+- 说明：这个任务我是先写完实现才去跑测试的，没有按顺序先看到失败；事后把四个新模块挪开跑了一次，三个测试文件都在导入时失败（模块不存在），再挪回来。

@@ -18,6 +18,7 @@ from typing import Callable, Iterable, Literal
 
 from cad_agent.checks.spec import CheckResult
 from cad_agent.notebook import RenderedNotebook
+from cad_agent.paths import work_root
 from cad_agent.sandbox.guard import clean_env
 
 GRACE_S = 30  # 子进程里除了运行模型，还要跑检查、导出、截图，所以外层超时比 timeout_s 多留一点
@@ -108,7 +109,7 @@ def run_job(
     给了 should_stop 时每 0.2 秒看一次，为真就结束子进程树，返回 error 类型为 Stopped 的结果。
     """
     started = time.monotonic()
-    workdir = Path(tempfile.mkdtemp(prefix="cad-agent-"))
+    workdir = Path(tempfile.mkdtemp(prefix="cad-agent-", dir=work_root()))   # 系统临时目录带中文时改用纯英文目录
     try:
         (workdir / "model.py").write_text(rendered.text, encoding="utf-8")
         job = {

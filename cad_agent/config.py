@@ -16,17 +16,25 @@ class ConfigError(Exception):
     """配置有问题；信息是中文，可以直接显示给用户。"""
 
 
-Phase = Literal["base", "clarify", "modeling"]
+Phase = Literal["base", "clarify", "modeling", "review"]
+Kind = Literal["openai", "anthropic"]
+KINDS = ("openai", "anthropic")
 
 
 @dataclass(frozen=True)
 class PhaseOverride:
-    """[llm.clarify] / [llm.modeling] 里写了的项；没写的是 None，沿用 [llm]。"""
+    """[llm.clarify] / [llm.modeling] / [llm.review] 里写了的项；没写的是 None，沿用 [llm]。
+
+    base_url、kind、api_key_env 只有 [llm.review] 能写：让看图审查走另一家服务。
+    """
 
     model: str | None = None
     temperature: float | None = None
     extra_body: dict | None = None
     pricing: Pricing | None = None
+    base_url: str | None = None
+    kind: Kind | None = None
+    api_key_env: str | None = None
 
 
 @dataclass(frozen=True)
@@ -55,6 +63,10 @@ class Config:
     max_tool_calls_per_stage: int = 25   # 分阶段时每个阶段的工具调用上限
     max_tool_calls_total: int = 200      # 分阶段时每轮的工具调用总上限（max_tool_calls 只在关掉分阶段时用）
     cases_dir: Path = field(default_factory=lambda: Path("cases"))
+    kind: Kind = "openai"                # 接口类型：OpenAI 兼容，或 Claude 官方接口
+    provider: str = ""                   # 预设 id（来自 settings.toml 时才有）
+    vision: bool = False                 # 看图审查用的模型能不能识图
+    review: PhaseOverride = field(default_factory=PhaseOverride)
 
     def api_key(self) -> str:
         key = os.environ.get(self.api_key_env, "").strip()
@@ -64,7 +76,7 @@ class Config:
 
     def llm_settings(self, phase: Phase) -> LLMSettings:
         """某个阶段实际用的模型设置：覆盖段写了的项用覆盖值（extra_body 整体替换，不合并），没写的沿用 [llm]。"""
-        override = {"base": PhaseOverride(), "clarify": self.clarify, "modeling": self.modeling}[phase]
+        override = {"base": PhaseOverride(), "clarify": self.clarify, "modeling": self.modeling, "review": self.review}[phase]
         return LLMSettings(
             model=self.model if override.model is None else override.model,
             temperature=self.temperature if override.temperature is None else override.temperature,
@@ -73,10 +85,17 @@ class Config:
         )
 
 
+    def endpoint(self, phase: Phase) -> tuple[Kind, str, str]:
+        """某个阶段连哪里：（接口类型, 地址, key 的环境变量名）。只有 review 能换服务，其余阶段都和 [llm] 相同。"""
+        o = self.review if phase == "review" else PhaseOverride()
+        return (o.kind or self.kind, o.base_url or self.base_url, o.api_key_env or self.api_key_env)
+
+
 # 段名 → {键: 类型}
 _SCHEMA: dict[str, dict[str, type | tuple[type, ...]]] = {
     "llm": {"base_url": str, "model": str, "api_key_env": str, "temperature": (int, float),
-            "extra_body": dict, "pricing": dict, "clarify": dict, "modeling": dict},
+            "extra_body": dict, "pricing": dict, "clarify": dict, "modeling": dict,
+            "kind": str, "vision": bool, "review": dict},
     "agent": {"run_timeout_s": (int, float), "max_build_failures": int, "max_tool_calls": int, "sessions_dir": str,
               "staged": bool, "mutation_check": bool, "visual_review": bool, "cases": bool,
               "max_tool_calls_per_stage": int, "max_tool_calls_total": int, "cases_dir": str},
@@ -84,6 +103,7 @@ _SCHEMA: dict[str, dict[str, type | tuple[type, ...]]] = {
 _GATE_KEYS = ("staged", "mutation_check", "visual_review", "cases")
 _POSITIVE_KEYS = ("max_tool_calls_per_stage", "max_tool_calls_total")
 _OVERRIDE_KEYS: dict[str, type | tuple[type, ...]] = {"model": str, "temperature": (int, float), "extra_body": dict, "pricing": dict}
+_REVIEW_KEYS: dict[str, type | tuple[type, ...]] = {**_OVERRIDE_KEYS, "base_url": str, "kind": str, "api_key_env": str}
 _PRICING_KEYS = ("input_hit", "input_miss", "output")
 
 
@@ -110,16 +130,25 @@ def _parse_pricing(section: str, data: dict) -> Pricing:
     return Pricing(*(float(data[k]) for k in _PRICING_KEYS))
 
 
+def _check_kind(section: str, value: str) -> None:
+    if value not in KINDS:
+        raise ConfigError(f"[{section}] 的 kind 只能是 {' 或 '.join(KINDS)}，收到 {value!r}")
+
+
 def _parse_override(section: str, data: dict) -> PhaseOverride:
-    unknown = sorted(set(data) - set(_OVERRIDE_KEYS))
+    allowed = _REVIEW_KEYS if section == "llm.review" else _OVERRIDE_KEYS
+    unknown = sorted(set(data) - set(allowed))
     if unknown:
-        raise ConfigError(f"[{section}] 里有不认识的项 {'、'.join(unknown)}；可用项：{'、'.join(_OVERRIDE_KEYS)}")
-    for key, typ in _OVERRIDE_KEYS.items():
+        raise ConfigError(f"[{section}] 里有不认识的项 {'、'.join(unknown)}；可用项：{'、'.join(allowed)}")
+    for key, typ in allowed.items():
         if key in data:
             _check_type(section, key, data[key], typ)
+    if "kind" in data:
+        _check_kind(section, data["kind"])
     return PhaseOverride(
         model=data.get("model"), temperature=data.get("temperature"), extra_body=data.get("extra_body"),
         pricing=_parse_pricing(f"{section}.pricing", data["pricing"]) if "pricing" in data else None,
+        base_url=data.get("base_url"), kind=data.get("kind"), api_key_env=data.get("api_key_env"),
     )
 
 
@@ -158,7 +187,9 @@ def load_config(path: Path) -> Config:
     values["gates"] = Gates(**{k: values.pop(k) for k in _GATE_KEYS if k in values})
     if "pricing" in values:
         values["pricing"] = _parse_pricing("llm.pricing", values["pricing"])
-    for phase in ("clarify", "modeling"):
+    if "kind" in values:
+        _check_kind("llm", values["kind"])
+    for phase in ("clarify", "modeling", "review"):
         if phase in values:
             values[phase] = _parse_override(f"llm.{phase}", values[phase])
     return Config(**values)
