@@ -16,6 +16,7 @@ from typing import Any
 
 from cad_agent.brief import Brief
 from cad_agent.checks.spec import CheckResult
+from cad_agent.llm.vision import redact_images
 
 VERSION_RE = re.compile(r"^v(\d+)$")
 
@@ -44,8 +45,8 @@ class Session:
         self.dir = candidate
 
     def log(self, kind: str, **data: Any) -> None:
-        """往 log.jsonl 追加一行；自动加上 ts 和 kind。"""
-        row = {"ts": _now().isoformat(timespec="milliseconds"), "kind": kind, **data}
+        """往 log.jsonl 追加一行；自动加上 ts 和 kind。图片块只记"图片 <字节数> 字节"，不记内容。"""
+        row = {"ts": _now().isoformat(timespec="milliseconds"), "kind": kind, **redact_images(data)}
         with (self.dir / "log.jsonl").open("a", encoding="utf-8") as f:
             f.write(json.dumps(row, ensure_ascii=False, default=str) + "\n")
 

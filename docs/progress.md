@@ -439,3 +439,9 @@
 - 查到的、和文档示例不一样的地方：已装的 anthropic 2.8.0 带 key 用的是 `Authorization: Bearer`，不是文档 curl 示例里的 `x-api-key`；流式读到一半断开时，SDK 抛的是 httpx2 的原始异常，不包装成 `APIConnectionError`。两条都补进了笔记第 8 节第 15 条（笔记的这部分改动跟着 Task 2 的提交进去了，是我暂存时多带了这个文件）。
 - **没有用真实接口验证**：整个适配层只经过假服务端测试；`Authorization: Bearer` 服务端认不认、思考块原样放回是否满足"不能改动"的检查、缓存标记是否真的命中，都没有验证。笔记第 8 节末尾写明了。
 - 说明：这个任务也是先写实现、后跑测试的，没有先看到失败（测试导入的模块当时还不存在，必然失败，但我没有亲自跑那一次）。
+
+## 第二版 计划 2 Task 5：图片消息与识图测试 —— 完成
+
+- 做了什么：新文件 `cad_agent/llm/vision.py`：`image_part`、`text_part`、`tiny_test_image`（只用标准库生成的 64×64 PNG，左半红、右半蓝，每次字节都一样）、`VISION_QUESTION`（原文照抄 F）、`test_vision`（不带工具发一条带图的 user 消息；回答里同时有"红""蓝"或 red、blue 算能识图；`LLMError` 时返回不能识图和原因的前 80 个字符，不抛异常；三句返回文字照抄 F）、`redact_images`。`Session.log` 写日志前用 `redact_images` 把图片块换成"图片 <字节数> 字节"，所以任何地方都不会把图片的 base64 写进日志。`OpenAICompatLLM` 不用改（原样发出）；`AnthropicLLM` 在 Task 4 里已经会把 `image_url` 转成 `image` 块。
+- 测试数量：新增 11 个（计划列的 8 个，多加了 `VISION_QUESTION` 逐字比对、日志脱敏遇到不合法的图片数据不崩（2 个））。先跑确认失败（模块不存在），再实现。全部测试通过（903 个）。
+- 说明：`test_vision` 这个函数名以 test 开头，加了 `__test__ = False`，免得被 pytest 当成测试。**识图测试没有用真实模型跑过**；它会花用户自己的钱，按设计只在用户点"测试识图"时运行（界面是计划 3 的事）。
