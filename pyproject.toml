@@ -13,6 +13,7 @@ dependencies = [
     "pyyaml>=6",
     "anthropic>=2.8",
     "keyring>=25.7",
+    "pywebview>=6.2",
 ]
 
 [project.optional-dependencies]
@@ -23,7 +24,8 @@ include = ["cad_agent*"]
 exclude = ["tests*", "benchmarks*", "scripts*"]
 
 [tool.setuptools.package-data]
-cad_agent = ["agent/prompts/*.md", "agent/prompts/*.json", "case_data/*/case.yaml", "providers.toml"]
+cad_agent = ["agent/prompts/*.md", "agent/prompts/*.json", "case_data/*/case.yaml", "providers.toml",
+             "desk/static/**/*", "desk/demo_data/**/*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

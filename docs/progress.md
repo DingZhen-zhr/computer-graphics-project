@@ -495,3 +495,13 @@
 - 测试：照计划只删了 8 条（`test_password_gate`、`test_budget_stops_new_messages`、`test_main_public_needs_password_and_pricing`、`test_public_launcher_and_gitignore`、`test_each_visitor_gets_their_own_session`、`test_too_many_busy_visitors_wait`、`test_visitor_limit_and_health`、`test_export_keeps_live_json`）和只给它们用的三个小函数（`login`、`make_pool`、`cookie_call`），新加 `test_public_mode_is_gone`，先运行看到它失败，再改代码。全部测试 905 个通过（912 − 8 + 1），用时约 10 分钟。
 - 偏离 D15：three.js 原样文件的一句代码注释里有 "budget"，测试跳过 `vendor/`；argparse 自带的英文报错换成"不认识的参数"。
 - 提醒：`tools\cloudflared.exe` 不在仓库里（`.gitignore` 忽略了 `tools/`），以后用不到了，可以自己删掉。
+
+## 第二版 计划 3 Task 2：窗口探测，视觉规范落成文件 —— 完成
+
+- 探测（Step 0，`scripts/probe_webview.py`）：装了 pywebview 6.2.1（用户批准的依赖；连带装了它自己的依赖 pythonnet 3.2.1、clr_loader 0.3.1、bottle 0.13.4、proxy_tools 0.1.0）。在这台 Windows 11 上，pywebview 用的后端是 `edgechromium`（WebView2，内核 Edg/157）。三件事都行：
+  1. 窗口能开（亲眼截图看到了"探测 pywebview"窗口）；
+  2. three.js r160 的方块在转：页面报回 WebGL 可用，12 秒画了 662 帧，截图里方块是转着的；
+  3. SSE 在跳：12 秒收到 11 条服务端推来的消息。
+  关掉窗口后进程正常退出（返回 0，从启动到退出共 14 秒）。所以不需要退到只做 `--browser`。
+- 做了什么：新包 `cad_agent/desk/`；`static/css/tokens.css`（浅色写在 `:root`，深色写在 `:root[data-theme="dark"]`，`data-theme="system"` 时用 `prefers-color-scheme` 选；颜色值逐个照抄计划；另加了一个计划没列的 `--paper-2`，是比底色深一点的纸色，给悬停和选中行用）；`static/css/base.css`（重置、14px 正文、三种按钮、输入框、2px 强调色焦点描边、小节标题的尺寸线、状态文字、减少动态效果）；`pyproject.toml` 加依赖 `pywebview>=6.2`，`package-data` 加 `desk/static/**/*`、`desk/demo_data/**/*`。
+- 测试：`tests/test_desk_style.py` 8 个（计划的 6 个，另加"跟随系统时用深色那一套"和"基础样式里有三种按钮、小节标题、状态文字"两个），先运行看到 8 个全部失败，再写样式。全部测试 913 个通过。两套配色对比度实测：浅色 正文 15.27、次要 5.0、强调 5.88、通过 5.66、不通过 5.79；深色 12.38、7.02、10.04、8.49、6.34。
