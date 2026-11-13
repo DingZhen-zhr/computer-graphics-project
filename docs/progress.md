@@ -539,3 +539,12 @@
   3. "在文件夹中显示"用模块里的 `reveal_path`（Windows `os.startfile`），测试里换掉它，不会真的弹出资源管理器。
   4. SSE 的连接带 `Connection: close`，每 15 秒一行注释；服务关闭时 SSE 线程在下一次等待结束后退出。
 - 测试：`tests/test_desk_server.py` 21 个（计划 15 个，另加保活注释、`case` 和 `reveal` 接口、`extra` 路由、静态文件路径穿越、F5 恢复页）。先运行看到没有模块而失败，再实现；实现后 SSE 的读取在测试客户端里先解析错了（把响应头和第一条事件当成一块），修的是测试客户端。全部测试 986 个通过。
+
+## 第二版 计划 3 Task 7：启动信息、设置、key、测试连接、案例的接口 —— 完成
+
+- 做了什么：`cad_agent/desk/settings_api.py`（`make_settings_routes(hub, make_llm_for=...)`）：`/api/boot`、`/api/settings`（读、写；只接受 `Settings` 有的键，值不对 400）、`/api/key`（存、删；首尾空白由 `keystore.set_key` 去掉；钥匙串不可用时 400，说明里有环境变量名）、`/api/test-connection`、`/api/test-vision`（成功时把设置里的 `vision` 改成 `on`）、`/api/cases`、`DELETE /api/cases/<id>`（自带的 403）。写设置、存删 key 之后调用 `hub.refresh_agents()`。测试连接、测试识图在另一个线程里跑，最多等 15 秒，超时给"连不上模型服务。请检查网络和地址。"；四种结果的文字照"界面文字"原文。
+- 由我定的细节：
+  1. `make_llm_for(设置, 阶段)` 的第二个参数我理解为阶段（`"clarify"` 用于测试连接，`"review"` 用于测试识图），密钥由它自己从环境变量或钥匙串取；这样这个文件从头到尾不经手密钥的值。没有密钥时它抛 `ConfigError`，接口把说明原样给页面。
+  2. 报错分类按我们自己客户端写的中文报错判断（"拒绝了请求（401/403）"→ 密钥不对；"网络连接失败""超时"→ 连不上；其余 → "模型服务返回了错误：<前 80 字>"）。有的服务会在报错里回显 key，所以给页面之前先把 key（以及像 `sk-…` 的串）换成"…"——`test_no_key_in_any_response` 就是用一个会回显假 key 的报错测的。
+  3. 后来做设置页时发现"数据目录：打开文件夹"没有接口，加了 `POST /api/open-data`（先写了测试 `test_open_data_folder`，看到失败再加）。
+- 测试：`tests/test_desk_settings_api.py` 21 个（计划 18 个，另加网络和其他报错、没有密钥、打开数据目录）。先运行看到没有模块而失败，再实现。全部测试 1007 个通过。
