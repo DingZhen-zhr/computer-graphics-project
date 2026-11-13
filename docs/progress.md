@@ -548,3 +548,16 @@
   2. 报错分类按我们自己客户端写的中文报错判断（"拒绝了请求（401/403）"→ 密钥不对；"网络连接失败""超时"→ 连不上；其余 → "模型服务返回了错误：<前 80 字>"）。有的服务会在报错里回显 key，所以给页面之前先把 key（以及像 `sk-…` 的串）换成"…"——`test_no_key_in_any_response` 就是用一个会回显假 key 的报错测的。
   3. 后来做设置页时发现"数据目录：打开文件夹"没有接口，加了 `POST /api/open-data`（先写了测试 `test_open_data_folder`，看到失败再加）。
 - 测试：`tests/test_desk_settings_api.py` 21 个（计划 18 个，另加网络和其他报错、没有密钥、打开数据目录）。先运行看到没有模块而失败，再实现。全部测试 1007 个通过。
+
+## 第二版 计划 3 Task 8：页面骨架、状态管理、侧栏、主题 —— 完成
+
+- 开工前：照计划运行了 `ui-consistency:finding-patterns`（同类页面只有旧网页一个，读了它的 `dom.js`、`index.html`；视觉数值全部按计划换掉），把结果和计划原文的"界面清单"合并写进 `docs/ui-checklist.md`。
+- 做了什么：`index.html`（顶栏、三栏、连接断开的提示行、提示条、对话框、图标模板）、`css/layout.css`、`js/main.js`、`api.js`、`store.js`、`format.js`、`dom.js`、`theme.js`、`sidebar.js`。三栏是 `240px | minmax(420px, 36fr) | minmax(440px, 64fr)`，1100 宽时正好放下。造页面一律用 `dom.js` 的 `h()`，文字只走 `textContent`，没有 `innerHTML`。
+- 由我定的细节（Ruling）：
+  1. `store.js` 按事件的 `seq` 去重：完整状态之后只接比它新的事件，所以断线重连、切会话、`resync` 后再取状态都不会重复也不会漏；完整状态里正在运行的那一轮（`pending`）放进末尾的"进行中"项，切回来时逐字输出接着往下走。
+  2. 删除会话的确认用页面自己的 `<dialog>`（默认焦点在"取消"上），不用系统的 `confirm`。
+  3. 图标放在 `index.html` 的 `<template>` 里由脚本复制（用 `createElementNS` 的话脚本里会出现 SVG 命名空间网址，和"页面里不出现 http"的规定冲突）。
+  4. 计划写的 `node --test cad_agent/desk/static/js/tests/` 在 Node 22 上不认目录，`test_node_tests_pass` 改为把目录下的 `*.test.js` 逐个传给 `node --test`（测的内容不变）。
+  5. 提交的时候，`main.js` 用的是只接到这一任务为止的版本（对话栏、工作台、整页由后面的任务接上），`chat.css`、`bench.css`、`pages.css` 先是只有一行说明的空文件；提交前把暂存的这一版单独取出来，全部脚本 `node --check` 通过、它带的 20 个 node 测试通过。
+- 测试：`js/tests/store.test.js`（计划 10 个 + 2 个）、`format.test.js`（6 组）、`api.test.js`（2 个）、`tests/test_desk_static.py` 7 个；先运行看到模块不存在而失败，再实现。全部测试 1014 个通过。
+- 看一遍（应用内置浏览器，1100×700 和 1600×1000，浅色、深色）：三栏、新建、切换、改名（回车保存）、删除（确认框）、切主题都对；停掉服务后顶栏下出现"✗ 连接断开，正在重试"，服务回来后自动接上并重新取了状态。发现并修掉：三栏一开始没撑满高度（隐藏的提示行不占网格的行，三栏落进了 `auto` 行），改为给每一块指定网格行。
