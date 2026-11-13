@@ -511,3 +511,15 @@
 - 做了什么：`Session.open`（不新建，目录不存在抛 `FileNotFoundError`）、`read_log`（坏行、不是对象、没有 kind 的都跳过）、`meta`、`set_meta`；`Context.restore`；新文件 `cad_agent/agent/resume.py`：`load_workspace`、`past_turns`、`resume_agent`。旧会话（没有 `plan.json` 但有特征）按计划造一个"整体 / 零件完成"的单阶段计划，特征和检查都归 `s1`，有版本时标成已通过。`resume_agent` 之后 `awaiting_confirmation` 看最后一轮是不是 `confirm`；分阶段时需求单打开 `require_relations`（和 ToolBox 造工作区时一样）；看图审查的图片目录 `review/round-<n>` 接着已有的编号，不覆盖。
 - 计划的 Files 里写了改 `loop.py`，实际不用改：恢复只需要换工作区和上下文，`Agent` 的接口够用。
 - 测试：`tests/test_resume.py` 10 个（计划的 7 个，另加"目录不存在报错""空会话读出空工作区""restore 拷贝了传入的列表"3 个），先运行看到因为没有 `resume` 模块而全部失败，再实现。全部测试 923 个通过。
+
+## 第二版 计划 3 Task 4：事件流和工作台 —— 完成
+
+- 做了什么：`cad_agent/desk/bus.py`（`EventBus`：seq 从 1 递增、只留最近 2000 条、太旧的位置返回一条 `resync`、事件深拷贝）；`view.py`（`build_state`，键照计划）；`workbench.py`（`Busy`、`Workbench`）。为了一个文件只做一件事，另拆了三个小文件：`labels.py`（工具开始时的一句说明、结束时的一句结果）、`transcript.py`（日志折叠成对话记录，用户 / 助手 / 工具树三种项）、`stl_info.py`（从版本的 STL 直接算外形尺寸和体积，版本目录里本来没存这两个数）。
+- 由我定的细节（Ruling）：
+  1. 工具是"执行完才写日志"的，没有"开始执行"的钩子：工作台在收到这次回复的 `assistant` 日志时排好队，第一个工具马上发 `tool_start`，每收到一条 `tool` 日志发 `tool_end` 再开始下一个，所以页面上同一时刻只有正在执行的那一个在转；这一轮提前结束（比如停止）时，已经开始但没执行的那个补一条 `ok=false` 的 `tool_end`，免得一直转。
+  2. 工作台在写 `tool` 日志时多记一个字段 `stage_at`（这个工具开始时的当前阶段），重开会话时工具树靠它分到正确的阶段下；旧日志没有这一项，工具都放进 `loose`。
+  3. 写日志、发事件、取完整状态用同一把锁，`state()` 里的 `last_seq` 和内容对得上；正忙时状态用最近一次写日志时深拷贝的工作区（工作线程同时在改，不能直接读）。完整状态多一个键 `pending`（正在逐字输出的文字和正在执行的工具），让切走再切回来的页面能接着显示（Review Focus 1）。
+  4. 工作线程里的意外异常：程序日志记堆栈，会话日志记一条 `error`（文字是固定的中文说明，不带异常原文），再发 `error` 事件。
+  5. 示例会话的工作台没有智能体，传入的 `agent` 是 `None`（接口的类型标注照计划写 `Agent`，没改）。
+  6. 一次 build 只是"本阶段通过、下一个阶段还没写"时，工具树里算顺利（`ok`），不算失败。
+- 测试：`tests/test_desk_bus.py` 7 个（计划 6 个 + 事件是拷贝）、`tests/test_desk_workbench.py` 15 个（计划 11 个 + 工具开始结束成对交替、提问项带问题列表、空消息报错、关闭时停掉正在跑的一轮）；先运行看到因为没有模块而失败，再实现。实现后 `test_events_for_a_full_turn` 失败过一次（上面第 6 条），改了判定后通过。全部测试 945 个通过。
