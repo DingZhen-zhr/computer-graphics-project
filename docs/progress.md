@@ -529,3 +529,13 @@
 - 做了什么：`cad_agent/desk/hub.py`（`Hub`：列表、新建、打开时从目录恢复、改名、删除、最多同时开 8 个工作台、设置改了换智能体）。会话 id 只认字母、数字、短横线；示例会话的 id 是 `demo-<目录名>`，必须正好是示例目录里有的那个（目录名 `phone_stand` 带下划线，所以示例不走 id 的正则，而是走白名单）；`..`、`a/b`、空文字、`demo-..` 都当作不存在（`FileNotFoundError`）。新建时 `meta.json` 写 `created`、`updated`；标题按 meta → 零件名 → "新会话"。
 - 由我定的细节：`refresh_agents` 对空闲的工作台立刻换上按新设置造的智能体（`Workbench._replace_agent`，这个小函数跟着 Task 4 的提交进去了）；正忙的先记下，等它空下来、下次被打开时再换。换的时候造智能体失败（比如新设置不完整）就继续用旧的，原因写进程序日志。LRU 只关空闲的，全在忙就先不关。
 - 测试：`tests/test_desk_hub.py` 20 个（计划 10 个；坏 id 那一条按 9 种写法参数化；另加"忙的不被 LRU 关掉""close 关掉全部"）。先运行看到没有模块而失败；实现后 `test_title_falls_back_to_part_name` 失败过一次：测试原来靠工厂给的需求单，但恢复会话时需求单应当以目录里的文件为准，所以改成先在会话目录里放好需求单（测试的断言没变）。全部测试 965 个通过。
+
+## 第二版 计划 3 Task 6：HTTP 服务 —— 完成
+
+- 做了什么：`cad_agent/desk/server.py`（`make_desk_server`：只监听 127.0.0.1；Host、Origin、令牌三道检查；页面、静态文件、`/files/`、SSE）和 `routes.py`（会话相关的接口和版本文件白名单，不碰 HTTP，方便测试和保持文件不超过 300 行）。`/static/vendor/three/` 取自旧网页包里的 three.js r160；页面带内容安全策略（脚本只能来自本机，内联的 import map 按哈希放行）；所有返回带 `Referrer-Policy: no-referrer`（页面地址里带过令牌）。
+- 由我定的细节：
+  1. 页面加载后会把令牌从地址栏去掉（计划 Task 8 的要求），所以按 F5 重新加载时没有令牌。走查时发现这会落到一个 403 的 JSON 上。解决：页面把令牌也存进这个标签页自己的 `sessionStorage`（别的网站读不到），浏览器（`Accept` 里有 `text/html`）没带令牌请求 `/` 时，服务端回一个不含任何令牌的小页面，用存着的令牌重新进来；不是浏览器的请求仍然是 JSON 的 403。加了测试 `test_reload_without_token_gets_a_recovery_page`。
+  2. 请求体超过 200 KB：先把多出来的读掉（最多读到 4 MB）再回 400 并断开。第一次跑全量测试时 `test_bad_json_is_400` 失败了一次：服务端没读完就断开，Windows 上对方还在发送就被重置（`WinError 10053`），单独跑时碰巧能过。改成先读掉后，这个文件连续跑 3 次都过，全量重跑通过。
+  3. "在文件夹中显示"用模块里的 `reveal_path`（Windows `os.startfile`），测试里换掉它，不会真的弹出资源管理器。
+  4. SSE 的连接带 `Connection: close`，每 15 秒一行注释；服务关闭时 SSE 线程在下一次等待结束后退出。
+- 测试：`tests/test_desk_server.py` 21 个（计划 15 个，另加保活注释、`case` 和 `reveal` 接口、`extra` 路由、静态文件路径穿越、F5 恢复页）。先运行看到没有模块而失败，再实现；实现后 SSE 的读取在测试客户端里先解析错了（把响应头和第一条事件当成一块），修的是测试客户端。全部测试 986 个通过。
