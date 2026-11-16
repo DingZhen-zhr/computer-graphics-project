@@ -1,1 +1,53 @@
-/* pages：后面的任务再填。颜色只用 tokens.css 的变量。 */
+/* 整页：引导、设置、案例库。颜色只用 tokens.css 的变量。 */
+
+.page-narrow { max-width: 720px; margin: 0 auto; padding: var(--s-6) var(--s-5); display: flex; flex-direction: column; gap: var(--s-4); }
+.page-title { font-size: 20px; font-weight: 600; letter-spacing: .04em; }
+.page-top { display: flex; justify-content: space-between; align-items: baseline; }
+.page-actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s-2); }
+.field-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: var(--s-3); }
+.field.wide input { max-width: 420px; }
+.note-block { max-width: 36em; border-left: 1px solid var(--line-soft); padding-left: var(--s-3); }
+
+/* ---- 引导 ---- */
+.ruler.steps { max-width: 420px; margin-bottom: var(--s-3); }
+.ruler.steps .tick-label { font-size: 11px; }
+.choice-list { display: flex; flex-direction: column; border-top: 1px solid var(--line-soft); }
+.choice {
+  display: grid; grid-template-columns: 9em minmax(0, 1fr); gap: var(--s-3); align-items: baseline; text-align: left;
+  padding: var(--s-2) var(--s-3); border: 0; border-bottom: 1px solid var(--line-soft); border-left: 2px solid transparent;
+  background: transparent; cursor: pointer;
+}
+.choice:hover { background: var(--paper-2); }
+.choice.on { border-left-color: var(--accent); background: var(--paper-2); }
+.choice-name { font-weight: 600; }
+.key-input { font-family: var(--font-mono); width: 100%; max-width: 420px; }
+
+/* ---- 设置 ---- */
+.settings { display: grid; grid-template-columns: 200px minmax(0, 1fr); height: 100%; }
+.set-nav { border-right: 1px solid var(--line); padding: var(--s-5) var(--s-3); display: flex; flex-direction: column; gap: var(--s-4); }
+.set-nav ol { display: flex; flex-direction: column; gap: 2px; }
+.set-nav a { display: flex; gap: var(--s-2); padding: var(--s-1) var(--s-2); color: var(--ink); text-decoration: none; font-size: 13px; }
+.set-nav a:hover { background: var(--paper-2); }
+.set-nav .mono { color: var(--ink-2); font-size: 11px; }
+.set-body { overflow-y: auto; padding: var(--s-6) var(--s-6) 30vh; display: flex; flex-direction: column; gap: var(--s-6); max-width: 760px; }
+.set-block { display: flex; flex-direction: column; gap: var(--s-3); scroll-margin-top: var(--s-5); }
+.set-block .field { max-width: 420px; }
+.set-note { font-size: 13px; }
+.toggle { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: var(--s-3); align-items: start; padding: var(--s-2) 0; border-bottom: 1px solid var(--line-soft); cursor: pointer; }
+.toggle input { margin-top: 4px; }
+.toggle-text { display: flex; flex-direction: column; gap: 2px; }
+.radio-row { display: flex; gap: var(--s-5); }
+.radio { display: flex; gap: var(--s-2); align-items: center; cursor: pointer; }
+.path { word-break: break-all; }
+.table.about { max-width: 420px; }
+
+/* ---- 案例库 ---- */
+.case-list { display: flex; flex-direction: column; }
+.case { padding: var(--s-3) 0; border-bottom: 1px solid var(--line-soft); display: flex; flex-direction: column; gap: var(--s-1); }
+.case-head { display: flex; align-items: baseline; gap: var(--s-3); }
+.case-head h3 { font-size: 14px; font-weight: 600; }
+.case-tags { display: flex; flex-wrap: wrap; gap: var(--s-1); flex: 1; }
+.case-request { font-size: 13px; }
+.case-stages { display: flex; flex-wrap: wrap; gap: var(--s-1) var(--s-4); color: var(--ink-2); }
+.empty-note { display: flex; flex-direction: column; align-items: flex-start; gap: var(--s-1); }
+.fatal { padding: var(--s-6); grid-column: 1 / -1; }

@@ -7,7 +7,10 @@ import { renderModel, viewVersion } from "./bench-model.js";
 import { renderParams } from "./bench-params.js";
 import { renderVersions } from "./bench-versions.js";
 import { renderTitleblock } from "./titleblock.js";
+import { renderCases } from "./cases.js";
 import { renderChat } from "./chat.js";
+import { renderOnboarding } from "./onboarding.js";
+import { renderSettings } from "./settings.js";
 import { $, clear, h, button, toast, icon } from "./dom.js";
 import { applyEvent, dispatch, emptyState, getState, onChange, setState } from "./store.js";
 import { renderSidebar } from "./sidebar.js";
@@ -149,6 +152,29 @@ registerView((state) => renderBench($("bench"), state, {
   versions: (panel, s) => renderVersions(panel, s, benchActions),
   titleblock: (slot, s) => renderTitleblock(slot, s, benchActions),
 }));
+
+const pageActions = {
+  boot: () => app.boot,
+  setBoot: (b) => { app.boot = b; renderTop(getState()); },
+  toast,
+  close: () => backToSession(),
+  openDemo: () => { const d = app.sessions.find((x) => x.demo); if (d) openSession(d.id); else backToSession(); },
+  start: () => createSession(),
+};
+registerPage("onboarding", (el) => renderOnboarding(el, pageActions));
+registerPage("settings", (el) => renderSettings(el, pageActions));
+registerPage("cases", (el) => renderCases(el, pageActions));
+
+function backToSession() {
+  if (app.currentId) {
+    closePage();
+    renderSide();
+    return;
+  }
+  const mine = app.sessions.find((x) => !x.demo);
+  if (mine) openSession(mine.id);
+  else createSession();
+}
 
 function modelName() {
   const b = app.boot;
