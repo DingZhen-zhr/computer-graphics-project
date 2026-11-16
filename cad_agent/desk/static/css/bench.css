@@ -1,1 +1,48 @@
-/* bench：后面的任务再填。颜色只用 tokens.css 的变量。 */
+/* 右栏：页签、模型页签（3D、工具条、阶段刻度）、检查、参数、版本、标题栏。颜色只用 tokens.css 的变量。 */
+
+/* ---- 页签 ---- */
+.tabs { display: flex; border-bottom: 1px solid var(--line); padding: 0 var(--s-3); gap: var(--s-1); }
+.tab {
+  height: 38px; padding: 0 var(--s-3); border: 0; background: transparent; cursor: pointer;
+  font-size: 13px; color: var(--ink-2); border-bottom: 2px solid transparent; margin-bottom: -1px;
+}
+.tab:hover { color: var(--ink); }
+.tab[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--accent); font-weight: 600; }
+.panels { flex: 1; min-height: 0; position: relative; }
+.panel { position: absolute; inset: 0; overflow: auto; }
+.panel[hidden] { display: none; }
+.panel-model { display: flex; flex-direction: column; overflow: hidden; }
+
+/* ---- 模型 ---- */
+.model-bar { display: flex; justify-content: space-between; align-items: center; gap: var(--s-2); padding: var(--s-2) var(--s-3); }
+.model-tools { display: flex; gap: var(--s-1); }
+.btn[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); }
+.version-select { font-family: var(--font-mono); font-size: 12px; height: 24px; padding: 0 var(--s-1); }
+.model-stage { position: relative; flex: 1; min-height: 0; margin: 0 var(--s-3); border: 1px solid var(--line-soft); }
+.viewport { position: absolute; inset: 0; overflow: hidden; }
+.viewer-canvas { display: block; width: 100%; height: 100%; cursor: grab; }
+.viewer-canvas:active { cursor: grabbing; }
+.dim-labels { position: absolute; inset: 0; pointer-events: none; }
+.dim-label {
+  position: absolute; left: 0; top: 0; padding: 0 3px; background: var(--paper);
+  font-family: var(--font-mono); font-size: 11px; color: var(--accent); white-space: nowrap;
+}
+.shot { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; background: var(--paper); }
+.viewer-note {
+  position: absolute; left: 0; right: 0; top: 0; padding: var(--s-1) var(--s-3);
+  border-bottom: 1px solid var(--line-soft); background: var(--paper); font-size: 12px; color: var(--ink-2);
+}
+.bench-empty { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: flex-start; justify-content: center; gap: var(--s-2); padding: var(--s-6); }
+.bench-empty p { max-width: 32em; color: var(--ink-2); }
+.bench-empty .btn { padding-left: 0; color: var(--accent); }
+
+/* 阶段回看：一条带刻度的尺寸线，刻度可以点 */
+.stage-ruler { padding: var(--s-2) var(--s-4) var(--s-3); min-height: 48px; }
+.ruler.wide { max-width: none; }
+.tick-btn { display: flex; flex-direction: column; align-items: center; gap: 2px; background: transparent; border: 0; padding: 0 2px; cursor: pointer; }
+.tick-btn:hover .tick-label { color: var(--ink); }
+.stage-ruler .tick.done .tick-mark { background: var(--paper); }
+.stage-ruler .tick.current .tick-mark { background: var(--accent); border-color: var(--accent); }
+
+/* 留出右下角标题栏的位置 */
+.titleblock-slot { flex: none; }

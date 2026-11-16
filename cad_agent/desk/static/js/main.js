@@ -1,6 +1,8 @@
 // 启动和路由：取启动信息、主题、会话列表；打开一个会话 = 取完整状态 + 从它的 last_seq 订阅事件。
 // 事件流断了：顶栏下面显示"连接断开，正在重试"；接上以后先取一次完整状态，再接着收事件（store 按 seq 去重）。
 import { configure, del, get, post, subscribe, tokenParam } from "./api.js";
+import { renderBench, showTab } from "./bench.js";
+import { renderModel, viewVersion } from "./bench-model.js";
 import { renderChat } from "./chat.js";
 import { $, clear, h, button, toast, icon } from "./dom.js";
 import { applyEvent, dispatch, emptyState, getState, onChange, setState } from "./store.js";
@@ -113,6 +115,40 @@ export async function reveal(version) {
 
 const chatActions = { send: (t) => sendMessage(t), stop: () => stopTurn(), reveal: (v) => reveal(v), fileUrl: (v, n) => fileUrl(v, n) };
 registerView((state) => renderChat($("chat"), state, chatActions));
+
+const sid = () => encodeURIComponent(app.currentId);
+const benchActions = {
+  fileUrl: (v, n) => fileUrl(v, n),
+  focusInput: () => document.querySelector(".composer-input")?.focus(),
+  send: (t) => sendMessage(t),
+  toast,
+  reveal: (v) => reveal(v),
+  showModel: (v) => { showTab("model"); viewVersion(v); },
+  modelName: () => modelName(),
+  applyParams: async (values) => {
+    const { status, body } = await post(`/api/sessions/${sid()}/params`, { values });
+    return status === 200 ? body : { ok: false, text: body.error, failed_checks: [] };
+  },
+  diff: async (a, b) => {
+    const { status, body } = await get(`/api/sessions/${sid()}/diff?a=${a}&b=${b}`);
+    return status === 200 ? body.lines : [];
+  },
+  saveCase: async (title, tags) => {
+    const { status, body } = await post(`/api/sessions/${sid()}/case`, { title, tags });
+    toast(status === 200 ? "已存为案例，可以在案例库里看到。" : body.error);
+  },
+};
+registerView((state) => renderBench($("bench"), state, {
+  model: (panel, s) => renderModel(panel, s, benchActions),
+}));
+
+function modelName() {
+  const b = app.boot;
+  if (!b) return "";
+  const p = (b.providers || []).find((x) => x.id === b.settings.provider);
+  return b.settings.model || (p && p.models[0]) || "";
+}
+
 const sideActions = {
   open: (id) => openSession(id),
   create: () => createSession(),
