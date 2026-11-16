@@ -46,3 +46,61 @@
 
 /* 留出右下角标题栏的位置 */
 .titleblock-slot { flex: none; }
+
+/* ---- 检查、参数、版本的公共部分 ---- */
+.pane { padding: var(--s-4) var(--s-4) var(--s-5); display: flex; flex-direction: column; gap: var(--s-5); }
+.bench-empty.static { position: static; padding: var(--s-6) var(--s-5); }
+.big-count { display: flex; align-items: baseline; gap: var(--s-3); }
+.num.big { font-size: 32px; line-height: 1; letter-spacing: -.02em; text-align: left; }
+.num.big.ok { color: var(--ok); }
+.num.big.bad { color: var(--bad); }
+.table.checks td:nth-child(2) { word-break: break-all; }
+.group-row th { padding-top: var(--s-3); font-size: 12px; font-weight: 600; color: var(--ink); border-bottom: 1px solid var(--line-soft); text-align: left; }
+.row-bad td { color: var(--bad); }
+.plain-list { padding-left: var(--s-4); list-style: "– "; font-size: 13px; }
+
+/* 看图审查的四张小图 */
+.review-views { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--s-2); margin-bottom: var(--s-3); }
+.view-thumb { display: flex; flex-direction: column; gap: 2px; padding: 0; border: 1px solid var(--line-soft); background: transparent; cursor: zoom-in; }
+.view-thumb img { width: 100%; aspect-ratio: 4 / 3; object-fit: contain; }
+.dialog-body.zoom { padding: var(--s-3); align-items: flex-end; }
+.dialog-body.zoom img { max-width: min(80vw, 900px); max-height: 70vh; }
+.dialog:has(.zoom) { max-width: none; }
+
+/* ---- 参数 ---- */
+.lock-note { padding: var(--s-2) var(--s-3); border: 1px dashed var(--line-soft); font-size: 13px; }
+.params-edit td { vertical-align: middle; }
+.params-edit tr.edited td:first-child { border-left: 2px solid var(--accent); padding-left: var(--s-2); }
+.params-edit .pname { display: block; }
+.params-edit .note { display: block; font-size: 11px; line-height: 1.4; max-width: 18em; }
+.param-input { width: 6.5em; text-align: right; font-family: var(--font-mono); }
+.param-input[aria-invalid="true"] { border-color: var(--bad); }
+.field-error { font-size: 11px; color: var(--bad); text-align: left; white-space: normal; }
+.params-edit .unit { width: 2.5em; }
+.params-edit .slider input { width: 100%; min-width: 80px; }
+.apply-row { display: flex; gap: var(--s-2); margin-top: var(--s-3); }
+.apply-failed { border: 1px solid var(--bad); padding: var(--s-2) var(--s-3); margin-bottom: var(--s-3); display: flex; flex-direction: column; gap: var(--s-1); }
+.failed-list { padding-left: var(--s-4); list-style: "– "; font-size: 13px; }
+
+/* ---- 版本 ---- */
+.versions { display: flex; flex-direction: column; }
+.version { display: grid; grid-template-columns: auto 96px minmax(0, 1fr); gap: var(--s-3); padding: var(--s-3) 0; border-bottom: 1px solid var(--line-soft); }
+.version.picked { border-left: 2px solid var(--accent); padding-left: var(--s-2); }
+.v-pick { padding-top: 2px; }
+.v-thumb { width: 96px; height: 72px; object-fit: contain; border: 1px solid var(--line-soft); }
+.v-body { display: flex; flex-direction: column; gap: var(--s-1); min-width: 0; }
+.v-head { display: flex; align-items: baseline; gap: var(--s-3); }
+.v-name { font-size: 15px; font-weight: 600; }
+.v-changes { font-size: 13px; color: var(--ink-2); overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.v-actions { display: flex; flex-wrap: wrap; gap: var(--s-1); }
+.compare { display: flex; flex-direction: column; gap: var(--s-2); }
+.compare-shots { display: grid; grid-template-columns: 1fr 1fr; gap: var(--s-3); }
+.compare-shots img { width: 100%; aspect-ratio: 4 / 3; object-fit: contain; border: 1px solid var(--line-soft); }
+
+/* ---- 标题栏：像图纸右下角的那一块 ---- */
+.titleblock-slot { display: flex; justify-content: flex-end; padding: 0 var(--s-3) var(--s-3); }
+.titleblock { border-collapse: collapse; border: 1px solid var(--line); min-width: 360px; max-width: 100%; }
+.titleblock td { border: 1px solid var(--line); padding: 2px var(--s-2) 3px; vertical-align: top; }
+.tb-label { display: block; font-size: 10px; color: var(--ink-2); letter-spacing: .08em; line-height: 1.4; }
+.tb-value { display: block; font-family: var(--font-mono); font-size: 12px; line-height: 1.4; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 16em; }
+.tb-part .tb-value { font-family: var(--font-ui); font-weight: 600; font-size: 13px; }

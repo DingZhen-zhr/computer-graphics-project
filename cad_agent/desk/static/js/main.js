@@ -2,7 +2,11 @@
 // 事件流断了：顶栏下面显示"连接断开，正在重试"；接上以后先取一次完整状态，再接着收事件（store 按 seq 去重）。
 import { configure, del, get, post, subscribe, tokenParam } from "./api.js";
 import { renderBench, showTab } from "./bench.js";
+import { renderChecks } from "./bench-checks.js";
 import { renderModel, viewVersion } from "./bench-model.js";
+import { renderParams } from "./bench-params.js";
+import { renderVersions } from "./bench-versions.js";
+import { renderTitleblock } from "./titleblock.js";
 import { renderChat } from "./chat.js";
 import { $, clear, h, button, toast, icon } from "./dom.js";
 import { applyEvent, dispatch, emptyState, getState, onChange, setState } from "./store.js";
@@ -140,6 +144,10 @@ const benchActions = {
 };
 registerView((state) => renderBench($("bench"), state, {
   model: (panel, s) => renderModel(panel, s, benchActions),
+  checks: (panel, s) => renderChecks(panel, s, benchActions),
+  params: (panel, s) => renderParams(panel, s, benchActions),
+  versions: (panel, s) => renderVersions(panel, s, benchActions),
+  titleblock: (slot, s) => renderTitleblock(slot, s, benchActions),
 }));
 
 function modelName() {
