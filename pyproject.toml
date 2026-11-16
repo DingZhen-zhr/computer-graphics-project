@@ -16,6 +16,12 @@ dependencies = [
     "pywebview>=6.2",
 ]
 
+[project.scripts]
+caliper = "cad_agent.app:main"
+
+[project.gui-scripts]
+caliper-app = "cad_agent.app:gui_main"
+
 [project.optional-dependencies]
 dev = ["pytest>=8"]
 

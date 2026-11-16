@@ -88,13 +88,15 @@ def _banner(config: Config, session: Session) -> tuple[str, dict]:
     return text, info
 
 
-def main(argv: list[str] | None = None, input_fn: Callable[[str], str] = input, print_fn: Callable[..., None] = print) -> int:
+def main(argv: list[str] | None = None, input_fn: Callable[[str], str] = input, print_fn: Callable[..., None] = print,
+         config: Config | None = None) -> int:
+    """config 不为空时（caliper --cli 不给 --config）直接用它，不读配置文件。"""
     parser = argparse.ArgumentParser(prog="python -m cad_agent", description="CAD 建模智能体")
     parser.add_argument("--config", default="config.toml", help="配置文件路径，默认 config.toml")
     args = parser.parse_args(argv)
 
     try:
-        config = load_config(Path(args.config))
+        config = config if config is not None else load_config(Path(args.config))
         agent, session = build_agent(config)
     except ConfigError as e:
         print_fn(str(e))

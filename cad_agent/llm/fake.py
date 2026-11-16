@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import copy
+import json
+from pathlib import Path
 from typing import Callable
 
 from cad_agent.llm.client import LLMReply, LLMStopped, ToolCall
@@ -47,3 +49,24 @@ class ScriptedLLM:
         if should_stop is not None and should_stop():
             raise LLMStopped()
         return nxt
+
+
+def load_script(path: Path) -> list[LLMReply]:
+    """读假模型剧本（开发和走查用）：JSON 数组，每项 {"content": "...", "tool_calls": [{"name", "args"}]}。
+
+    写得不对时抛 ValueError（中文，带第几项）。工具调用的 id 按 call_1、call_2…编号。
+    """
+    raw = json.loads(Path(path).read_text(encoding="utf-8"))
+    if not isinstance(raw, list):
+        raise ValueError("剧本应该是一个 JSON 数组，每一项是模型的一次回复")
+    replies: list[LLMReply] = []
+    for i, item in enumerate(raw, 1):
+        if not isinstance(item, dict) or not isinstance(item.get("content", ""), str):
+            raise ValueError(f"剧本第 {i} 项应该是对象，content 是文字")
+        calls = []
+        for j, tc in enumerate(item.get("tool_calls") or [], 1):
+            if not isinstance(tc, dict) or not isinstance(tc.get("name"), str) or not isinstance(tc.get("args", {}), dict):
+                raise ValueError(f"剧本第 {i} 项的第 {j} 个工具调用要有 name（文字）和 args（对象）")
+            calls.append(ToolCall(f"call_{j}", tc["name"], tc.get("args", {})))
+        replies.append(LLMReply(item.get("content", ""), calls, {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}))
+    return replies

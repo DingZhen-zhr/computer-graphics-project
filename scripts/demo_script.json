@@ -1,0 +1,238 @@
+[
+ {
+  "content": "好的，做一块安装板。先问两件事，确定了我就整理需求单。",
+  "tool_calls": [
+   {
+    "name": "update_brief",
+    "args": {
+     "part": {
+      "name": "安装板",
+      "purpose": "把小设备固定到机架上"
+     },
+     "set_params": [
+      {
+       "name": "plate_l",
+       "value": 100,
+       "unit": "mm",
+       "source": "user",
+       "note": "板长（x 方向）"
+      },
+      {
+       "name": "plate_w",
+       "value": 60,
+       "unit": "mm",
+       "source": "user",
+       "note": "板宽（y 方向）"
+      }
+     ],
+     "features": [
+      "板",
+      "角孔，四个角上"
+     ],
+     "relations": [
+      "角孔在板的四个角上，孔心离相邻两条边各 hole_inset，贯通板厚"
+     ],
+     "open_questions": [
+      "板厚多少？",
+      "角孔多大、离边多远？"
+     ]
+    }
+   },
+   {
+    "name": "ask_user",
+    "args": {
+     "questions": [
+      "板厚多少？建议 5 mm。",
+      "角孔多大、孔心离边多远？建议孔径 6 mm、离边 10 mm。"
+     ]
+    }
+   }
+  ]
+ },
+ {
+  "content": "记下了。需求单整理好了，请你看一下。",
+  "tool_calls": [
+   {
+    "name": "update_brief",
+    "args": {
+     "set_params": [
+      {
+       "name": "plate_t",
+       "value": 5,
+       "unit": "mm",
+       "source": "user",
+       "note": "板厚"
+      },
+      {
+       "name": "hole_d",
+       "value": 6,
+       "unit": "mm",
+       "source": "user",
+       "note": "角孔直径"
+      },
+      {
+       "name": "hole_inset",
+       "value": 10,
+       "unit": "mm",
+       "source": "user",
+       "note": "角孔孔心离相邻两条边的距离"
+      }
+     ],
+     "open_questions": []
+    }
+   },
+   {
+    "name": "request_confirmation",
+    "args": {}
+   }
+  ]
+ },
+ {
+  "content": "分两个阶段做：先做板，再打四个角孔。",
+  "tool_calls": [
+   {
+    "name": "set_plan",
+    "args": {
+     "stages": [
+      {
+       "title": "板",
+       "done_when": "有一块 plate_l × plate_w × plate_t 的矩形板"
+      },
+      {
+       "title": "角孔",
+       "done_when": "四个角上各有一个贯通的孔"
+      }
+     ]
+    }
+   }
+  ]
+ },
+ {
+  "content": "第一阶段：先写检查，再建板。",
+  "tool_calls": [
+   {
+    "name": "set_checks",
+    "args": {
+     "stage": "s1",
+     "checks": [
+      {
+       "id": "size-x",
+       "type": "bbox",
+       "axis": "x",
+       "expected": "plate_l"
+      },
+      {
+       "id": "size-y",
+       "type": "bbox",
+       "axis": "y",
+       "expected": "plate_w"
+      },
+      {
+       "id": "size-z",
+       "type": "bbox",
+       "axis": "z",
+       "expected": "plate_t"
+      }
+     ]
+    }
+   },
+   {
+    "name": "upsert_feature",
+    "args": {
+     "slug": "plate",
+     "role": "build",
+     "code": "_profile = scad.make_rectangle_rface(width=plate_l, height=plate_w, center=(0, 0, 0), normal=(0, 0, 1))\nplate = scad.extrude_rsolid(profile=_profile, direction=(0, 0, 1), distance=plate_t)"
+    }
+   },
+   {
+    "name": "build",
+    "args": {}
+   }
+  ]
+ },
+ {
+  "content": "第二阶段：四个角孔。",
+  "tool_calls": [
+   {
+    "name": "set_checks",
+    "args": {
+     "stage": "s2",
+     "checks": [
+      {
+       "id": "corner-holes",
+       "type": "count",
+       "kind": "faces",
+       "expected": 4,
+       "where": [
+        [
+         "geom.type",
+         "==",
+         "CYLINDER"
+        ],
+        [
+         "geom.area",
+         ">=",
+         "pi * hole_d * plate_t * 0.95"
+        ],
+        [
+         "geom.area",
+         "<=",
+         "pi * hole_d * plate_t * 1.05"
+        ]
+       ]
+      },
+      {
+       "id": "corner-hole-center",
+       "type": "point_outside",
+       "point": [
+        "-plate_l / 2 + hole_inset",
+        "-plate_w / 2 + hole_inset",
+        "plate_t / 2"
+       ]
+      },
+      {
+       "id": "corner-hole-edge",
+       "type": "point_inside",
+       "point": [
+        "-plate_l / 2 + hole_inset + hole_d / 2 + 0.3",
+        "-plate_w / 2 + hole_inset",
+        "plate_t / 2"
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "name": "upsert_feature",
+    "args": {
+     "slug": "corner-holes",
+     "role": "pattern",
+     "code": "_hole = scad.make_cylinder_rsolid(radius=hole_d / 2, height=plate_t + 2, bottom_face_center=(-plate_l / 2 + hole_inset, -plate_w / 2 + hole_inset, -1))\n_row = scad.linear_pattern_rsolidlist(shape=_hole, direction=(1, 0, 0), count=2, spacing=plate_l - 2 * hole_inset)\n_grid = [_q for _h in _row for _q in scad.linear_pattern_rsolidlist(shape=_h, direction=(0, 1, 0), count=2, spacing=plate_w - 2 * hole_inset)]\ncorner_holes = scad.cut_rsolid(plate, _grid, skip_non_intersecting=False)"
+    }
+   },
+   {
+    "name": "build",
+    "args": {}
+   }
+  ]
+ },
+ {
+  "content": "把孔径改成 8 mm。",
+  "tool_calls": [
+   {
+    "name": "update_brief",
+    "args": {
+     "set_params": [
+      {
+       "name": "hole_d",
+       "value": 8,
+       "unit": "mm",
+       "source": "user",
+       "note": "角孔直径"
+      }
+     ]
+    }
+   }
+  ]
+ }
+]
