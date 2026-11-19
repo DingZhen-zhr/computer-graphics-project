@@ -280,3 +280,31 @@ def test_close_stops_running_turn(tmp_path):
     threading.Timer(0.2, llm.gate.set).start()
     wb.close(timeout=5)
     assert not wb.is_busy()
+
+
+# ---------------------------------------------------------------- 第二版计划 3 最后整体复查后补的测试
+
+
+def test_state_mid_turn_uses_the_replaced_agents_workspace(tmp_path):
+    """设置改了、换过智能体以后：运行中的完整状态要用新智能体的工作区，不是旧的（复查 C1）。"""
+    wb, session = make_wb(tmp_path, ScriptedLLM([]))
+    gate = GateLLM(LLMReply("好", [], {}))
+    fresh_brief = staged_brief()
+    fresh_brief.part_name = "换过的零件"
+    box = ToolBox(Workspace(fresh_brief, FeatureList(), []), run_job=StageRunner(), gates=GATES_OFF)
+    wb._replace_agent(Agent(gate, box, session, Config(base_url="http://x", model="m")))
+    wb.submit("你好")
+    assert gate.entered.wait(5)
+    assert wb.state()["brief"]["part"]["name"] == "换过的零件"
+    gate.gate.set()
+    wait_idle(wb)
+
+
+def test_apply_params_clears_a_stale_stop_request(tmp_path):
+    """一轮刚结束时点的"停止"不能留到下一次手动改参数（复查 I4）。"""
+    wb, session = delivered(tmp_path)
+    wb.stop()
+    runner = wb.agent.toolbox._run_job
+    runner.calls.clear()
+    assert wb.apply_params({"phone_w": 90}).ok
+    assert runner.calls and all(not c["should_stop"]() for c in runner.calls if "should_stop" in c)

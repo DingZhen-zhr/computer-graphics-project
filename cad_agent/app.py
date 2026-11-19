@@ -88,8 +88,9 @@ def build_hub(settings: Settings, *, script: Path | None = None) -> Hub:
             config, problem = to_config(Settings()), str(e)
         review = None
         modeling = None
-        if script is not None:
-            llm: LLM = ScriptedLLM(load_script(script))
+        if script is not None:   # 剧本接着这个会话已经用掉的回复往下走（关掉窗口再打开时不从头再来）
+            used = sum(1 for row in session.read_log() if row.get("kind") == "assistant")
+            llm: LLM = ScriptedLLM(load_script(script)[used:])
         elif problem is not None:
             llm = _FailingLLM(problem)
         else:

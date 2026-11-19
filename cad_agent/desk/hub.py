@@ -74,7 +74,7 @@ class Hub:
         """会话目录；id 不合法或目录不存在都抛 FileNotFoundError。"""
         if self._is_demo(session_id):
             return self.demo_dir / session_id[len(DEMO_PREFIX):]   # type: ignore[operator]
-        if not isinstance(session_id, str) or not ID_RE.match(session_id) or session_id.startswith(DEMO_PREFIX):
+        if not isinstance(session_id, str) or not ID_RE.fullmatch(session_id) or session_id.startswith(DEMO_PREFIX):
             raise FileNotFoundError("没有这个会话")
         d = self.sessions_dir / session_id
         if not d.is_dir():
@@ -92,7 +92,7 @@ class Hub:
         mine = []
         if self.sessions_dir.is_dir():
             for d in self.sessions_dir.iterdir():
-                if d.is_dir() and ID_RE.match(d.name) and not d.name.startswith(DEMO_PREFIX):
+                if d.is_dir() and ID_RE.fullmatch(d.name) and not d.name.startswith(DEMO_PREFIX):
                     mine.append(self._item(d, d.name, False))
         mine.sort(key=lambda x: (x["updated"], x["id"]), reverse=True)
         demos = [self._item(self.demo_dir / n, DEMO_PREFIX + n, True) for n in self._demo_names()]   # type: ignore[operator]
@@ -176,7 +176,11 @@ class Hub:
                 wb.close()
                 del self._open[session_id]
             self._stale.discard(session_id)
-            shutil.rmtree(d)
+            try:
+                shutil.rmtree(d)
+            except OSError:
+                logger.exception("删除会话目录失败")
+                raise PermissionError("有文件正被别的程序占用，没能删干净。关掉打开着这个零件文件的程序，再删一次。") from None
 
     def close(self) -> None:
         with self._lock:

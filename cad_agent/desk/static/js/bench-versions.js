@@ -46,6 +46,7 @@ function compareBlock(state, actions, rerender) {
   return h("div", { class: "compare" },
     h("p", { class: "mono" }, `${a} → ${b}`),
     lines === null ? h("p", { class: "muted" }, "正在对比……")
+      : !Array.isArray(lines) ? h("p", { role: "alert" }, status("bad", lines.error || "没能对比这两个版本。"))
       : lines.length ? h("ul", { class: "plain-list mono" }, lines.map((l) => h("li", {}, l))) : h("p", { class: "muted" }, "参数没有变化。"),
     h("div", { class: "compare-shots" }, [a, b].map((n) => h("figure", {}, h("img", { src: actions.fileUrl(n, "view.png"), alt: `${n} 的截图` }),
       h("figcaption", { class: "mono small" }, n)))));

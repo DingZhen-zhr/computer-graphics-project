@@ -77,7 +77,9 @@ function draw(panel, state, actions) {
     rerender();
     const res = await actions.applyParams(changes);
     ui.busyApply = false;
-    if (res.ok) {
+    if (res.busy) {
+      actions.toast(res.text);   // 正在运行：改动留着，等这一轮结束再点"应用"
+    } else if (res.ok) {
       ui.edits = {};
       ui.result = null;
       actions.toast(`已存为 ${res.version}`);
@@ -93,11 +95,11 @@ function draw(panel, state, actions) {
       button("去对话里说", () => actions.focusInput(), { kind: "text" })));
   }
   clear(panel, h("div", { class: "pane" },
-    h("section", { "aria-labelledby": "h-params" }, sectionHead("01", "参数", locked ? "" : "改完点“应用”", "h-params"),
+    h("section", { "aria-labelledby": "h-params" }, sectionHead("01", "参数", locked ? "" : '改完点"应用"', "h-params"),
       locked ? h("p", { class: "lock-note muted" }, locked) : null,
       resultBlock(state, actions),
       h("table", { class: "table params-edit" },
-        h("thead", {}, h("tr", {}, h("th", {}, "参数"), h("th", { class: "num" }, "数值"), h("th", {}, ""), h("th", {}, "调节"), h("th", {}, "来源"))),
+        h("thead", {}, h("tr", {}, h("th", {}, "参数"), h("th", { class: "num" }, "数值"), h("th", {}, h("span", { class: "sr-only" }, "单位")), h("th", {}, "调节"), h("th", {}, "来源"))),
         h("tbody", {}, params.map((p) => paramRow(p, !!locked, rerender)))),
       locked ? null : h("div", { class: "apply-row" },
         button(n ? `应用（${n} 处改动）` : "应用", apply, { kind: "primary", disabled: !n || Object.keys(ui.errors).length > 0 }),

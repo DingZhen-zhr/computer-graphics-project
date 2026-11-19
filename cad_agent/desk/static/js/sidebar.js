@@ -49,7 +49,7 @@ export function renderSidebar(el, sessions, ui, actions) {
     h("nav", { class: "side-list", "aria-label": "会话" },
       mine.length
         ? h("ol", { class: "sessions" }, mine.map((s) => row(s, ui, actions)))
-        : h("p", { class: "side-empty" }, "还没有会话。点上面的“新会话”开始做第一个零件。"),
+        : h("div", { class: "side-empty" }, h("p", {}, "还没有会话。"), button("开始做第一个零件", actions.create, { kind: "text" })),
       demos.length ? h("div", { class: "side-group" }, h("h2", { class: "side-label" }, "示例"),
         h("ol", { class: "sessions" }, demos.map((s) => row(s, ui, actions)))) : null),
     h("div", { class: "side-foot" }, button("案例库", actions.cases, { kind: "text" })));

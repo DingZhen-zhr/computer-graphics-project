@@ -131,7 +131,8 @@ def make_settings_routes(hub: Hub, *, make_llm_for: Callable[[Settings, str], LL
         except (ConfigError, TypeError, ValueError) as e:
             return 400, {"error": str(e) or "设置的值不对"}
         save_settings(s)
-        hub.refresh_agents()
+        if set(body) - {"theme"}:   # 只换外观时不用按新设置重造智能体
+            hub.refresh_agents()
         return 200, settings_dict(s)
 
     def set_key(body: Any) -> tuple[int, Any]:

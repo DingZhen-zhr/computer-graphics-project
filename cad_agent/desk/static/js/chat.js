@@ -83,7 +83,7 @@ function treeEl(work, key) {
     if (toggle) {
       return h("button", { type: "button", class: `${cls} tree-toggle`, "aria-expanded": line.collapsed ? "false" : "true", onclick: toggle }, inner);
     }
-    return h("div", { class: cls }, line.state === "running" ? h("span", { class: "spin", "aria-label": "正在运行" }) : null, inner);
+    return h("div", { class: cls }, line.state === "running" ? h("span", { class: "spin", role: "img", "aria-label": "正在运行" }) : null, inner);
   }));
 }
 
@@ -117,7 +117,7 @@ function syncComposer() {
   const demo = !!(s && s.session && s.session.demo);
   const busy = !!(s && s.busy);
   ui.input.disabled = demo || !s || !s.session;
-  ui.note.textContent = demo ? DEMO_NOTE : busy ? "正在运行。点“停止”可以中途停下，已经写好的内容会保留。" : "Enter 发送，Shift + Enter 换行";
+  ui.note.textContent = demo ? DEMO_NOTE : busy ? '正在运行。点"停止"可以中途停下，已经写好的内容会保留。' : "Enter 发送，Shift + Enter 换行";
   clear(ui.sendBtn, busy ? [icon("stop"), "停止"] : "发送");
   ui.sendBtn.disabled = demo || (!busy && !ui.input.value.trim());
   ui.sendBtn.setAttribute("aria-label", busy ? "停止这一轮" : "发送");

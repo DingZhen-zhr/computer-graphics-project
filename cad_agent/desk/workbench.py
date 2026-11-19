@@ -65,7 +65,7 @@ class Workbench:
                     raw_log(kind, **data)
                     try:
                         self._on_record(kind, data)
-                        self._ws_copy = copy.deepcopy(agent.ws)
+                        self._ws_copy = copy.deepcopy(self.agent.ws)   # 换过智能体以后也要拷新的那个
                     except Exception:  # noqa: BLE001 - 监听器出错不能打断智能体；原因写进程序日志
                         logger.exception("把日志翻译成界面事件时出错（%s）", kind)
 
@@ -221,6 +221,7 @@ class Workbench:
 
     def apply_params(self, values: dict[str, float]) -> ManualResult:
         self._claim()
+        self.agent._stop.clear()   # 上一轮刚结束时点的"停止"不能留到这里，不然沙盒一开始就被停掉
         try:
             return manual_apply(self.agent, values)
         finally:

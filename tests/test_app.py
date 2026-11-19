@@ -189,3 +189,21 @@ def test_entry_points_declared():
     assert data["project"]["scripts"]["caliper"] == "cad_agent.app:main"
     assert data["project"]["gui-scripts"]["caliper-app"] == "cad_agent.app:gui_main"
     assert any(d.startswith("pywebview") for d in data["project"]["dependencies"])
+
+
+def test_demo_script_resumes_where_the_session_left_off(home):
+    """走查时关掉窗口再打开：剧本从这个会话已经用掉的回复后面接着往下走，不从头再来。"""
+    from cad_agent.session import Session
+
+    hub = app.build_hub(Settings(), script=SCRIPT)
+    try:
+        sid = hub.create()
+        s = Session.open(hub.sessions_dir / sid)
+        s.log("assistant", content="一", tool_calls=[])
+        s.log("assistant", content="二", tool_calls=[])
+        agent = hub.make_agent(Session.open(hub.sessions_dir / sid))
+        script = load_script(SCRIPT)
+        assert [r.content for r in agent.llm.replies] == [r.content for r in script[2:]]
+        assert script[-1].tool_calls == [] and script[-1].content   # 最后一条是重开以后用的普通回复
+    finally:
+        hub.close()

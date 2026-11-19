@@ -16,7 +16,7 @@
 /* ---- 模型 ---- */
 .model-bar { display: flex; justify-content: space-between; align-items: center; gap: var(--s-2); padding: var(--s-2) var(--s-3); }
 .model-tools { display: flex; gap: var(--s-1); }
-.btn[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); }
+.btn[aria-pressed="true"] { background: var(--paper-2); font-weight: 600; }   /* 按下的开关：和主要按钮区分开 */
 .version-select { font-family: var(--font-mono); font-size: 12px; height: 24px; padding: 0 var(--s-1); }
 .model-stage { position: relative; flex: 1; min-height: 0; margin: 0 var(--s-3); border: 1px solid var(--line-soft); }
 .viewport { position: absolute; inset: 0; overflow: hidden; }
@@ -98,7 +98,7 @@
 .compare-shots img { width: 100%; aspect-ratio: 4 / 3; object-fit: contain; border: 1px solid var(--line-soft); }
 
 /* ---- 标题栏：像图纸右下角的那一块 ---- */
-.titleblock-slot { display: flex; justify-content: flex-end; padding: 0 var(--s-3) var(--s-3); }
+.titleblock-slot { display: flex; justify-content: flex-end; padding: var(--s-2) var(--s-3) var(--s-3); border-top: 1px solid var(--line-soft); }
 .titleblock { border-collapse: collapse; border: 1px solid var(--line); min-width: 360px; max-width: 100%; }
 .titleblock td { border: 1px solid var(--line); padding: 2px var(--s-2) 3px; vertical-align: top; }
 .tb-label { display: block; font-size: 10px; color: var(--ink-2); letter-spacing: .08em; line-height: 1.4; }

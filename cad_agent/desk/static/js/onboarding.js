@@ -40,11 +40,15 @@ export function renderOnboarding(el, actions) {
           h("label", { class: "field" }, h("span", {}, "接口地址"), h("input", { value: st.custom.base_url, placeholder: "服务商文档里的地址，一般以 /v1 结尾",
             oninput: (e) => { st.custom.base_url = e.target.value; } })),
           h("label", { class: "field" }, h("span", {}, "模型名"), h("input", { value: st.custom.model, oninput: (e) => { st.custom.model = e.target.value; } }))) : null,
+        st.result ? h("p", { role: "status" }, status(st.result.ok ? "ok" : "bad", st.result.message)) : null,
         h("div", { class: "page-actions" }, button("下一步", async () => {
           const body2 = { provider: st.provider, model: "", base_url: "" };
           if (st.provider === "custom") Object.assign(body2, { base_url: st.custom.base_url.trim(), model: st.custom.model.trim() });
           const res = await post("/api/settings", body2);
-          if (res.status !== 200) return actions.toast(res.body.error);
+          if (res.status !== 200) {
+            st.result = { ok: false, message: res.body.error };
+            return draw();
+          }
           st.boot = (await get("/api/boot")).body;
           actions.setBoot(st.boot);
           st.step = 1;

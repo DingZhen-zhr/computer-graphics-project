@@ -67,7 +67,7 @@ def _values(body: Any) -> dict[str, float]:
 
 
 def _version_dir(hub: Hub, sid: str, name: str) -> Path:
-    if not isinstance(name, str) or not VERSION_RE.match(name):
+    if not isinstance(name, str) or not VERSION_RE.fullmatch(name):
         raise ApiError(400, "版本名应该像 v1、v2 这样")
     d = hub.open(sid).session.part_dir() / "versions" / name
     if not d.is_dir():
@@ -136,15 +136,15 @@ def version_file(hub: Hub, sid: str, rest: list[str]) -> Path:
     path: Path | None = None
     if len(rest) >= 2 and rest[0] == "current":
         tail = rest[1:]
-        if len(tail) == 2 and tail[0] == "stages" and STAGE_FILE_RE.match(tail[1]):
+        if len(tail) == 2 and tail[0] == "stages" and STAGE_FILE_RE.fullmatch(tail[1]):
             path = base / "stages" / tail[1]
-        elif len(tail) == 3 and tail[0] == "review" and ROUND_RE.match(tail[1]) and VIEW_RE.match(tail[2]):
+        elif len(tail) == 3 and tail[0] == "review" and ROUND_RE.fullmatch(tail[1]) and VIEW_RE.fullmatch(tail[2]):
             path = base / "review" / tail[1] / tail[2]
-    elif len(rest) >= 2 and VERSION_RE.match(rest[0]):
+    elif len(rest) >= 2 and VERSION_RE.fullmatch(rest[0]):
         v, tail = base / "versions" / rest[0], rest[1:]
         if len(tail) == 1 and tail[0] in VERSION_FILES:
             path = v / tail[0]
-        elif len(tail) == 2 and tail[0] == "stages" and STAGE_FILE_RE.match(tail[1]):
+        elif len(tail) == 2 and tail[0] == "stages" and STAGE_FILE_RE.fullmatch(tail[1]):
             path = v / "stages" / tail[1]
     if path is None or not path.is_file():
         raise ApiError(404, "没有这个文件")

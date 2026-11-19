@@ -204,3 +204,27 @@ def test_close_closes_all(tmp_path):
     threading.Timer(0.2, llm.gate.set).start()
     hub.close()
     assert not wb.is_busy() and hub._open == {}
+
+
+def test_delete_with_a_locked_file_gives_a_plain_message(tmp_path, monkeypatch):
+    """Windows 上有文件被别的程序占着时删不掉：给一句中文说明，不带路径和原始报错（复查 I3）。"""
+    from cad_agent.desk import hub as hub_mod
+
+    hub = make_hub(tmp_path)
+    sid = hub.create()
+
+    def locked(path):
+        raise PermissionError(13, "[WinError 32] 另一个程序正在使用此文件", str(path))
+
+    monkeypatch.setattr(hub_mod.shutil, "rmtree", locked)
+    with pytest.raises(PermissionError) as e:
+        hub.delete(sid)
+    assert "WinError" not in str(e.value) and str(tmp_path) not in str(e.value) and "占用" in str(e.value)
+
+
+@pytest.mark.parametrize("bad", ["abc\n", "v1\n"])
+def test_ids_with_trailing_newline_are_not_found(tmp_path, bad):
+    hub = make_hub(tmp_path)
+    (tmp_path / "sessions" / "abc").mkdir(parents=True)
+    with pytest.raises(FileNotFoundError):
+        hub.open(bad)

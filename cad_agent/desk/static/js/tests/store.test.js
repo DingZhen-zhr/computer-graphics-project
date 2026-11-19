@@ -123,3 +123,14 @@ test("test_resync_sets_flag", () => {
   const s = applyEvent(fullState(), { seq: 50, type: "resync" });
   assert.equal(s.needResync, true);
 });
+
+test("test_stage_event_adds_stage_file", () => {
+  // 正在建模时一个阶段通过：它的 STL 已经导出，模型页签马上可以看（不用等这一轮结束）
+  let s = run(fullState({ plan: plan2, stage_files: [] }), [{ seq: 11, type: "turn_start", text: "x" },
+    { seq: 12, type: "stage", id: "s1", title: "底板", checks: 5, size: [1, 2, 3], volume: 6 }]);
+  assert.deepEqual(s.stage_files, ["s1"]);
+  s = applyEvent(s, { seq: 13, type: "stage", id: "s1", title: "底板", checks: 5 });
+  assert.deepEqual(s.stage_files, ["s1"]);
+  s = applyEvent(s, { seq: 14, type: "stage", id: "s2", title: "立板", checks: 2 });
+  assert.deepEqual(s.stage_files, ["s1", "s2"]);
+});

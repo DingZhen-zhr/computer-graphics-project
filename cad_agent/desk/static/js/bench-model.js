@@ -3,6 +3,7 @@
 import { button, clear, h } from "./dom.js";
 import { onThemeChange } from "./theme.js";
 import { createViewer } from "./viewer.js";
+import { NO_WEBGL } from "./viewer-dims.js";
 
 const EMPTY = "还没有模型。在对话里说说要做什么零件，第一个阶段通过后，这里就能转着看。";
 const DONE = "完成";
@@ -107,7 +108,8 @@ export function renderModel(panel, state, actions) {
   const sid = state.session ? state.session.id : null;
   const counts = `${(state.versions || []).length}|${(state.stage_files || []).join(",")}`;
   if (sid !== ui.sessionId) {
-    Object.assign(ui, { sessionId: sid, version: null, stage: null, pinned: false, url: null, fallback: null, counts });
+    Object.assign(ui, { sessionId: sid, version: null, stage: null, pinned: false, url: null, counts,
+      fallback: ui.viewer.ok ? null : NO_WEBGL });   // 没有 WebGL 时这条说明要一直留着
   } else if (counts !== ui.counts) {
     Object.assign(ui, { stage: null, pinned: false, counts });   // 新版本或新阶段通过：自动切过去
   }

@@ -53,8 +53,9 @@ function renderSide() {
   renderSidebar($("sidebar"), app.sessions, { currentId: app.currentId, renaming: app.renaming }, sideActions);
 }
 
-async function loadState() {
-  const { status, body } = await get(`/api/sessions/${encodeURIComponent(app.currentId)}/state`);
+async function loadState(id = app.currentId) {
+  const { status, body } = await get(`/api/sessions/${encodeURIComponent(id)}/state`);
+  if (id !== app.currentId) return null;   // 回来得太晚：用户已经切到别的会话了
   if (status !== 200) {
     toast(body.error);
     return null;
@@ -65,20 +66,25 @@ async function loadState() {
 
 export async function openSession(id) {
   closePage();
-  if (app.unsubscribe) app.unsubscribe();
-  app.unsubscribe = null;
   app.currentId = id;
   remember(id);
   renderSide();
-  const st = await loadState();
-  if (!st || app.currentId !== id) return;
+  await resubscribe(id);
+}
+
+// 先停掉事件流，取一次完整状态，再从它的 last_seq 接着订阅：这样中间的事件既不会丢，也不会被完整状态盖掉
+async function resubscribe(id) {
+  if (app.unsubscribe) app.unsubscribe();
+  app.unsubscribe = null;
+  const st = await loadState(id);
+  if (!st || app.currentId !== id || app.unsubscribe) return;
   app.unsubscribe = subscribe(id, st.last_seq, onEvent, onStatus);
 }
 
 function onEvent(ev) {
   dispatch(ev);
   if (ev.type === "state" || ev.type === "turn_end") refreshSessions();
-  if (getState().needResync) loadState();
+  if (getState().needResync) resubscribe(app.currentId);
 }
 
 function onStatus(s) {
@@ -88,7 +94,7 @@ function onStatus(s) {
   } else if (s === "open" && app.retrying) {
     app.retrying = false;
     $("conn").classList.add("hidden");
-    loadState();
+    resubscribe(app.currentId);
     refreshSessions();
   }
 }
@@ -134,11 +140,12 @@ const benchActions = {
   modelName: () => modelName(),
   applyParams: async (values) => {
     const { status, body } = await post(`/api/sessions/${sid()}/params`, { values });
+    if (status === 409) return { ok: false, busy: true, text: body.error };
     return status === 200 ? body : { ok: false, text: body.error, failed_checks: [] };
   },
   diff: async (a, b) => {
     const { status, body } = await get(`/api/sessions/${sid()}/diff?a=${a}&b=${b}`);
-    return status === 200 ? body.lines : [];
+    return status === 200 ? body.lines : { error: body.error };
   },
   saveCase: async (title, tags) => {
     const { status, body } = await post(`/api/sessions/${sid()}/case`, { title, tags });
@@ -192,7 +199,7 @@ const sideActions = {
     const { status, body } = await post(`/api/sessions/${encodeURIComponent(id)}/rename`, { title });
     if (status !== 200) toast(body.error);
     await refreshSessions();
-    if (id === app.currentId) loadState();
+    if (id === app.currentId) resubscribe(id);
   },
   remove: async (id) => {
     const { status, body } = await del(`/api/sessions/${encodeURIComponent(id)}`);
@@ -235,7 +242,7 @@ function renderTop(state) {
 
 // ---- 启动 ----
 function fatal(text) {
-  clear($("app"), h("div", { class: "fatal" }, h("p", {}, text)));
+  clear($("app"), h("div", { class: "fatal" }, h("p", {}, text), h("p", { class: "muted" }, "关掉这个窗口，重新打开卡尺再试。")));
 }
 
 async function start() {

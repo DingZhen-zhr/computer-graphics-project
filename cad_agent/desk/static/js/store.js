@@ -96,7 +96,8 @@ const HANDLERS = {
   plan: (s, ev) => ({ ...s, plan: { stages: ev.stages, current: ev.current } }),
   stage: (s, ev) => {
     const plan = s.plan ? { ...s.plan, stages: s.plan.stages.map((x) => (x.id === ev.id ? { ...x, passed: true } : x)) } : s.plan;
-    const next = { ...s, plan };
+    const files = s.stage_files || [];
+    const next = { ...s, plan, stage_files: files.includes(ev.id) ? files : [...files, ev.id] };   // 这个阶段的 STL 已经导出了
     return withLive(next, (live) => {
       const node = stageNode(next, live, ev.id);
       node.passed = true;

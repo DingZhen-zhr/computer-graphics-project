@@ -1,6 +1,6 @@
 /* 页面骨架：顶栏、三栏（会话 240px | 对话 ≥ 420px | 工作台 ≥ 440px）、连接状态、提示条、对话框、左栏。 */
 
-body { display: grid; grid-template-rows: auto auto minmax(0, 1fr); min-width: 1100px; min-height: 700px; overflow: hidden; }
+body { display: grid; grid-template-rows: auto auto minmax(0, 1fr); min-width: 1040px; min-height: 640px; overflow: hidden; }
 .topbar { grid-row: 1; }
 .conn { grid-row: 2; }
 .app, .page { grid-row: 3; }
@@ -77,3 +77,9 @@ body.on-page .app { display: none; }
 .dialog-actions { display: flex; justify-content: flex-end; gap: var(--s-2); margin-top: var(--s-2); }
 .field { display: flex; flex-direction: column; gap: var(--s-1); font-size: 12px; color: var(--ink-2); }
 .field input { font-size: 14px; color: var(--ink); }
+
+/* 窗口最小是 1100×700，但这是连边框算的：页面本身会窄十几像素。只在这种时候把左栏和两栏的下限放松一点，免得右边被切掉 */
+@media (max-width: 1099px) {
+  .topbar { grid-template-columns: 220px minmax(0, 1fr) auto; }
+  .app { grid-template-columns: 220px minmax(400px, 36fr) minmax(420px, 64fr); }
+}

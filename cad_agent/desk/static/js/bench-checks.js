@@ -68,7 +68,7 @@ export function renderChecks(panel, state, actions) {
       button("去对话里说", () => actions.focusInput(), { kind: "text" })));
   }
   clear(panel, h("div", { class: "pane" },
-    h("div", { class: "big-count" }, h("span", { class: `num big ${passed === checks.length ? "ok" : "bad"}` }, `${passed} / ${checks.length}`),
+    h("div", { class: "big-count" }, h("span", { class: `num big ${passed === checks.length ? "ok" : "bad"}` }, `${passed === checks.length ? "✓" : "✗"} ${passed} / ${checks.length}`),
       h("span", { class: "muted small" }, "检查通过")),
     h("section", { "aria-labelledby": "h-checks" }, sectionHead("01", "检查", "", "h-checks"),
       h("table", { class: "table checks" },

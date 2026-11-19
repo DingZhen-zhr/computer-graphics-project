@@ -272,3 +272,12 @@ def test_open_data_folder(env, tmp_path, monkeypatch):
     api = Api(tmp_path)
     assert api("POST", "/api/open-data", {}) == (200, {"ok": True})
     assert shown == [paths.app_home()] and paths.app_home().is_dir()
+
+
+def test_theme_only_save_does_not_rebuild_agents(env, tmp_path):
+    """只换外观时不用按新设置重造智能体（复查 M1）。"""
+    api = Api(tmp_path)
+    assert api("POST", "/api/settings", {"theme": "dark"})[0] == 200
+    assert api.refreshed == 0
+    api("POST", "/api/settings", {"model": "deepseek-v4-pro"})
+    assert api.refreshed == 1

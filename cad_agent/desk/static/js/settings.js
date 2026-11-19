@@ -34,7 +34,8 @@ export function renderSettings(el, actions) {
     }
     draw();
   };
-  const shout = (where) => (note[where] ? h("p", { class: "set-note", role: "status" }, status(note[where].ok ? "ok" : "bad", note[where].message)) : null);
+  const shout = (where) => (note[where] ? h("p", { class: "set-note", role: "status" },
+    status(note[where].ok === null ? "none" : note[where].ok ? "ok" : "bad", note[where].message)) : null);
 
   function service(s, prov) {
     const list = h("datalist", { id: "models-list" }, (prov.models || []).map((m) => h("option", { value: m })));
@@ -53,7 +54,7 @@ export function renderSettings(el, actions) {
     const k = boot.key;
     const input = h("input", { type: "password", autocomplete: "off", spellcheck: "false", "aria-label": "新的密钥" });
     const run = async (fn, where) => {
-      note[where] = { ok: true, message: "正在处理……" };
+      note[where] = { ok: null, message: "正在处理……" };
       draw();
       note[where] = await fn();
       boot = (await get("/api/boot")).body;
@@ -86,12 +87,12 @@ export function renderSettings(el, actions) {
   function vision(s, prov) {
     const on = s.vision === "on" || (s.vision === "auto" && prov.vision === "yes");
     const why = s.vision === "on" ? "测试识图通过了，或者你手动打开了。" : s.vision === "off" ? "你手动关掉了。"
-      : prov.vision === "yes" ? "这个服务的文档写明能看图。" : "还不知道这个模型能不能看图，先按不能处理。可以点“测试识图”试一下（会花一点点钱）。";
+      : prov.vision === "yes" ? "这个服务的文档写明能看图。" : '还不知道这个模型能不能看图，先按不能处理。可以点"测试识图"试一下（会花一点点钱）。';
     const reviewProv = boot.providers.find((p) => p.id === (s.review_provider || s.provider)) || prov;
     return block("vision", "03", "看图审查",
       h("p", {}, status(on ? "ok" : "none", on ? "开着" : "关着"), h("span", { class: "muted" }, `　${why}`)),
       h("div", { class: "page-actions" }, button("测试识图", async () => {
-        note.vision = { ok: true, message: "正在测试……" };
+        note.vision = { ok: null, message: "正在测试……" };
         draw();
         const r = await post("/api/test-vision", {});
         note.vision = r.status === 200 ? r.body : { ok: false, message: r.body.error };
@@ -153,7 +154,7 @@ export function renderSettings(el, actions) {
   function data() {
     return block("data", "07", "数据",
       h("p", {}, "会话、案例和设置都在：", h("span", { class: "mono path" }, boot.data_dir)),
-      h("div", { class: "page-actions" }, button("打开文件夹", () => post("/api/open-data", {}))));
+      h("div", { class: "page-actions" }, button("打开文件夹", async () => { const r = await post("/api/open-data", {}); if (r.status !== 200) actions.toast(r.body.error); })));
   }
 
   function about() {

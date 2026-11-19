@@ -157,3 +157,29 @@ def test_context_restore():
     ctx.restore(past)
     past.append({"role": "user", "content": "不该影响"})
     assert ctx.messages() == [{"role": "system", "content": "系统"}, {"role": "user", "content": "a"}, {"role": "assistant", "content": "b"}]
+
+
+def test_corrupt_json_file_does_not_lock_the_session(tmp_path):
+    """写到一半断电留下的坏 plan.json：会话照样能打开，按没有这个文件处理（复查 I3）。"""
+    old, ws, session = delivered_v1(tmp_path)
+    (session.dir / "plan.json").write_text('[{"id": "s1", "ti', encoding="utf-8")
+    loaded = load_workspace(Session.open(session.dir))
+    assert loaded.brief.part_name == ws.brief.part_name and loaded.plan is not None
+
+
+def test_state_files_are_written_atomically(tmp_path, monkeypatch):
+    """需求单等状态文件先写临时文件再改名，写到一半出错时旧文件还在（复查 I3）。"""
+    import os
+
+    from cad_agent import session as session_mod
+
+    s = Session(tmp_path / "s")
+    s.set_meta(title="旧标题")
+    real_replace = os.replace
+    monkeypatch.setattr(session_mod.os, "replace", lambda *a: (_ for _ in ()).throw(OSError("磁盘满了")))
+    import pytest
+
+    with pytest.raises(OSError):
+        s.set_meta(title="新标题")
+    monkeypatch.setattr(session_mod.os, "replace", real_replace)
+    assert s.meta()["title"] == "旧标题" and not list(s.dir.glob("*.tmp"))

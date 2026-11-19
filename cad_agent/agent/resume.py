@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 import json
+import logging
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -20,15 +21,20 @@ from cad_agent.tools import Workspace
 if TYPE_CHECKING:
     from cad_agent.agent.loop import Agent
 
+logger = logging.getLogger("caliper.desk")
 END_KINDS = ("reply", "question", "confirm", "delivered", "failed", "stopped")   # 一轮的结局（AgentTurn.kind）
 LEGACY_TITLE = "整体"
 LEGACY_DONE_WHEN = "零件完成"
 
 
 def _read(path: Path, default: Any) -> Any:
+    """读 JSON；文件不存在、或者读不出来（比如以前写到一半断电留下的半个文件）都按没有处理，后者写进程序日志。"""
     try:
         return json.loads(path.read_text(encoding="utf-8"))
     except FileNotFoundError:
+        return default
+    except (OSError, ValueError):
+        logger.warning("会话文件读不出来，按没有处理：%s", path.name)
         return default
 
 
