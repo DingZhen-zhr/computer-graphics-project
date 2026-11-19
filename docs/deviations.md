@@ -129,3 +129,15 @@
   两者不能兼得。主要的用法（README 的一行命令、`caliper update`）都是 `irm | iex`，它按服务器给的 `charset=utf-8` 解码，不带 BOM 时完全正常。
 - 怎么改：`install.ps1` 存成不带 BOM 的 UTF-8（文件开头写明原因和本地运行的办法）。本地运行一律用 `Get-Content -Raw -Encoding UTF8 .\install.ps1 | iex`：本机实测（Task 3 Step 4）、持续集成（Task 4）、README 的离线安装办法（Task 7）都这样写。`test_ps1_parses` 改成按 UTF-8 读出文字后交给同一个解析器的 `ParseInput`；演示模式的测试也用这种方式运行。另外加一条测试：`install.ps1` 不能带 BOM；经 `iex` 运行时标准错误输出必须是空的。
 - 影响：Task 3 的测试和本机实测命令；Task 4 的 `ci.yml`；Task 7 README"装不上怎么办"。PowerShell 7（pwsh）默认按 UTF-8 读，`-File` 在那里没有这个问题。
+
+## D18（第二版计划 4 Task 4）持续集成的 Mac 机器从 macos-14 改成 macos-15（用户定的）
+- 原计划：Task 4 的 Interfaces 写明矩阵是 `windows-latest`、`macos-14`；设计文档第 6.4 节也写的 `macos-14`。
+- 实际情况：第一次推送后（运行 44530868432），Mac 那一台没有开始就被取消，GitHub 的报错是 `The configuration 'macos-14-arm64-us-default' is not supported`。查 GitHub 官方的 runner-images 说明（2026-11-20）：macOS 14 标着已弃用，只剩 x64（Intel）版；Apple 芯片的只有 `macos-15`、`macos-26`（也就是 `macos-latest`）。
+- 怎么改：这是 Interfaces 里的内容，所以先问了用户；用户选了 `macos-15`（还能用的 Apple 芯片镜像里版本最低的，最接近我们支持的下限 macOS 14，而且写死版本不会自己变）。`ci.yml` 的矩阵和 `test_matrix_has_both_platforms` 的断言一起改成 `["windows-latest", "macos-15"]`。
+- 影响：持续集成不再覆盖 macOS 14 本身；macOS 14 只靠组员按 `docs/mac-checklist.md` 人工验证（如果组员的 Mac 是 14）。README"验证到什么程度"一节照这个写（Task 7）。
+
+## D19（第二版计划 4 Task 6）`tests/test_desk_static.py` 的"自己写的文件"不算 three.js
+- 原计划：Task 6 把 three.js 的四个文件搬到 `cad_agent/desk/static/vendor/three/`；旧测试只有计划表格里列出的才能改。
+- 实际情况：`test_desk_static.py` 用一个小函数 `_own_files` 收集 `desk/static/` 下面的全部文件，再检查"没有网址""不超过 300 行""脚本里没有颜色字面值"。three.js 搬进来以后，它这几条都不满足（第三方文件里有网址注释、上万行、颜色常量），而这些规矩本来就只管我们自己写的文件。three.js 原样保存，不能改。
+- 怎么改：只改 `_own_files` 一处，跳过 `vendor/` 下面的文件；三条测试的断言一个字没动。和 D15 是同一个道理。另外 `test_desk_export.py` 和 `test_desk_legacy.py::test_old_web_package_is_gone` 会检查 three.js 确实在新位置、`REVISION` 仍是 `'160'`。
+- 影响：只影响这一个测试文件。

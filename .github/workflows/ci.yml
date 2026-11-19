@@ -24,7 +24,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [windows-latest, macos-14]
+        os: [windows-latest, macos-15]   # 计划写的是 macos-14，GitHub 已经不提供 Apple 芯片的 macos-14（偏离 D18）
     env:
       PYTHONUTF8: "1"
     steps:

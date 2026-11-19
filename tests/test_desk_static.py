@@ -18,7 +18,9 @@ needs_node = pytest.mark.skipif(NODE is None, reason="没有 node")   # 这台�
 
 
 def _own_files(*suffixes: str) -> list[Path]:
-    return sorted(p for p in STATIC.rglob("*") if p.is_file() and p.suffix in suffixes)
+    # 第三方的 three.js 不算自己写的文件：计划 4 Task 6 把它搬进了 static/vendor/three/（偏离 D19）
+    return sorted(p for p in STATIC.rglob("*")
+                  if p.is_file() and p.suffix in suffixes and "vendor" not in p.relative_to(STATIC).parts)
 
 
 @needs_node

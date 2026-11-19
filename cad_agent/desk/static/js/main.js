@@ -1,6 +1,6 @@
 // 启动和路由：取启动信息、主题、会话列表；打开一个会话 = 取完整状态 + 从它的 last_seq 订阅事件。
 // 事件流断了：顶栏下面显示"连接断开，正在重试"；接上以后先取一次完整状态，再接着收事件（store 按 seq 去重）。
-import { configure, del, get, post, subscribe, tokenParam } from "./api.js";
+import { configure, del, fileUrl as versionFileUrl, get, isStatic, post, subscribe } from "./api.js";
 import { renderBench, showTab } from "./bench.js";
 import { renderChecks } from "./bench-checks.js";
 import { renderModel, viewVersion } from "./bench-model.js";
@@ -118,7 +118,7 @@ export async function stopTurn() {
 }
 
 export function fileUrl(version, name) {
-  return `/files/${encodeURIComponent(app.currentId)}/${version}/${name}?${tokenParam()}`;
+  return versionFileUrl(app.currentId, version, name);
 }
 
 export async function reveal(version) {
@@ -250,6 +250,11 @@ async function start() {
   $("brand-mark").append(icon("caliper"));
   $("theme-btn").addEventListener("click", () => saveTheme(nextTheme(currentTheme())).then(() => renderTop(getState())));
   $("settings-btn").addEventListener("click", () => openPage("settings"));
+  if (isStatic()) {
+    // 在线示例：只有一个只读的示例会话；没有设置和引导，右上角换成回主页安装的链接
+    document.body.classList.add("static-mode");
+    $("settings-btn").replaceWith(h("a", { class: "btn btn-text", href: "../" }, "安装卡尺"));
+  }
   onChange((state) => {
     renderTop(state);
     for (const render of views) render(state);
@@ -260,6 +265,7 @@ async function start() {
   applyTheme(body.settings.theme);
   renderTop(getState());
   await refreshSessions();
+  if (isStatic()) return app.sessions.length ? openSession(app.sessions[0].id) : fatal(body.error || "在线示例的数据没有加载出来。");
   const mine = app.sessions.filter((s) => !s.demo);
   if (!mine.length && !body.ready && pages.onboarding) return openPage("onboarding");
   const last = remembered();

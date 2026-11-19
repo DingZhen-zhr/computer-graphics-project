@@ -14,6 +14,7 @@ import hashlib
 import hmac
 import json
 import logging
+import mimetypes
 import os
 import re
 import secrets
@@ -27,13 +28,14 @@ from urllib.parse import parse_qs, unquote, urlsplit
 
 from cad_agent.desk.hub import Hub
 from cad_agent.desk.routes import ApiError, session_api, translate, version_file
-from cad_agent.web.server import STATIC_DIR as WEB_STATIC
-from cad_agent.web.server import _content_type
 
 logger = logging.getLogger("caliper.desk")
 
 STATIC_DIR = Path(__file__).parent / "static"
-VENDOR_DIR = WEB_STATIC / "vendor" / "three"
+VENDOR_DIR = STATIC_DIR / "vendor" / "three"   # three.js r160（计划 4 Task 6 从旧网页包搬到这里）
+CONTENT_TYPES = {".js": "text/javascript; charset=utf-8", ".mjs": "text/javascript; charset=utf-8", ".css": "text/css; charset=utf-8",
+                 ".html": "text/html; charset=utf-8", ".svg": "image/svg+xml", ".png": "image/png", ".json": "application/json; charset=utf-8",
+                 ".py": "text/plain; charset=utf-8", ".step": "application/octet-stream", ".stl": "application/octet-stream"}
 VENDOR_PREFIX = "vendor/three/"
 KEEPALIVE_S = 15.0
 MAX_BODY = 200_000
@@ -51,6 +53,10 @@ try { t = sessionStorage.getItem("caliper.token"); } catch (e) {}
 if (t) { location.replace("/?t=" + encodeURIComponent(t)); }
 else { document.getElementById("m").textContent = "这个页面要从卡尺的窗口里打开。请关掉它，重新打开卡尺。"; }
 </script></body></html>"""
+
+
+def _content_type(path: Path) -> str:
+    return CONTENT_TYPES.get(path.suffix.lower()) or mimetypes.guess_type(path.name)[0] or "application/octet-stream"
 
 
 def reveal_path(path: Path) -> None:

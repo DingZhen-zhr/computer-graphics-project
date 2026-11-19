@@ -83,3 +83,7 @@ body.on-page .app { display: none; }
   .topbar { grid-template-columns: 220px minmax(0, 1fr) auto; }
   .app { grid-template-columns: 220px minmax(400px, 36fr) minmax(420px, 64fr); }
 }
+
+/* 在线示例（静态回放，计划 4 Task 5）：只有一个只读会话，不要侧栏 */
+body.static-mode .sidebar { display: none; }
+body.static-mode .app { grid-template-columns: minmax(420px, 36fr) minmax(440px, 64fr); }

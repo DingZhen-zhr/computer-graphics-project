@@ -308,3 +308,87 @@ def test_apply_params_clears_a_stale_stop_request(tmp_path):
     runner.calls.clear()
     assert wb.apply_params({"phone_w": 90}).ok
     assert runner.calls and all(not c["should_stop"]() for c in runner.calls if "should_stop" in c)
+
+
+# ---------------------------------------------------------------- 从旧网页的测试接过来的几项（计划 4 Task 6 Step 1 核对时补的）
+# 旧的 tests/test_web.py 删除前逐条核对：下面这些断言在新测试里还没有，按新界面的写法补上。
+
+from cad_agent.gates import Gates   # noqa: E402 - 只给下面这几条用
+from helpers import BOX, PHONE_W, TILT, USER_PARAMS, Runner, bad_result, make_brief   # noqa: E402
+
+LEGACY = Gates(staged=False, mutation_check=False, visual_review=False, cases=False)
+OLD_ASK = scripted_call("update_brief", {"part": {"name": "手机支架"}, "open_questions": ["手机多宽？"]}, "先问两件事",
+                        ("ask_user", {"questions": ["手机多宽？建议 78 mm", "要充电口吗？"]}))
+OLD_FIRST_REQUEST = scripted_call("update_brief", {"part": {"name": "手机支架", "purpose": "放桌上看视频"}, "set_params": USER_PARAMS,
+                                                   "features": ["底座"]})
+OLD_UPSERT = scripted_call("upsert_feature", {"slug": "base", "role": "build", "code": BOX})
+OLD_SET_CHECKS = scripted_call("set_checks", {"checks": [PHONE_W, TILT]})
+OLD_BUILD = scripted_call("build", {})
+
+
+def make_legacy_wb(tmp_path, llm, *, confirmed: bool, runner=None) -> tuple[Workbench, Session]:
+    """1.2 版的单阶段流程（staged 关掉），旧网页测试用的就是它。"""
+    session = Session(tmp_path / "sessions")
+    ws = Workspace(make_brief(True) if confirmed else Brief(), FeatureList(), [])
+    box = ToolBox(ws, run_job=runner or Runner(), gates=LEGACY)
+    agent = Agent(llm, box, session, Config(base_url="http://x", model="m", gates=LEGACY))
+    return Workbench(agent, session), session
+
+
+def test_question_turn_keeps_user_text_lead_and_phase(tmp_path):
+    """接替 test_web.py::test_question_flow。"""
+    wb, _ = make_legacy_wb(tmp_path, ScriptedLLM([OLD_ASK]), confirmed=False)
+    assert wb.state()["transcript"] == [] and wb.state()["phase"] == "clarify"
+    say(wb, "做一个支架")
+    st = wb.state()
+    assert st["transcript"][0] == {"role": "user", "text": "做一个支架"}
+    bot = st["transcript"][-1]
+    assert bot["kind"] == "question" and bot["questions"] == ["手机多宽？建议 78 mm", "要充电口吗？"] and "先问两件事" in bot["text"]
+    assert st["busy"] is False and st["phase"] == "clarify" and st["brief"]["part"]["name"] == "手机支架"
+
+
+def test_confirm_entry_carries_the_brief(tmp_path):
+    """接替 test_web.py::test_confirm_flow_carries_the_brief。"""
+    wb, _ = make_legacy_wb(tmp_path, ScriptedLLM([OLD_FIRST_REQUEST]), confirmed=False)
+    say(wb, "做一个支架")
+    st = wb.state()
+    bot = st["transcript"][-1]
+    assert bot["kind"] == "confirm" and [p["name"] for p in bot["brief"]["params"]] == ["phone_w", "tilt_deg"]
+    assert st["phase"] == "confirm" and st["brief"]["part"]["purpose"] == "放桌上看视频"
+
+
+def test_delivered_entry_counts_checks(tmp_path):
+    """接替 test_web.py::test_delivery_fills_checks_versions_and_stage 里交付卡片、检查、外形尺寸那几项。"""
+    wb, _ = make_legacy_wb(tmp_path, ScriptedLLM([OLD_UPSERT, OLD_SET_CHECKS, OLD_BUILD]), confirmed=True)
+    say(wb, "开始建模")
+    st = wb.state()
+    delivered_ = [t for t in st["transcript"] if t.get("kind") == "delivered"]
+    assert [d["version"] for d in delivered_] == ["v1"] and delivered_[0]["total"] == delivered_[0]["passed"] == 4
+    assert st["phase"] == "delivered" and {c["id"] for c in st["checks"]} >= {"valid", "width"}
+    # 旧网页的状态里有"最近一次 build 量出来的外形尺寸"（facts）；新界面没有这一项，外形尺寸从 STL 读（test_state_after_delivery 查）
+
+
+def test_failed_build_turn_shows_failure(tmp_path):
+    """接替 test_web.py::test_failed_build_turn_shows_failure。"""
+    runner = Runner(bad_result("e1"), bad_result("e2"), bad_result("e3"))
+    llm = ScriptedLLM([OLD_UPSERT, OLD_SET_CHECKS, OLD_BUILD, OLD_BUILD, OLD_BUILD])
+    wb, _ = make_legacy_wb(tmp_path, llm, confirmed=True, runner=runner)
+    say(wb, "开始建模")
+    st = wb.state()
+    assert st["transcript"][-1]["kind"] == "failed" and "3 次" in st["transcript"][-1]["text"]
+    assert st["versions"] == [] and st["phase"] == "modeling"
+
+
+def test_busy_state_shows_the_users_message(tmp_path):
+    """接替 test_web.py::test_busy_returns_409_and_reports_progress 里"处理中时已经能看到用户这句话"那一项。"""
+    llm = GateLLM(LLMReply("好的", [], {}))
+    wb, _ = make_wb(tmp_path, llm)
+    wb.submit("第一句")
+    assert llm.entered.wait(5)
+    try:
+        st = wb.state()
+        assert st["busy"] is True and st["transcript"] == [{"role": "user", "text": "第一句"}]
+    finally:
+        llm.gate.set()
+    wait_idle(wb)
+    assert wb.state()["transcript"][-1]["text"] == "好的"

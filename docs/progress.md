@@ -777,3 +777,143 @@
 - 测试：`tests/test_ci_workflow.py` 5 个（计划 3 个，另加工作流名字和触发条件、装了 uv / Node / Python 3.12）。先把 `ci.yml` 挪开运行，5 个全部失败；放回后通过。
 - 全部测试 1116 个通过（含 `sca`，用时 9 分 18 秒）。
 - 还没做：推送到 GitHub（Step 3，要先问用户），看两个平台的运行结果并修 Mac 上的问题（Step 4、5）。
+
+## 第二版 计划 4 Task 4 第一次运行的结果（推送后）
+
+- 用户同意后推送了 44 个提交（`70c138f..2d2a72d`）。持续集成运行 44530868432：
+  - **Windows**：测试这一步 1115 个通过、1 个失败。失败的是旧的 `test_web.py::test_committed_site_is_up_to_date`：Windows 上检出代码时 git 把 three.js 的 LICENSE 换成了 CRLF 换行，和 `site/` 里原样保存的那份逐字节比对不上。这条测试本来就在 Task 6 的删除清单里。新的 `test_site_is_up_to_date` 会碰到同样的问题，所以导出时把文字文件一律写成 LF（Task 5，加了测试 `test_export_writes_lf_line_endings`，先看到它失败）。测试这一步失败后，安装、自检、smoke 都被跳过，还没在持续集成里跑过。
+  - **Mac**：机器没有起来，报错 `The configuration 'macos-14-arm64-us-default' is not supported`。GitHub 已经不提供 Apple 芯片的 macos-14。问过用户，改用 `macos-15`（偏离 D18）。
+- 日志是从 GitHub 网页上读的：浏览器面板里已经登录了账号，我只读了日志，没有点"重新运行"之类的任何按钮。公开接口拿不到日志（返回 403）。
+
+## 第二版 计划 4 Task 5 + Task 6：产品主页和在线回放；旧网页界面退役 —— 完成（合成一次提交）
+
+### Task 5
+
+**做了什么**
+
+- `cad_agent/desk/export.py`：函数 `export_static`，命令是 `python -m cad_agent.desk.export <会话目录> <输出目录> [--title 标题]`，标题默认"在线示例"。导出的内容：
+  - `index.html`：根元素带 `data-mode="static"`，里面的地址都改成 `./static/…`；
+  - `static/`、`state.json`、`files/<版本>/…`。
+- `state.json` 里多一项 `static_diffs`，放各版本两两之间的参数变化。在线回放没有服务，版本对比只能先算好。
+- 会话日志里录到的绝对路径只留 `versions\…` 之后的部分。1.1 版的录制里有 `C:\Users\…\benchmarks\…\versions\v1\view.png` 这样的路径，旧演示站一直公开着它，这次去掉了。
+- 导出的文字文件一律写成 LF 换行。
+- `api.js` 加了静态模式：
+  - `get` 从 `state.json` 读，能回答启动信息、会话列表、状态和版本对比四种请求；
+  - `post`、`del` 返回 403，说明"这是只读的在线示例"；
+  - `subscribe` 什么都不做；
+  - 版本文件的地址统一由 `api.fileUrl` 生成。
+- `main.js` 在静态模式下：给页面加 `static-mode`（`layout.css` 里藏掉侧栏，两栏铺满）；直接打开示例会话，不进引导；右上角的"设置"换成指回主页的"安装卡尺"。
+- `chat.js` 在静态模式下，输入框下面的说明改成"点右上角的'安装卡尺'"。原来写的是"点左上角的'新会话'"，在线示例里没有这个按钮。
+- `site/`：
+  - 删掉旧导出的 `site/api`、`site/files`、`site/static`、`site/.cad-agent-site`；
+  - `site/demo/` 是新的导出；
+  - `site/index.html` 是手写的产品主页，依次是：标题、一句话、图纸标题栏、两条安装命令（各带复制按钮）、系统要求原文、五步流程、"在线看一个示例"、GitHub 链接。页脚写课程作业，以及 SCA（Apache-2.0）和 three.js（MIT）的许可证。
+  - 主页用 `demo/static/css/` 里同一套 `tokens.css` 和 `base.css`，深浅色跟随系统，也有切换按钮；不加载任何外部资源；页面上没有成功率数字。
+- `pages.yml`：名字改成"发布产品主页"，注释里的导出命令换成新的。
+
+**本地实测**（用 Python 自带的静态文件服务打开 `site/`，在浏览器面板里看）
+
+- 主页：
+  - 浅色、深色都看过；
+  - 手机宽度（375）下没有横向滚动；
+  - 复制按钮：面板不给剪贴板权限时，会选中命令并提示按 Ctrl+C；换成能用的剪贴板时，按钮变成"已复制"，复制到的正是那条命令。
+- 在线示例：
+  - 浅色、深色都看过；
+  - 能拖动旋转 3D，能切到 v1；
+  - 检查页显示 15/15 和实测值；
+  - 版本页能勾两版对比，显示"tilt_deg: 65 → 70 (deg)"和两张截图；
+  - 外观按钮能切换，不报错；
+  - "安装卡尺"指回主页；
+  - 控制台没有错误。
+- 示例是 1.1 版的录制，没有阶段信息，所以在示例里看不到"切阶段"。桌面端的阶段刻度在计划 3 的走查里看过。
+
+**看页面时找出并改掉的两个问题**
+
+1. import map 写成 `static/vendor/three/three.module.js` 时，浏览器把它当成无效地址，three.js 加载不了，页面全空。改成以 `./` 开头。`test_export_layout` 加了这一条断言。如实写：这条断言是和改动同时加的，没有单独看到它失败。
+2. `viewer.js` 用绝对地址 `/static/vendor/three/OrbitControls.js` 导入，放在 `/demo/` 下面就 404。改成相对的 `../vendor/three/…`，在桌面端的服务下解析到的还是同一个地址。加了 `test_exported_scripts_import_only_relative_paths`，先看到它失败，再改。
+
+**测试**
+
+- `tests/test_desk_export.py` 13 个：计划 7 个，另加 6 个：
+  - 版本对比预先算好；
+  - 不覆盖别人的目录；
+  - 命令行；
+  - 主页用同一套颜色、支持深浅色；
+  - 只用相对地址导入；
+  - LF 换行。
+
+  import map 的地址以 `./` 开头，是加在 `test_export_layout` 里的一条断言，不是单独的测试。
+- 主页的成功率检查只看页面上的文字，不看 `<style>` 里的内容：样式里的 `100%` 不是成功率。
+- node 测试：新加 `api-static.test.js` 9 个；`api.test.js` 加 1 个，查本机服务的文件地址带令牌。
+- 如实写：`export.py` 在第一次运行这些测试之前就写好了，所以导出部分的 6 个测试第一次就通过。第一次运行时失败的是另外 5 个：静态模式、`site/` 不是最新、主页、深浅色、`pages.yml`。
+
+### Task 6
+
+**Step 1：删之前逐条核对**
+
+每条写的是"被删的旧测试 → 接替它的新测试"。标"新补"的，是这次核对时发现新测试里还缺、先补上的。
+
+- `test_question_flow` → 新补 `test_desk_workbench.py::test_question_turn_keeps_user_text_lead_and_phase`，查用户那句话、问题列表、开场白、阶段、零件名。旧接口特有的 `mode`、`activity` 两项，新界面没有。
+- `test_confirm_flow_carries_the_brief` → 新补 `test_confirm_entry_carries_the_brief`。
+- `test_delivery_fills_checks_versions_and_stage` → 由三条接替：
+  - `test_state_after_delivery` 查版本的字段和阶段；
+  - `test_apply_params_publishes_state` 查第二版和变化行；
+  - 新补 `test_delivered_entry_counts_checks`，查交付卡片的通过数、总数和检查列表。
+
+  旧状态里"最近一次 build 的外形尺寸"（facts）新界面没有这一项，外形尺寸从 STL 读。
+- `test_busy_returns_409_and_reports_progress` → `test_desk_server.py::test_busy_is_409`、`test_desk_workbench.py::test_busy_rejects_params_message_and_delete`、`test_desk_hub.py::test_delete_busy_is_refused`（旧的"重置"在新界面是删除和新建），再加新补的 `test_busy_state_shows_the_users_message`。旧的 `busy_seconds` 新界面没有。
+- `test_bad_messages_400` → `test_bad_json_is_400`、`test_empty_message_is_value_error`，再加新补的 `test_desk_server.py::test_message_without_text_key_is_400`（键名写错）。
+- `test_agent_crash_is_reported_and_service_keeps_going` → `test_agent_crash_becomes_error_event`：报错以后，下一句照常回答。
+- `test_failed_build_turn_shows_failure` → 新补 `test_desk_workbench.py::test_failed_build_turn_shows_failure`：1.2 版流程里连续三次 build 失败，这一轮以 failed 结束，文字里有"3 次"，没有版本。
+- `test_files_whitelist` → `test_desk_server.py::test_files_whitelist`、`test_static_and_vendor`：目录穿越、白名单外的文件、不存在的版本都返回 404。
+- `test_diff_endpoint` → `test_desk_server.py::test_diff_endpoint`：正常 200，v9 是 404，`../x` 是 400。
+- `test_reset_starts_a_clean_session` → `test_session_crud_over_http`、`test_desk_hub.py::test_create_open_list`。
+- `test_unknown_route_and_localhost_only` → `test_unknown_session_is_404`（含 `/api/nope`、`/nope`）、`test_binds_localhost_only`。
+- `test_web_state_with_staged_session` → `test_state_after_delivery`、`test_events_for_a_full_turn`（都是分阶段的会话）。
+- `test_replay_matches_the_live_session` → `test_desk_hub.py::test_reopen_after_restart_resumes`（重开后和原来的状态逐项相同）、`test_desk_demo.py::test_demo_session_state`。
+- `test_replay_is_read_only_over_http` → `test_demo_is_403_for_writes`（写操作 403、文件能读）、`test_demo_workbench_is_read_only`。
+- `test_main_replay` → `test_desk_demo.py` 的三条、`test_demo_session_listed_last_and_read_only`。回放的命令行入口随旧网页一起删了。
+- `test_main_reports_a_missing_key` → `test_app.py::test_missing_key_turn_fails_with_hint`、`test_cli.py::test_missing_key_returns_1`。
+- `test_main_reports_a_missing_config` → `test_cli.py::test_missing_config_returns_1`。
+- `test_bind_server_tries_the_next_port` → 不需要了：新的服务用系统分配的随机端口（0 号端口），不会撞端口。`test_main_browser_mode_starts_server` 查服务能起来。
+- `test_build_live_agent_uses_a_live_session` → `test_app.py::test_demo_script_runs_end_to_end`、`test_main_browser_mode_starts_server`。
+- `test_static_files_offline_ready` → `test_desk_static.py::test_no_external_resources`。
+- `test_stylesheet_follows_the_visual_spec` → `test_desk_style.py` 的八条。
+- `test_page_scripts_are_valid_modules` → `test_all_modules_parse`、`test_node_tests_pass`。
+- `test_pages_are_served_with_the_right_types` → `test_desk_server.py::test_static_and_vendor`、`test_files_whitelist`（查 js、css、png 的类型）。
+- `test_export_static_site`、`test_committed_site_is_up_to_date` → `test_desk_export.py` 全部。
+- `test_start_scripts_and_readme`、`test_public_mode_is_gone` → 功能没有了，不需要接替。
+
+新补的 6 条第一次运行就通过，因为它们查的是已有的行为，不是新功能。唯一的失败是我在 `test_delivered_entry_counts_checks` 里写的"外形尺寸"那一行：新界面没有 facts（见上），这一行删掉了。
+
+**搬家**
+
+- `cad_agent/web/events.py` → `cad_agent/desk/events.py`。用 `git mv`，只在文件说明开头加了一句。
+- `cad_agent/web/app.py` 里的 `LiveSession`、`version_summary`、`ReplayApp`，连同它们用到的共用部分 → `cad_agent/desk/replay.py`。代码原样；旧网页的实时模式 `LiveApp` 没有搬。
+- three.js 的四个文件 → `cad_agent/desk/static/vendor/three/`，用 `git mv`。
+
+**引用改到新位置**
+
+- `desk/server.py`：`VENDOR_DIR` 指向自己的 `static/vendor/three/`；`_content_type` 和类型表搬了进来。
+- `desk/transcript.py`、`desk/view.py`：从新位置导入。
+- `desk/export.py`：three.js 已经在 `static/` 里，不再单独复制。
+
+**删除**
+
+- `cad_agent/web/` 整个目录、`start_web.bat`、`start_replay.bat`、`tests/test_web.py`。
+- `pyproject.toml` 的 `package-data` 去掉 Task 3 临时加的 `web/static/vendor/three/*`。`desk/static/**/*` 已经包含新位置，`test_package_ships_everything_the_page_loads` 照样会查。
+- `README.md` 的"网页演示"一节换成一小段"在线示例"（Task 7 会整个重写）。
+- 留着的：`scripts/backfill_stl.py`、`demo/phone_stand`。
+
+**测试**
+
+- `tests/test_desk_legacy.py` 11 个：10 个是从 `test_web.py` 原样搬来的，只改了导入路径，函数体用脚本按行原样取出；另加 `test_old_web_package_is_gone`。先运行看到导入失败，再搬家。
+- 偏离 D19：three.js 搬进 `desk/static/` 以后，`test_desk_static.py` 的三条规矩把它也算了进去。只改了收集文件的那个小函数，让它跳过 `vendor/`；断言没动。
+
+**另外**
+
+`tests/test_desk_server.py::test_foreign_origin_and_host_are_rejected` 在一次局部运行里报过一次 `ConnectionAbortedError`，是 Windows 上对方断开连接的时机问题。单独连跑 3 次都通过，`server.py` 里和它有关的部分也没有改动。全量测试里如果再出现，再查。
+
+**全部测试**：1109 个通过（含 `sca`，用时 10 分 51 秒）。比 Task 4 时的 1116 个少，是因为删了 `test_web.py` 的 37 个；加回来的有：`test_desk_export.py` 13 个、`test_desk_legacy.py` 11 个，核对时新补的 5 个在 `test_desk_workbench.py`、1 个在 `test_desk_server.py`。node 测试从 37 个变成 47 个。
+
+**和这次一起提交的**：持续集成的 Mac 机器从 `macos-14` 改成 `macos-15`（偏离 D18，用户定的；`ci.yml` 和 `test_ci_workflow.py` 的断言一起改，先看到断言失败再改 `ci.yml`）。这样提交的内容和上面跑全部测试的那一份完全一样。

@@ -1,0 +1,89 @@
+/* 页面骨架：顶栏、三栏（会话 240px | 对话 ≥ 420px | 工作台 ≥ 440px）、连接状态、提示条、对话框、左栏。 */
+
+body { display: grid; grid-template-rows: auto auto minmax(0, 1fr); min-width: 1040px; min-height: 640px; overflow: hidden; }
+.topbar { grid-row: 1; }
+.conn { grid-row: 2; }
+.app, .page { grid-row: 3; }
+
+/* ---- 顶栏 ---- */
+.topbar {
+  display: grid; grid-template-columns: 240px minmax(0, 1fr) auto; align-items: center;
+  height: 44px; border-bottom: 1px solid var(--line);
+}
+.brand { display: flex; align-items: center; gap: var(--s-2); padding: 0 var(--s-4); height: 100%; border-right: 1px solid var(--line); }
+.brand-mark { display: inline-flex; color: var(--ink); }
+.brand-name { font-size: 15px; font-weight: 700; letter-spacing: .12em; }
+.brand-en { font-family: var(--font-mono); font-size: 11px; color: var(--ink-2); letter-spacing: .04em; }
+.top-title { padding: 0 var(--s-4); font-size: 13px; color: var(--ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.top-actions { display: flex; gap: var(--s-1); padding: 0 var(--s-3); }
+
+.conn {
+  padding: var(--s-1) var(--s-4); border-bottom: 1px solid var(--bad); color: var(--bad);
+  font-size: 13px; text-align: center;
+}
+.conn::before { content: "✗ "; }
+
+/* ---- 三栏 ---- */
+.app {
+  display: grid; min-height: 0;
+  grid-template-columns: 240px minmax(420px, 36fr) minmax(440px, 64fr);
+}
+.app > * { min-width: 0; min-height: 0; }
+.sidebar { border-right: 1px solid var(--line); display: flex; flex-direction: column; }
+.chat { border-right: 1px solid var(--line); display: flex; flex-direction: column; }
+.bench { display: flex; flex-direction: column; position: relative; }
+
+/* 设置、案例库、引导：占满顶栏下面的整片区域 */
+.page { min-height: 0; overflow: auto; }
+body.on-page .app { display: none; }
+
+/* ---- 左栏 ---- */
+.side-head { padding: var(--s-3); border-bottom: 1px solid var(--line-soft); }
+.side-head .btn { width: 100%; }
+.side-list { flex: 1; overflow-y: auto; padding: var(--s-2) 0; }
+.side-empty { padding: var(--s-3) var(--s-4); color: var(--ink-2); font-size: 13px; }
+.side-group { margin-top: var(--s-4); }
+.side-label { padding: 0 var(--s-4) var(--s-1); font-size: 12px; font-weight: 400; color: var(--ink-2); letter-spacing: .06em; }
+.sessions { display: flex; flex-direction: column; }
+.session { position: relative; display: flex; align-items: stretch; border-left: 2px solid transparent; }
+.session.current { border-left-color: var(--accent); background: var(--paper-2); }
+.session-open {
+  flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; text-align: left;
+  padding: var(--s-2) var(--s-2) var(--s-2) var(--s-4); background: transparent; border: 0; cursor: pointer;
+}
+.session-open:hover { background: var(--paper-2); }
+.s-title { font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.session.current .s-title { font-weight: 600; }
+.s-meta { display: flex; justify-content: space-between; gap: var(--s-2); font-size: 11px; color: var(--ink-2); font-family: var(--font-mono); }
+.s-rename { width: 100%; font-size: 13px; padding: 2px var(--s-1); }
+.session-tools { display: flex; align-items: center; padding-right: var(--s-1); opacity: 0; }
+.session:hover .session-tools, .session:focus-within .session-tools { opacity: 1; }
+.session-tools .btn { padding: 0 var(--s-1); }
+.side-foot { border-top: 1px solid var(--line-soft); padding: var(--s-2) var(--s-3); }
+
+/* ---- 提示条 ---- */
+.toast {
+  position: fixed; left: 50%; bottom: var(--s-5); transform: translateX(-50%);
+  padding: var(--s-2) var(--s-4); background: var(--paper); color: var(--ink); border: 1px solid var(--line);
+  font-size: 13px; opacity: 0; pointer-events: none; transition: opacity .15s linear;
+}
+.toast.show { opacity: 1; }
+
+/* ---- 对话框 ---- */
+.dialog { padding: 0; border: 1px solid var(--line); border-radius: var(--radius); background: var(--paper); color: var(--ink); max-width: 440px; }
+.dialog::backdrop { background: var(--paper); opacity: .7; }
+.dialog-body { display: flex; flex-direction: column; gap: var(--s-3); padding: var(--s-5); }
+.dialog-body h3 { font-size: 14px; }
+.dialog-actions { display: flex; justify-content: flex-end; gap: var(--s-2); margin-top: var(--s-2); }
+.field { display: flex; flex-direction: column; gap: var(--s-1); font-size: 12px; color: var(--ink-2); }
+.field input { font-size: 14px; color: var(--ink); }
+
+/* 窗口最小是 1100×700，但这是连边框算的：页面本身会窄十几像素。只在这种时候把左栏和两栏的下限放松一点，免得右边被切掉 */
+@media (max-width: 1099px) {
+  .topbar { grid-template-columns: 220px minmax(0, 1fr) auto; }
+  .app { grid-template-columns: 220px minmax(400px, 36fr) minmax(420px, 64fr); }
+}
+
+/* 在线示例（静态回放，计划 4 Task 5）：只有一个只读会话，不要侧栏 */
+body.static-mode .sidebar { display: none; }
+body.static-mode .app { grid-template-columns: minmax(420px, 36fr) minmax(440px, 64fr); }

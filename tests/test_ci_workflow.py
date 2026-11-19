@@ -40,7 +40,8 @@ def test_workflow_name_and_triggers():
 def test_matrix_has_both_platforms():
     job = list(_load()["jobs"].values())[0]
     matrix = job["strategy"]["matrix"]
-    assert matrix["os"] == ["windows-latest", "macos-14"]
+    # 计划写的是 macos-14；GitHub 已经不提供 Apple 芯片的 macos-14 了，用户定了 macos-15（偏离 D18）
+    assert matrix["os"] == ["windows-latest", "macos-15"]
     assert job["runs-on"] == "${{ matrix.os }}"
     assert job["strategy"].get("fail-fast") is False   # 一个平台失败时另一个照样跑完
 

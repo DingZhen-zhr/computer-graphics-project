@@ -375,3 +375,11 @@ def test_reload_without_token_gets_a_recovery_page(serve):
     assert "sessionStorage" in text and c.token not in text and "从卡尺的窗口里打开" in text
     status, body, kind = c.call("GET", "/", token=False)   # 不是浏览器：照旧是 JSON
     assert status == 403 and body["error"]
+
+
+def test_message_without_text_key_is_400(serve):
+    """接替 test_web.py::test_bad_messages_400 里键名写错（txt）那一项（计划 4 Task 6 Step 1 核对时补的）。"""
+    c, hub = serve()
+    sid = hub.create()
+    status, data, _ = c.call("POST", f"/api/sessions/{sid}/message", {"txt": "x"})
+    assert status == 400 and data["error"]

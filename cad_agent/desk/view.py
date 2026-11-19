@@ -14,7 +14,7 @@ from cad_agent.desk.stl_info import stl_facts
 from cad_agent.desk.transcript import build_transcript, turn_totals
 from cad_agent.session import Session
 from cad_agent.tools import Workspace
-from cad_agent.web.app import version_summary
+from cad_agent.desk.replay import version_summary
 
 NEW_TITLE = "新会话"
 

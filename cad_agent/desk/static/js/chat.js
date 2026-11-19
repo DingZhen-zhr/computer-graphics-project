@@ -1,5 +1,6 @@
 // 中栏：顶部的阶段刻度、对话记录（逐字输出、工具树、各种卡片）、底部输入框（运行时变成"停止"）。
 // 对话记录按项缓存：内容没变的项不重画，所以正在填的回答、展开的阶段、滚动位置都不会跳。
+import { isStatic } from "./api.js";
 import { troubleCard, confirmCard, deliveredCard, questionCard } from "./cards.js";
 import { button, clear, h, icon } from "./dom.js";
 import { treeLines } from "./tooltree.js";
@@ -8,6 +9,7 @@ const EMPTY = "说说你想做什么零件。不用一次说全，缺的尺寸�
 const EXAMPLES = ["做一个放在桌上看视频的手机支架", "做一个法兰盘，外径 120，上面一圈 6 个螺栓孔", "做一个装电路板的小盒子，外形 80×50×30"];
 const PLACEHOLDER = "说说要做什么，或者要怎么改";
 const DEMO_NOTE = '这是一段录制好的示例，只能看。想自己做一个，点左上角的"新会话"。';
+const STATIC_NOTE = '这是一段录制好的示例，只能看。想自己做一个，点右上角的"安装卡尺"。';
 const FLOW = [["clarify", "澄清"], ["confirm", "确认"], ["planning", "规划"], ["modeling", "建模"], ["delivered", "交付"]];
 
 let ui = null;   // 这一栏的元素和缓存
@@ -117,7 +119,7 @@ function syncComposer() {
   const demo = !!(s && s.session && s.session.demo);
   const busy = !!(s && s.busy);
   ui.input.disabled = demo || !s || !s.session;
-  ui.note.textContent = demo ? DEMO_NOTE : busy ? '正在运行。点"停止"可以中途停下，已经写好的内容会保留。' : "Enter 发送，Shift + Enter 换行";
+  ui.note.textContent = demo ? (isStatic() ? STATIC_NOTE : DEMO_NOTE) : busy ? '正在运行。点"停止"可以中途停下，已经写好的内容会保留。' : "Enter 发送，Shift + Enter 换行";
   clear(ui.sendBtn, busy ? [icon("stop"), "停止"] : "发送");
   ui.sendBtn.disabled = demo || (!busy && !ui.input.value.trim());
   ui.sendBtn.setAttribute("aria-label", busy ? "停止这一轮" : "发送");

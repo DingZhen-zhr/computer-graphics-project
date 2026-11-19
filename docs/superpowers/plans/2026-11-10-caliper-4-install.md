@@ -199,7 +199,7 @@ docs/mac-checklist.md              Mac 人工清单（Task 7）
 **Files：** Create `.github/workflows/ci.yml`、`tests/test_ci_workflow.py`；可能 Modify 少数旧测试（只按 Global Constraints 允许的那一种改法）
 
 **Interfaces：**
-- Produces：工作流 `持续集成`，在推送到 `master` 和有拉取请求时运行；矩阵 `windows-latest`、`macos-14`，Python 3.12。步骤：
+- Produces：工作流 `持续集成`，在推送到 `master` 和有拉取请求时运行；矩阵 `windows-latest`、`macos-15`（偏离 D18：原为 `macos-14`，GitHub 已不提供 Apple 芯片的 macos-14），Python 3.12。步骤：
   1. 检出代码；装 uv（官方的 setup action）；装 Node（给 `node --test` 用）。
   2. `uv venv --python 3.12`，装 `-e ".[dev]"`。
   3. 跑全部测试（设 `PYTHONUTF8=1`）。

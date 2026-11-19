@@ -14,7 +14,7 @@ from typing import Callable
 
 from cad_agent.agent.automation import has_error
 from cad_agent.desk.labels import tool_label, tool_summary
-from cad_agent.web.events import _assistant_entry
+from cad_agent.desk.events import _assistant_entry
 
 END_KINDS = ("reply", "question", "confirm", "delivered", "failed", "stopped", "error")
 

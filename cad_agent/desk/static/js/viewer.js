@@ -1,8 +1,8 @@
 // 3D 视图：three.js 显示 STL。z 朝上；实体颜色、轮廓线、网格、尺寸线的颜色都从 tokens.css 读（脚本里不写颜色值）。
 // 浅色是浅灰实体加墨色轮廓线；深色是半透明浅蓝实体加白色轮廓线。外形尺寸是叠在画布上的文字，每一帧按投影位置摆。
 import * as THREE from "three";
-import { OrbitControls } from "/static/vendor/three/OrbitControls.js";
-import { STLLoader } from "/static/vendor/three/STLLoader.js";
+import { OrbitControls } from "../vendor/three/OrbitControls.js";
+import { STLLoader } from "../vendor/three/STLLoader.js";
 import { h } from "./dom.js";
 import { cssVar } from "./theme.js";
 import { NO_WEBGL, STL_FAILED, dimSegments } from "./viewer-dims.js";

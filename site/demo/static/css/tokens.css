@@ -1,0 +1,59 @@
+/* 卡尺的视觉规范（设计文档 5.3）：浅色是米白图纸加墨线，深色是深蓝蓝图加白线。
+   全部颜色只在这个文件里出现；其他样式和脚本一律用这里的变量。 */
+
+:root {
+  --paper: #F4F1EA;
+  --paper-2: #EAE5D9;
+  --ink: #1B1B1B;
+  --ink-2: #6B675E;
+  --accent: #1F4FD8;
+  --ok: #2E6B3F;
+  --bad: #B3261E;
+  --line: var(--ink);
+  --line-soft: var(--ink-2);
+  --part: #D9D5CB;
+  --part-edge: var(--ink);
+
+  --font-ui: "Microsoft YaHei UI", "PingFang SC", system-ui, sans-serif;
+  --font-mono: "Cascadia Mono", "SF Mono", Consolas, monospace;
+  --s-1: 4px;
+  --s-2: 8px;
+  --s-3: 12px;
+  --s-4: 16px;
+  --s-5: 24px;
+  --s-6: 32px;
+  --radius: 2px;
+  color-scheme: light;
+}
+
+:root[data-theme="dark"] {
+  --paper: #0F2A4A;
+  --paper-2: #16365C;
+  --ink: #E6EEF8;
+  --ink-2: #9DB7D6;
+  --accent: #FFD166;
+  --ok: #8FD6A3;
+  --bad: #FF8A80;
+  --line: var(--ink);
+  --line-soft: var(--ink-2);
+  --part: #7FA3CC;
+  --part-edge: var(--ink);
+  color-scheme: dark;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root[data-theme="system"] {
+    --paper: #0F2A4A;
+    --paper-2: #16365C;
+    --ink: #E6EEF8;
+    --ink-2: #9DB7D6;
+    --accent: #FFD166;
+    --ok: #8FD6A3;
+    --bad: #FF8A80;
+    --line: var(--ink);
+    --line-soft: var(--ink-2);
+    --part: #7FA3CC;
+    --part-edge: var(--ink);
+    color-scheme: dark;
+  }
+}
