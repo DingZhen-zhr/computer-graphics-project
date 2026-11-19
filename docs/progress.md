@@ -756,3 +756,24 @@
   - 第一次运行时，两个脚本已经写好了（等 Task 2 的全量测试时写的）。为了看到真正的失败，我先把两个脚本挪开再运行，15 个全部失败；放回后还有 4 个失败（图标还没生成、演示模式在 PowerShell 里读输出的编码不对、第 4 步取不到文件夹时出错、plist 里多了一个网址）。这几处都改了。
   - PowerShell 往管道里写的是控制台代码页，所以测试按 `oem` 解码。
 - 全部测试 1111 个通过（含 `sca`，用时 9 分 24 秒）。
+
+## 第二版 计划 4 Task 4：持续集成 —— 本地部分完成，等推送
+
+- 做了什么：`.github/workflows/ci.yml`（工作流"持续集成"：推送到 `master`、有拉取请求、手动触发时运行；矩阵 `windows-latest`、`macos-14`，`fail-fast: false`，Python 3.12，`PYTHONUTF8=1`）。步骤依次是：
+  1. 检出代码，装 uv、装 Node 22；
+  2. `uv venv --python 3.12`，再 `uv pip install -e ".[dev]"`；
+  3. 跑全部测试；
+  4. 用检出的源码跑安装脚本（Windows 按 D17 用 `Get-Content -Raw -Encoding UTF8 install.ps1 | Invoke-Expression; exit $LASTEXITCODE`，用的是 Windows PowerShell 5.1；Mac 用 `sh install.sh`）；
+  5. 把 `uv tool dir --bin` 加进后面几步的 PATH；
+  6. `caliper doctor --offline`；
+  7. `caliper --smoke`；
+  8. 再跑一次安装脚本。
+
+  不用任何密钥，不调用任何模型接口。另外 `.gitignore` 加了 `build/`（uv 从本地源码构建时 setuptools 留下的目录）。
+- 用的 Action 版本是 2026-11-19 查 GitHub 上各仓库的最新发布再确认标签存在的：
+  - `actions/checkout@v7`
+  - `actions/setup-node@v7`
+  - `astral-sh/setup-uv@v10.3.3`：这个仓库没有 `v10` 这种大版本标签，只能写完整版本号。
+- 测试：`tests/test_ci_workflow.py` 5 个（计划 3 个，另加工作流名字和触发条件、装了 uv / Node / Python 3.12）。先把 `ci.yml` 挪开运行，5 个全部失败；放回后通过。
+- 全部测试 1116 个通过（含 `sca`，用时 9 分 18 秒）。
+- 还没做：推送到 GitHub（Step 3，要先问用户），看两个平台的运行结果并修 Mac 上的问题（Step 4、5）。
