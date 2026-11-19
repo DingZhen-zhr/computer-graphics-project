@@ -3,9 +3,9 @@ requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "cad-agent"
-version = "0.1.0"
-description = "基于 SimpleCADAPI 的命令行 CAD 建模智能体（AICG Project 3）"
+name = "caliper-cad"
+version = "2.0.0"
+description = "卡尺 Caliper：用平常话做 CAD 零件，每一步都由程序实测（基于 SimpleCADAPI，AICG Project 3）"
 requires-python = ">=3.10,<3.14"
 dependencies = [
     "simplecadapi[editor,verify]==2.2.7",

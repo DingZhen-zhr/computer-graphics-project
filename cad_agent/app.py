@@ -5,6 +5,9 @@
     caliper --cli [--config 文件]   终端对话模式
     caliper --demo-script 剧本.json  开发用：模型换成假模型剧本，沙盒是真的，不需要密钥
     caliper doctor [--offline] [--json]   自检
+    caliper update           更新到最新发布
+    caliper uninstall [--delete-data | --keep-data]   卸载
+    caliper --version        显示版本号
     caliper --smoke          持续集成用（不在帮助里）：不开窗口，起服务，请求一次首页和 /api/boot
 
 没有密钥也能启动（界面会进引导页）；智能体第一次要调用模型时才需要密钥，没有就让这一轮以 failed 结束，提示去设置里填。
@@ -23,7 +26,7 @@ import time
 import webbrowser
 from pathlib import Path
 
-from cad_agent import cli, doctor, paths
+from cad_agent import __version__, cli, doctor, maintenance, paths
 from cad_agent.agent.loop import Agent
 from cad_agent.brief import Brief
 from cad_agent.cases import load_cases
@@ -180,7 +183,7 @@ def _run_cli(config_file: str | None) -> int:
     return cli.main([], config=config)
 
 
-SUBCOMMANDS = {"doctor": doctor.doctor_main}
+SUBCOMMANDS = {"doctor": doctor.doctor_main, "update": maintenance.update_main, "uninstall": maintenance.uninstall_main}
 
 
 def _start(settings: Settings, script: Path | None) -> tuple[Hub, object, str]:
@@ -215,8 +218,9 @@ def main(argv: list[str] | None = None) -> int:
     if argv and argv[0] in SUBCOMMANDS:
         return SUBCOMMANDS[argv[0]](argv[1:])
     parser = argparse.ArgumentParser(prog="caliper", description="卡尺 Caliper：用平常话做 CAD 零件，每一步都由程序实测。"
-                                     "另有子命令：caliper doctor（自检）。",
+                                     "另有子命令：caliper doctor（自检）、caliper update（更新）、caliper uninstall（卸载）。",
                                      epilog="--demo-script <剧本文件>：开发用，模型换成假模型剧本，不需要密钥。")
+    parser.add_argument("--version", action="version", version=f"卡尺 Caliper {__version__}", help="显示版本号")
     parser.add_argument("--browser", action="store_true", help="不开桌面窗口，改用默认浏览器打开")
     parser.add_argument("--cli", action="store_true", help="终端对话模式")
     parser.add_argument("--config", metavar="文件", help="终端对话模式用的配置文件；不给就用设置和钥匙串里的密钥")

@@ -703,3 +703,17 @@
 - 测试：`tests/test_doctor.py` 28 个（计划 14 个，另加：纯英文临时目录是 ok、WebView2 在时是 ok、`webview` 导入失败是 warn、钥匙串测试项用自己的服务名、模型服务能连上是 ok、没有 key 是 warn、数据目录写不进是 fail、平台、Python 版本、SCA 版本、方块尺寸不对、命令行报告、`--smoke` 不在帮助里）。钥匙串都用内存里的假后端，网络和沙盒都换成假的；只有 `test_all_ok_on_this_machine`（`sca`）真的建方块。先运行看到"没有 doctor 模块"的失败，再实现。
 - 本机用内存钥匙串跑 `caliper doctor --offline`：九项 ✓ 或 —，`密钥` 一项是 !（没有 key），最后一行"有 1 项需要注意"，返回码 0。
 - 全部测试 1065 个通过（含 `sca`，用时 9 分 57 秒）。
+
+## 第二版 计划 4 Task 2：版本号、更新和卸载 —— 完成
+
+- 做了什么：`__version__ = "2.0.0"`；`pyproject.toml` 的发行名改成 `caliper-cad`、版本 `2.0.0`、描述改成卡尺的一句话；`cad_agent/maintenance.py`（`REPO`、`INSTALL_PS1`、`INSTALL_SH`、`shortcut_paths`、`update_command`、`run_update`、`run_uninstall`，另有命令行入口 `update_main`、`uninstall_main`）；`app.py` 接上 `caliper --version`（打印 `卡尺 Caliper 2.0.0`）、`caliper update`、`caliper uninstall [--delete-data | --keep-data]`，帮助里的说明列出三个子命令。
+- 改名后在 `.venv` 里先 `pip uninstall cad-agent`，再 `pip install --no-deps -e .`，同一个目录换个名字重新登记，没有装任何新东西。`.venv\Scripts\caliper --version` 打印 `卡尺 Caliper 2.0.0`。
+- 由我定的细节：
+  1. Windows 的"开始菜单\程序""桌面"位置向系统要（`SHGetFolderPathW`），和安装脚本用的 `[Environment]::GetFolderPath` 是同一个来源；桌面被挪到别处时两边一致。
+  2. `update_command`：Windows 是 `powershell -NoProfile -ExecutionPolicy Bypass -Command "irm <INSTALL_PS1> -TimeoutSec 60 | iex"`；Mac 是 `sh -c "curl -fsSL --connect-timeout 20 <INSTALL_SH> | sh"`。
+  3. 卸载第 2 步对每个预设直接调 `keyring.delete_password("caliper", 预设 id)`，没有的跳过；只删服务名 `caliper` 的项，别的程序的不动；只报异常类型。环境变量里的 key 不动，打印一句说明。
+  4. 第 3 步：数据目录只有在"名字里带 Caliper"而且"在用户主目录里面、不是主目录本身或它的上级"时才删，否则拒绝并说明原因，返回码 1（Review Focus 4 之外多加的保险）。读回答时遇到输入结束（EOF）按保留处理；回答去掉首尾空白、不分大小写，等于 `yes` 才删。
+  5. 第 4 步：新开的进程先等 3 秒再运行 `uv tool uninstall caliper-cad`（Windows 上正在运行的程序文件删不掉，先让当前这个 caliper 退出）。Windows 用 `DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP`，Mac 用 `start_new_session=True`。uv 先在 PATH 里找，再看 `~/.local/bin`。开不了进程时打印"请关掉卡尺后自己运行：uv tool uninstall caliper-cad"，返回码 1。
+- 测试：`tests/test_maintenance.py` 28 个（计划 11 个，有一个按两个平台、一个按六种回答参数化；另加：安装脚本地址、更新命令失败时的说明、两个平台的快捷方式位置、Mac 的 Caliper.app、快捷方式不存在时跳过、回答时输入结束、在后台卸载用了脱离当前进程的参数、四步按顺序打印、两个子命令的命令行、每个预设的 key 都删）。文件操作都在临时目录里，钥匙串用内存假后端，运行外部命令的都是假函数；没有真的运行过 `caliper uninstall` 或 `caliper update`。
+- 如实写：`maintenance.py` 是在第一次运行这些测试之前写好的（等 Task 1 的全量测试时顺手写的），所以第一次运行时大部分测试已经通过，只有版本号、发行名和两个命令行入口失败。为了看到真正的失败，我把 `maintenance.py` 临时挪开再运行，看到"没有这个模块"的失败，再放回来。
+- 全部测试 1093 个通过（含 `sca`，用时 9 分 42 秒）。
