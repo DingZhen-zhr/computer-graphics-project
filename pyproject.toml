@@ -31,7 +31,8 @@ exclude = ["tests*", "benchmarks*", "scripts*"]
 
 [tool.setuptools.package-data]
 cad_agent = ["agent/prompts/*.md", "agent/prompts/*.json", "case_data/*/case.yaml", "providers.toml",
-             "desk/static/**/*", "desk/demo_data/**/*"]
+             "desk/static/**/*", "desk/demo_data/**/*",
+             "web/static/vendor/three/*"]   # 桌面端的服务从这里取 three.js；计划 4 Task 6 搬到 desk/static/vendor/three/ 后去掉
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

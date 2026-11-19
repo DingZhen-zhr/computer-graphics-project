@@ -3,3 +3,8 @@ site/** -text
 demo/** -text
 *.stl binary
 *.step -text
+
+# 安装脚本：Mac 的 sh 脚本必须是 LF 换行；PowerShell 脚本在 Windows 上用 CRLF
+install.sh text eol=lf
+*.sh text eol=lf
+install.ps1 text eol=crlf

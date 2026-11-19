@@ -30,6 +30,8 @@ WIN_SHORTCUT = "卡尺 Caliper.lnk"
 MAC_APP = "Caliper.app"
 ASK_DELETE = "要把会话、案例和设置也一起删掉吗？输入 yes 确认删除，直接回车保留："
 UNINSTALL_WAIT_S = 3   # 后台卸载先等几秒，让当前这个 caliper 进程先退出（Windows 上正在运行的程序文件删不掉）
+UPDATE_WAIT_S = 3
+UPDATE_TITLE = "卡尺 Caliper 更新"
 
 _spawn = subprocess.Popen   # 命令行入口用；测试里换掉
 _call = subprocess.call
@@ -97,9 +99,15 @@ def shortcut_paths() -> list[Path]:
 
 
 def update_command() -> list[str]:
-    """这个平台上重新运行安装脚本的命令。"""
+    """这个平台上重新运行安装脚本的命令。
+
+    Windows 不让替换正在运行的程序文件（计划 4 Task 3 实测：卡尺开着时 uv 报"拒绝访问"），而 caliper update 本身就在运行，
+    所以用 start 开一个新窗口：先等几秒让这个 caliper 退出，再运行安装脚本；窗口留着，装完能看到结果。start 会立刻返回。
+    """
     if _system() == "win32":
-        return ["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", f"irm {INSTALL_PS1} -TimeoutSec 60 | iex"]
+        script = f"Start-Sleep -Seconds {UPDATE_WAIT_S}; irm {INSTALL_PS1} -TimeoutSec 60 | iex"
+        return ["cmd", "/c", "start", UPDATE_TITLE, "powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-NoExit",
+                "-Command", script]
     return ["sh", "-c", f"curl -fsSL --connect-timeout 20 {INSTALL_SH} | sh"]
 
 
@@ -112,6 +120,9 @@ def run_update(run: Callable = subprocess.call, say: Callable = print) -> int:
     except OSError as e:
         say(f"没能运行这条命令（{type(e).__name__}）。可以把上面这条命令复制到终端里自己运行。")
         return 1
+    if code == 0 and _system() == "win32":
+        say(f"更新会在一个新窗口里进行：等这个 caliper 退出 {UPDATE_WAIT_S} 秒后开始，结果在那个窗口里看。"
+            "开着的卡尺窗口请先关掉，不然 Windows 不让替换正在运行的程序。")
     if code != 0:
         say(f"更新没有成功（返回码 {code}），原因见上面安装脚本的输出。")
     return int(code)
@@ -232,6 +243,8 @@ def run_uninstall(*, delete_data: bool | None, ask: Callable[[str], str] = input
     say("[3/4] 数据目录（会话、案例、设置、日志）")
     ok = _handle_data(delete_data, ask, say) and ok
     say(f"[4/4] 让 uv 卸载程序本身：uv tool uninstall {DIST_NAME}")
+    if _system() == "win32":
+        say("  开着的卡尺窗口请先关掉：Windows 不让删除正在运行的程序文件。")
     cmd, kwargs = _uninstall_command()
     try:
         run(cmd, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, **kwargs)

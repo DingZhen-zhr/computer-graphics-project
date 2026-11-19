@@ -93,7 +93,10 @@ def test_update_runs_install_script_command(monkeypatch, system):
     assert run.calls == [cmd]
     text = " ".join(cmd)
     if system == "win32":
-        assert cmd[0].lower().startswith("powershell") and INSTALL_PS1 in text and "iex" in text
+        # Windows 上正在运行的程序文件不能被替换（Task 3 实测：uv 报"拒绝访问"），
+        # 所以在一个新窗口里先等几秒、等这个 caliper 退出后再运行安装脚本；start 会立刻返回
+        assert cmd[:3] == ["cmd", "/c", "start"]
+        assert "powershell" in text and INSTALL_PS1 in text and "iex" in text and "Start-Sleep" in text
     else:
         assert cmd[0] == "sh" and INSTALL_SH in text and "curl" in text and "| sh" in text
         assert "--connect-timeout" in text
@@ -272,3 +275,10 @@ def test_every_provider_key_is_removed(box):
         box["keyring"].set_password("caliper", p.id, FAKE)
     run_uninstall(delete_data=False, say=lambda *_: None, run=Recorder())
     assert not any(service == "caliper" for service, _ in box["keyring"].store)
+
+
+def test_update_on_windows_says_it_continues_in_a_new_window(monkeypatch):
+    monkeypatch.setattr(maintenance, "_system", lambda: "win32")
+    said: list[str] = []
+    assert run_update(run=Recorder(), say=said.append) == 0
+    assert any("新窗口" in s for s in said)

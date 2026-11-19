@@ -114,3 +114,18 @@
 - 实际情况：`static/vendor/three/three.module.js`（three.js r160 原样，第三方文件）第 20610 行有一句代码注释 `(not to blow over maxLights budget)`，和公网隧道无关；这个文件不能改。
 - 怎么改：测试跳过 `vendor/` 目录下的第三方文件，其余文件照计划搜。另外 argparse 自带的报错是英文，`python -m cad_agent.web` 的参数解析器把 "unrecognized arguments" 换成"不认识的参数"，让计划写的那句提示成立。
 - 影响：只影响这一条测试；后面的任务不受影响。
+
+## D16（第二版计划 4 Task 3）默认来源是 git 地址，但电脑上没有 git 时改用同一标签的压缩包
+- 原计划：`CALIPER_SOURCE` 的默认值是 `git+https://github.com/DingZhen-zhr/computer-graphics-project@v2.0.0`，安装就是 `uv tool install --python 3.12 --force <来源>`。
+- 实际情况：uv 从 git 地址安装时要调用电脑上的 git 程序（文档没写；本机实测把 git 从 PATH 拿掉后报 `Git executable not found`，见 `docs/install-notes.md` 第 2 节）。干净的 Windows 电脑通常没有 git；Mac 没装命令行工具时 `/usr/bin/git` 只是个一运行就弹窗的占位。照原样做，成功标准 4（干净的 Windows 机器一行命令装好）达不成。
+- 怎么改：默认值和变量名一字不改（`test_default_source_is_the_release_tag` 照计划断言）。只多一步：来源是默认的 git 地址、而且找不到可用的 git 时，脚本打印一句说明，改用同一个标签的压缩包 `caliper-cad @ https://github.com/DingZhen-zhr/computer-graphics-project/archive/refs/tags/v2.0.0.zip`；用户自己设的 git 地址找不到 git 时，说明原因并停下。
+- 影响：Task 3 的两个脚本；Task 7 README"装不上怎么办"一节提一句；Task 8 发布时这个压缩包地址随标签自动生效，不用另外上传。
+
+## D17（第二版计划 4 Task 3）install.ps1 不带 BOM；本地运行改用"按 UTF-8 读进来再执行"，不用 -File
+- 原计划：Task 3 Step 4 在本机用 `powershell -ExecutionPolicy Bypass -File install.ps1` 实测；`test_ps1_parses` 用 PowerShell 的语法解析器解析 `install.ps1`。
+- 实际情况（本机实测，Windows PowerShell 5.1，中文系统）：
+  1. 文件带 UTF-8 BOM 时，用户的用法 `irm … | iex` 会把 BOM 和第一个词连在一起当成命令名，开头先报一行红字"The term '﻿#' is not recognized"，后面才照常运行。试了五种第一行的写法都躲不开。
+  2. 文件不带 BOM 时，`-File` 和 `Parser::ParseFile` 会按系统编码（中文 Windows 是 936）读，中文全乱，直接报语法错误。
+  两者不能兼得。主要的用法（README 的一行命令、`caliper update`）都是 `irm | iex`，它按服务器给的 `charset=utf-8` 解码，不带 BOM 时完全正常。
+- 怎么改：`install.ps1` 存成不带 BOM 的 UTF-8（文件开头写明原因和本地运行的办法）。本地运行一律用 `Get-Content -Raw -Encoding UTF8 .\install.ps1 | iex`：本机实测（Task 3 Step 4）、持续集成（Task 4）、README 的离线安装办法（Task 7）都这样写。`test_ps1_parses` 改成按 UTF-8 读出文字后交给同一个解析器的 `ParseInput`；演示模式的测试也用这种方式运行。另外加一条测试：`install.ps1` 不能带 BOM；经 `iex` 运行时标准错误输出必须是空的。
+- 影响：Task 3 的测试和本机实测命令；Task 4 的 `ci.yml`；Task 7 README"装不上怎么办"。PowerShell 7（pwsh）默认按 UTF-8 读，`-File` 在那里没有这个问题。

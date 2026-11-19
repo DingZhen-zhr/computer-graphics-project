@@ -717,3 +717,42 @@
 - 测试：`tests/test_maintenance.py` 28 个（计划 11 个，有一个按两个平台、一个按六种回答参数化；另加：安装脚本地址、更新命令失败时的说明、两个平台的快捷方式位置、Mac 的 Caliper.app、快捷方式不存在时跳过、回答时输入结束、在后台卸载用了脱离当前进程的参数、四步按顺序打印、两个子命令的命令行、每个预设的 key 都删）。文件操作都在临时目录里，钥匙串用内存假后端，运行外部命令的都是假函数；没有真的运行过 `caliper uninstall` 或 `caliper update`。
 - 如实写：`maintenance.py` 是在第一次运行这些测试之前写好的（等 Task 1 的全量测试时顺手写的），所以第一次运行时大部分测试已经通过，只有版本号、发行名和两个命令行入口失败。为了看到真正的失败，我把 `maintenance.py` 临时挪开再运行，看到"没有这个模块"的失败，再放回来。
 - 全部测试 1093 个通过（含 `sca`，用时 9 分 42 秒）。
+
+## 第二版 计划 4 Task 3：安装脚本 —— 完成
+
+- 做了什么：`install.ps1`（Windows）、`install.sh`（Mac）、`scripts/make_icon.py` 和它生成的 `cad_agent/desk/static/icon.png`（256×256）、`icon.ico`（16 到 256 七种尺寸）、`icon.icns`；`docs/install-notes.md`（uv 用法的出处和本机实测）；`.gitattributes` 在原有几行后面加了三行（`install.sh` 和 `*.sh` 用 LF，`install.ps1` 用 CRLF）。
+- 两个脚本按计划的五步走，每步开头打印 `[n/5]`；四个环境变量 `CALIPER_SOURCE`、`CALIPER_MIRROR`、`CALIPER_NO_SHORTCUT`、`CALIPER_DRY_RUN`。镜像：PyPI 用清华，Python 用 npmmirror（两边对应文件的 HEAD 请求都是 200）。下载都带 20 秒连接超时（uv 用 `UV_HTTP_CONNECT_TIMEOUT=20`）。不需要管理员权限：没有 `RunAs`、`HKLM`、`Set-ExecutionPolicy`、`sudo`。
+- 偏离两条：
+  - D16：uv 从 git 地址安装要用电脑上的 git（本机实测"Git executable not found"）。默认来源不变；找不到 git 时改用同一标签的压缩包 `caliper-cad @ …/archive/refs/tags/v2.0.0.zip`。
+  - D17：`install.ps1` 不能带 BOM（`irm | iex` 会把 BOM 当成命令名报红字），而不带 BOM 时 Windows PowerShell 5.1 的 `-File` 会按系统编码读乱中文。所以本地运行、测试和持续集成都改用 `Get-Content -Raw -Encoding UTF8 install.ps1 | iex`；`test_ps1_parses` 用同一个解析器的 `ParseInput`。
+- 由我定的细节：
+  1. 整段脚本放在 `& { … }` 里，出错时不 `exit`（用 `irm | iex` 时会关掉用户的窗口），而是设好 `$LASTEXITCODE` 正常结束；用 `-File` 运行时才 `exit`。
+  2. 临时改的 uv 环境变量结束时还原；加进 PATH 的 uv 目录保留，这个窗口里马上就能用 `caliper`。
+  3. 快捷方式的图标路径用工具环境自己的 Python（`-I`，不受当前目录影响）去问包装在哪里。
+  4. Mac 的 x86_64 提示里多一句"可能是终端开了 Rosetta"。
+  5. Mac 上 `/usr/bin/git` 在没装命令行工具时只是个弹窗占位，不算有 git。
+  6. Info.plist 不写 DOCTYPE 那一行，脚本里除了本仓库、uv 安装脚本和两个镜像，没有别的网址。
+  7. 演示模式最后一行写"这是演示模式……没有真的安装"，不写"装好了"。
+- 本机实测（用户同意后装的，装完保留；细节见 `docs/install-notes.md` 第 5 节）：
+  1. 先按 uv 官方文档装了 uv 0.13.9，12.7 秒。
+  2. 第一次装卡尺 106 秒，返回码 0。`caliper --version` 正常；开始菜单和桌面各有一个"卡尺 Caliper.lnk"；双击后只有一个"卡尺 Caliper"窗口，没有控制台窗口；`caliper doctor` 十项全是 ✓，"全部正常"。
+  3. 再装一次：之前建的会话"安装测试"、设置 `run_timeout_s = 61` 都在。
+  4. 从 zip 压缩包安装（PATH 里没有 git 时）能装上。
+- 实测找出并改掉的两个真问题，都是先写测试、看到失败再改：
+  1. 装好的程序打开后三栏是空的：three.js 在 `cad_agent/web/static/vendor/three/`，但 `package-data` 没收它。先加测试 `test_package_ships_everything_the_page_loads`，看到它失败；再在 `package-data` 里加 `web/static/vendor/three/*`。Task 6 搬家后去掉这一条，测试照样查。
+  2. 卡尺开着时重装，uv 报"拒绝访问"：Windows 不让替换正在运行的文件，脚本却打印网络提示。改成：
+     - 安装脚本在第 3 步先查有没有卡尺的进程，有就请用户先关掉，然后停下（加了测试 `test_ps1_stops_when_caliper_is_running`；实测开着窗口运行，看到了这句话）；
+     - `caliper update` 在 Windows 上改成用 `start` 开新窗口、先等 3 秒再运行安装脚本。这改了 Task 2 里我自己写的一条断言：Windows 的命令原来以 `powershell` 开头，现在以 `cmd /c start` 开头，并且必须带 `Start-Sleep`，没有放松。另外加了一条测试：Windows 上 `caliper update` 会说"在新窗口里进行"。
+  3. `caliper uninstall` 在 Windows 上第 4 步前提醒先关掉卡尺窗口。
+- 测试：
+  - `tests/test_install_scripts.py` 有 17 个：计划 9 个，Mac 平台检查按两种情况参数化；另外 8 个是：
+    - `install.ps1` 不带 BOM、`install.sh` 只用 LF；
+    - 经 `iex` 运行后窗口还在、标准错误输出是空的；
+    - 不支持 Linux；
+    - 四个环境变量两个脚本都写了；
+    - 装出来的包里有页面要用的全部静态文件；
+    - 卡尺开着时先停下。
+  - `tests/test_maintenance.py` 加了 1 个。
+  - 第一次运行时，两个脚本已经写好了（等 Task 2 的全量测试时写的）。为了看到真正的失败，我先把两个脚本挪开再运行，15 个全部失败；放回后还有 4 个失败（图标还没生成、演示模式在 PowerShell 里读输出的编码不对、第 4 步取不到文件夹时出错、plist 里多了一个网址）。这几处都改了。
+  - PowerShell 往管道里写的是控制台代码页，所以测试按 `oem` 解码。
+- 全部测试 1111 个通过（含 `sca`，用时 9 分 24 秒）。
