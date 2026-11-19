@@ -1,224 +1,306 @@
-# CAD 建模智能体（AICG Project 3）
+# 卡尺 Caliper
 
-一个命令行 CAD 建模智能体：用自然语言说需求，它会追问、整理成需求单、等你确认，然后用 [SimpleCADAPI](https://pypi.org/project/simplecadapi/)（下面简称 SCA）按特征建模，由程序自动测量检查；检查不过会自动修改重试（最多 3 次），通过后导出 STEP 文件和截图，并且支持多轮修改。
+说出你要的零件，它来建模，每一步都实测。
 
-核心思路：**程序管流程，模型只做判断**。需求单是否确认、检查是否通过、能不能交付，都由程序判定；模型只负责理解需求、写每个特征的几行建模代码、写检查项。所以换任何大模型都能用，只要改配置文件。
+卡尺是一个桌面应用：你用平常话描述一个零件，它先把需求问清楚，再分阶段用 [SimpleCADAPI](https://pypi.org/project/simplecadapi/)（下面简称 SCA）建模，每一步的尺寸都由程序在沙盒里真的建出来、量出来，模型说了不算。最后交付 STEP、STL 和参数化的源文件。名字的意思就是这个立场：拿卡尺量过才算数。
 
-## 分阶段建模与终检（第二版内核）
+![卡尺的主界面：左边是会话，中间是对话和交付卡片，右边是 3D 模型、阶段刻度和标题栏](docs/images/caliper-main.jpg)
 
-第二版（卡尺 Caliper）把建模拆成阶段，每一步都由程序实测，模型说了不算：
-
-```
-澄清 ──确认──▶ 规划 ──▶ 阶段 S1 ──▶ S2 ──▶ … ──▶ Sn ──▶ 终检 ──▶ 交付
- ▲                       每个阶段：先写检查 → 建模 → 程序实测        │
- └──────────────────────── 用户提出修改 ◀───────────────────────────┘
-```
-
-- **位置关系**：零件有两个以上组成部分时，需求单里要写清各部分怎么相接（`relations`），写全了程序才请用户确认。
-- **计划与阶段**：确认后模型先用 `set_plan` 把零件拆成 1~12 个阶段；每个阶段先写检查（`set_checks`）才能写特征；`build` 从当前阶段起逐个阶段截断运行，检查全过才进下一阶段。
-- **终检**：最后一个阶段通过后，程序检查每个用户参数都有检查用到，再做**参数扰动验证**：把每个用户参数改掉 20% 重建、检查的期望值冻结在原来的数值上——如果所有检查仍然通过，说明模型没用上这个参数或者没有检查约束它，退回给模型。
-- 另外还有：`probe`（在沙盒里试一小段代码看打印结果）、`read_reference`（读 SCA 官方的建模文档）、案例库（规划时参考相似零件，自带 8 个，见 `cad_agent/case_data/`）、交付后不经过模型直接改参数（内核部分，界面在后续版本）。
-
-四个开关都写在配置文件的 `[agent]` 里，默认全开，可以逐个关掉做对照：
-
-```toml
-[agent]
-staged = true          # 分阶段流程；false 就退回 1.2 版的单阶段流程（提示词、工具、build 返回都和 1.2 版逐字相同）
-mutation_check = true  # 终检的参数扰动验证
-visual_review = true   # 看图审查（下一份计划实现）
-cases = true           # 案例库
-```
-
-**第二版的成功率要等付费评测之后才有数字。** 现在的测试（假模型剧本加真实 SCA 沙盒）证明的是关卡按设计工作、流程表达得了这些零件，不是"真模型做得好"。
+在线看一个示例（不用安装，只读）：<https://dingzhen-zhr.github.io/computer-graphics-project/demo/>
 
 ## 安装
 
-要求：Windows 或其他系统，Python 3.10–3.13。在项目目录里执行（PowerShell）：
+Windows（在 PowerShell 里粘贴这一行）：
+
+```powershell
+irm https://raw.githubusercontent.com/DingZhen-zhr/computer-graphics-project/master/install.ps1 | iex
+```
+
+Mac（在"终端"里粘贴这一行）：
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/DingZhen-zhr/computer-graphics-project/master/install.sh | sh
+```
+
+**系统要求：** Windows 10/11（64 位），或 Apple 芯片的 Mac（macOS 14 及以上）。不支持 Intel 芯片的 Mac（SCA 没有对应的安装包）和 Linux。需要一个大模型服务的 API key，推荐 DeepSeek。
+
+安装脚本做五件事，每一步做之前都会先打印出来：
+
+1. 检查系统和芯片，不支持就说明原因并退出，什么都不改。
+2. 准备 [uv](https://docs.astral.sh/uv/)：电脑上没有就运行 uv 的官方安装脚本。不需要预先装 Python。
+3. 用 uv 准备一个独立的 Python 3.12 环境，装上卡尺（第一次要下载几百 MB）。
+4. 建快捷方式：Windows 是开始菜单和桌面上的"卡尺 Caliper"；Mac 是"应用程序"里的 Caliper。
+5. 运行一次自检 `caliper doctor`，把结果打印出来。
+
+它只往当前用户的目录里写东西，不需要管理员权限。装好后，双击"卡尺 Caliper"打开；或者在终端里输入 `caliper`（提示找不到时，关掉终端再开一个新的）。
+
+**第一次打开**会进引导页：
+
+1. 选模型服务（默认 DeepSeek）；
+2. 粘贴 API key，点"测试连接"：key 存进系统钥匙串，不写进任何文件；
+3. 完成。
+
+任何一步都可以点"先看示例"跳过，示例会话不需要 key。
+
+## 装不上怎么办
+
+**连不上 GitHub 或 PyPI，或者下载很慢。** 改走国内镜像，PyPI 用清华的镜像，Python 用 npmmirror 的镜像：
+
+```powershell
+$env:CALIPER_MIRROR = "1"; irm https://raw.githubusercontent.com/DingZhen-zhr/computer-graphics-project/master/install.ps1 | iex
+```
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/DingZhen-zhr/computer-graphics-project/master/install.sh | CALIPER_MIRROR=1 sh
+```
+
+脚本里每一次下载都有 20 秒的连接超时，不会一直卡着。uv 本身是从它的官网下载的，镜像管不到这一步。
+
+**GitHub 完全打不开：下载压缩包在本地装。**
+
+1. 想办法拿到本仓库发布标签 `v2.0.0` 的压缩包（GitHub 页面上的 Code → Download ZIP，或者找别人拷一份），解压。
+2. 把 `CALIPER_SOURCE` 指到解压出来的目录，再运行目录里的安装脚本。
+
+Windows：
+
+```powershell
+$env:CALIPER_SOURCE = "D:\下载\computer-graphics-project-2.0.0"
+Get-Content -Raw -Encoding UTF8 D:\下载\computer-graphics-project-2.0.0\install.ps1 | iex
+```
+
+Mac：
+
+```sh
+CALIPER_SOURCE=~/Downloads/computer-graphics-project-2.0.0 sh ~/Downloads/computer-graphics-project-2.0.0/install.sh
+```
+
+在 Windows 上，本地的 `install.ps1` 要用上面这种"按 UTF-8 读进来再执行"的写法，不要用 `powershell -File install.ps1`。Windows 自带的 PowerShell 5.1 会按系统编码读文件，中文会乱。
+
+**电脑上没有 git。** 不用管：脚本发现没有 git，会自动改为下载同一个版本的压缩包来装。
+
+**另外两个开关：**
+
+- `CALIPER_NO_SHORTCUT=1`：不建快捷方式。
+- `CALIPER_DRY_RUN=1`：只打印每一步要做什么，什么都不执行。
+
+**提示"卡尺正在运行"。** Windows 不让替换正在运行的程序。关掉所有卡尺窗口，以及终端里运行着的 `caliper`，再装一次。
+
+**Windows 上窗口打不开（多见于 Windows 10）。** 通常是缺少 Microsoft Edge WebView2 运行时。到 <https://developer.microsoft.com/microsoft-edge/webview2/> 下载"常青版"装上。装好之前，可以先用 `caliper --browser` 在默认浏览器里打开同样的界面。
+
+**`caliper doctor` 每一项是什么意思：**
+
+| 项 | 查什么 | 不通过时 |
+|---|---|---|
+| `platform` | 系统和芯片在不在支持范围里 | 不能用 |
+| `python` | Python 版本在 3.10 到 3.13 之间 | 不能用：重新运行安装命令 |
+| `sca` | 能找到 simplecadapi，版本是 2.2.7 | 不能用：重新运行安装命令 |
+| `sandbox` | 用沙盒真的建一个 10×20×30 的方块，量出来对不对 | 不能用 |
+| `workdir` | 沙盒的工作目录是不是纯英文路径。用户名是中文时，系统临时目录会带中文，程序会自动改用 `C:\ProgramData\Caliper\work` | 改用了备用目录是"需要注意"；备用目录也建不了才是"不能用" |
+| `window` | 窗口组件能不能用（Windows 上还要有 WebView2） | 需要注意：先用 `caliper --browser` |
+| `keyring` | 系统钥匙串能不能写、读、删（用一条测试项，查完就删） | 需要注意：可以改用环境变量存 key |
+| `data` | 数据目录能不能建、能不能写 | 不能用 |
+| `provider` | 能不能连上设置里的模型服务（只建立连接，不发请求；`--offline` 时跳过） | 需要注意：检查网络和接口地址 |
+| `key` | 有没有可用的 key，只说它来自环境变量还是钥匙串，不显示任何一位 | 需要注意：在设置里填，或者设环境变量 |
+
+`caliper doctor --json` 输出同样的内容，方便发给别人看。有"不能用"的项时返回码是 1。
+
+## 怎么用
+
+窗口分三栏：
+
+- **左：会话。** 历史会话（零件名、时间、版本数），可以新建、改名、删除；点开旧会话可以接着做。底部是案例库。
+- **中：对话。**
+  - 回复逐字出现。
+  - 工具调用显示成一棵树：阶段是树干，工具是分支。
+  - 提问、确认需求单、交付各有一张卡片。
+  - 运行时，发送按钮变成"停止"。
+- **右：工作台。** 有模型、检查、参数、版本四个页签。右下角是图纸样式的标题栏：零件、版本、阶段、模型、费用、缓存命中率、日期。
+
+一次完整的过程：
+
+1. **提需求**：比如"做一个放在桌上看视频的小支架"。
+2. **回答**：它先追问影响能不能用的关键尺寸，每个问题都给一个建议值，直接回答"可以"也行。
+3. **确认**：需求单整理好以后会摆出来，包括：
+   - 每个参数是你给的还是它建议的；
+   - 各部分怎么相接（位置关系）。
+
+   你点"确认"它才动手。
+4. **规划**：把零件拆成几个阶段，每个阶段写明做完后零件上多了什么。
+5. **逐阶段建模**：每个阶段先写检查、再写建模代码，程序真的建出来并测量；检查全过才进下一阶段。模型页签下面的阶段刻度可以点，看零件一个阶段一个阶段长出来。
+6. **交付**：终检通过后存成一个版本。交付卡片上写着检查通过数、参数扰动验证和看图审查的结论，可以下载文件。
+
+交付之后还可以：
+
+- **直接改参数**：在"参数"页签里改数值（输入框或滑块），点"应用"。程序从第一个阶段起重新验证，通过就存成新版本，全程**不调用模型、不花钱**。没通过时数值退回原样；可以点"让助手处理"，把这次改动发给助手。
+- **版本对比和导出**："版本"页签里勾两个版本，对比参数和截图；每个版本都能下载 STEP、STL、参数化源文件，或者在文件夹中显示。
+- **存为案例**：填一个标题和标签，以后做相似零件时，规划阶段会参考它（只参考做法，尺寸以需求单为准）。
+- **示例会话**：左栏"示例"里的"桌面看视频小支架"是 1.1 版的一次真实录制。它只读，不需要 key。
+
+## 它是怎么保证质量的
+
+**程序管流程，模型只做判断。** 需求单有没有确认、该不该进下一阶段、能不能交付，都由程序判定。模型只能调用我们定义的十几个工具，跳不过关卡。
+- 拦得住：没确认就开工、跳过检查直接交付、改了需求不重新验证。
+- 拦不住：模型把需求理解错了，而你也没看出来就点了确认。
+
+**分阶段，先写检查再建模。** 每个阶段必须先写至少一条检查（尺寸、体积、某处有没有材料等），才能写这个阶段的特征。build 由程序在沙盒里真的运行、测量，检查全过才能往下走；同一阶段连续失败 3 次就停下，把原因告诉你。
+- 拦得住：尺寸错、少了特征、建模代码运行出错。
+- 拦不住：检查本身写错了。下面两条就是为它准备的。
+
+**终检的参数扰动验证。** 最后一个阶段通过后，程序先确认每个你给的参数都至少被一条检查用到。然后把这些参数一个一个改掉（乘 1.2，整数加 1）重建模型，检查的期望值仍按原来的数字算：
+- 至少一条检查不通过，说明这个参数真的管着几何，过关；
+- 检查仍然全过，说明模型根本没用上这个参数，或者没有检查管它，退回给模型重做。
+
+这一步不调用模型。
+- 拦得住：参数改了几何不变；检查和参数无关。
+- 拦不住：模型和检查"自洽地错"，比如两边都按叠放来算。
+
+**看图审查。** 交付前，程序渲染四张图（等轴测、正视、俯视、右视），另开一次全新的模型调用，只给它需求单和这四张图，让它逐个部分、逐条位置关系回答"符合 / 不符合 / 看不出"。有"不符合"就退回，最多两轮；两轮后仍有异议，照常交付，但在交付卡片上标出来，由你判断。当前模型不能识图时自动跳过，并在卡片上写明"未做看图审查"。
+- 拦得住：部件放错位置、方向反了这类一眼能看出的错。
+- 拦不住：细小的尺寸差。另外它依赖审查模型的眼力，它也会看错。
+
+## 命令
+
+| 命令 | 作用 |
+|---|---|
+| `caliper` | 打开桌面窗口 |
+| `caliper --browser` | 不开窗口，改用默认浏览器打开同样的界面（终端里按 Ctrl+C 退出） |
+| `caliper --cli` | 终端对话模式。不给 `--config` 时，用设置页里的服务和钥匙串里的 key |
+| `caliper doctor` | 自检，见上面的表；`--offline` 不连模型服务，`--json` 输出 JSON |
+| `caliper update` | 更新到最新发布：重新运行安装脚本覆盖安装，会话、设置和 key 都不受影响 |
+| `caliper uninstall` | 依次删除快捷方式、钥匙串里卡尺存的 key、问过你之后删除数据，最后让 uv 卸载程序本身。`--delete-data` 直接删数据，`--keep-data` 保留数据；不在终端里运行时不问，按保留处理 |
+| `caliper --version` | 显示版本号 |
+
+## 模型服务和密钥
+
+**支持的服务**（在设置页里选）：
+
+- DeepSeek（默认，重点调优）；
+- 智谱 GLM、Kimi、通义千问；
+- OpenAI；
+- Claude（官方接口）；
+- 自定义地址（任何 OpenAI 兼容的接口）。
+
+各家的地址和建议的模型名都对照官方文档核实过（`cad_agent/providers.toml`），模型名也可以自己改。代码里不写任何价格；想看费用，到设置里照服务的价目页填。
+
+**key 存在哪：**
+
+- 在界面里填的 key 存进系统钥匙串（Windows 凭据管理器 / Mac 钥匙串），服务名 `caliper`，用户名是服务的编号，比如 `deepseek`。
+- 也可以用环境变量，环境变量优先。每家的变量名不同，比如 `DEEPSEEK_API_KEY`、`ANTHROPIC_API_KEY`，设置页里有写。
+- key 不写进任何文件、日志、会话记录；界面上只显示最后四位。
+
+**怎么换、怎么删：**
+
+- 在设置页里点"更换"或"删除"；
+- `caliper uninstall` 会删掉钥匙串里卡尺存的全部 key；
+- 环境变量里的 key 是你自己设的，卡尺不动它。
+
+**哪些没有用真实接口验证过（未用真实接口验证）：**
+
+- **Claude** 官方接口：只用假服务端做过单元测试，接口细节见 `docs/llm-api-notes.md` 第 8 节。
+- **DeepSeek 以外的预设**（智谱 GLM、Kimi、通义千问、OpenAI、自定义地址）：地址和模型名是照官方文档写的，没有拿真实的 key 跑过。
+- **看图审查**：整个流程是用假模型测的。DeepSeek 能不能识图没有实测，默认按不能识图处理；设置页里的"测试识图"会花你自己几厘钱，要你自己点。
+
+## 数据放在哪
+
+- Windows：`%LOCALAPPDATA%\Caliper`；Mac：`~/Library/Application Support/Caliper`。可以用环境变量 `CALIPER_HOME` 改到别处。
+- 里面有：`settings.toml`（除 key 以外的全部设置）、`sessions/`（每个会话一个目录）、`cases/`（你存的案例）、`logs/`（程序日志）。
+- 一个会话目录里有：
+  - `log.jsonl`：每条消息、工具调用、结果、耗时、token，以及启动时的软件和模型版本；
+  - `brief.json`（需求单）、`plan.json`（计划）、`features.json`、`checks.json`；
+  - `versions/v1/`、`v2/`…：每个版本的 `model.py`（参数化源文件，可以用 `sca edit` 打开）、`model.step`、`model.stl`、`view.png`、检查结果，以及各阶段的 STL。
+- 沙盒运行时的临时文件放在系统临时目录；那个目录带中文时，改放在 `C:\ProgramData\Caliper\work`。
+- 程序本身由 uv 管理：Windows 在 `%APPDATA%\uv\tools\caliper-cad`，命令在 `%USERPROFILE%\.local\bin`；Mac 在 `~/.local/share/uv/tools/caliper-cad`，命令在 `~/.local/bin`。
+
+## 给开发者
+
+**从源码运行**（Windows PowerShell，Python 3.10–3.13）：
 
 ```powershell
 python -m venv .venv
 .venv\Scripts\python -m pip install -e ".[dev]"
+.venv\Scripts\caliper                                              # 桌面窗口
+.venv\Scripts\caliper --demo-script scripts\demo_script.json       # 模型换成假模型剧本，不需要 key、不花钱，沙盒是真的
+.venv\Scripts\python -m cad_agent --config config.toml             # 旧的命令行用法，评测脚本也用它
 ```
 
-这会装好 `simplecadapi[editor,verify]==2.2.7`、`openai`、`anthropic`（Claude 官方接口）、`keyring`（系统钥匙串）、`pyyaml` 和测试用的 `pytest`。所有命令都用 `.venv\Scripts\python`，不要往系统 Python 里装包。
+所有命令都用 `.venv\Scripts\python`，不要往系统 Python 里装包。`config.example.toml` 里写了全部配置项。
 
-## 配置模型
-
-1. 把示例配置复制一份：
-
-   ```powershell
-   Copy-Item config.example.toml config.toml
-   ```
-
-   `config.toml` 里是模型地址、模型名、key 所在的环境变量名、超时和重试上限。默认用 DeepSeek；换成 GLM、通义、Kimi 等任何 OpenAI 兼容接口，只改 `[llm]` 里的 `base_url`、`model`、`api_key_env`，不用改代码。`config.toml` 已在 `.gitignore` 里，不会被提交。
-
-   还有几项可选的设置（都在 `config.example.toml` 里用注释写出来了，不写就和以前完全一样）：
-
-   - `extra_body`（写在 `[llm]` 里）：原样作为请求的 `extra_body` 发给接口，程序不认识里面的内容。比如 DeepSeek 实测可以这样关掉思考（`docs/llm-api-notes.md` 第 4 节）：`extra_body = {thinking = {type = "disabled"}}`。
-   - `[llm.pricing]`：`input_hit`、`input_miss`、`output` 三项，单位是 元 / 百万 token，**照模型服务的价目页自己填**（代码里不放任何价格）。填了以后每轮结束会显示本轮的大概费用，评测报告里也会有费用。
-   - `[llm.clarify]`（澄清阶段，需求单还没确认）和 `[llm.modeling]`（建模阶段，需求单已确认）：可以单独换 `model`、`temperature`、`extra_body`、`pricing`，没写的项沿用 `[llm]`；`extra_body` 是整体替换，不合并。一轮开始时按需求单有没有确认决定用哪个模型，这一轮里不换。例如只让澄清阶段不思考：
-
-     ```toml
-     [llm.clarify]
-     extra_body = {thinking = {type = "disabled"}}
-     ```
-
-   - `kind`（写在 `[llm]` 里）：`openai`（默认，OpenAI 兼容接口）或 `anthropic`（Claude 官方接口）。**Claude 适配层只经过假服务端的单元测试，未用真实接口验证**（接口细节见 `docs/llm-api-notes.md` 第 8 节）。
-   - `vision`（写在 `[llm]` 里，默认 `false`）：看图审查用的模型能不能识图。为 `true` 且分阶段流程、`[agent] visual_review` 都开着时，交付前会渲染四张图，另发一次只带图和需求单的审查调用。
-   - `[llm.review]`：看图审查单独用的模型；除了上面那几项，还可以写 `base_url`、`kind`、`api_key_env`，让审查走另一家服务（比如建模用 DeepSeek、审查用一个能看图的模型）。
-   - 各家服务的地址和建议的模型名查过官方文档，写在 `cad_agent/providers.toml` 和 `docs/llm-api-notes.md` 第 9 节；除 DeepSeek 外都没有用真实接口验证过。
-
-2. **API key 只放在环境变量里，不写进任何文件。** 在 PowerShell 里这样设置（把引号里换成你自己的 key；只对当前这个终端窗口有效）：
-
-   ```powershell
-   $env:DEEPSEEK_API_KEY="这里换成你的key"
-   ```
-
-   如果 `api_key_env` 改成了别的名字，就设置那个名字的变量。没设置时程序会提示“请先设置环境变量 …”并退出。
-
-## 运行
+**跑测试：**
 
 ```powershell
-.venv\Scripts\python -m cad_agent --config config.toml
+.venv\Scripts\python -m pytest -q                # 全部测试（含真实 SCA 的，大约 10 分钟）
+.venv\Scripts\python -m pytest -q -m "not sca"   # 跳过需要真实运行 SCA 的较慢测试
 ```
 
-启动时会打印 Python、simplecadapi、模型名的版本，并写进会话日志。然后直接说出你想做的零件，例如：
+测试全部用假模型和沙盒，不联网、不花钱，钥匙串用内存里的假后端。GitHub Actions 每次推送都在 Windows 和 Apple 芯片的 Mac 上跑全部测试，再用源码跑一遍安装脚本、自检和无窗口启动（`.github/workflows/ci.yml`）。
 
-> 做一个放在桌上看视频的小支架
+**评测脚本**：`benchmarks/` 里有 11 个任务，分三档：
 
-典型过程：
+- 简单 5 个：手机支架、法兰盘、L 形支架、电路板小盒、阶梯轴；
+- 中等 3 个：轴承座、电池盒、直齿轮；
+- 困难 3 个：散热器、三通管接头、支架臂。
 
-1. **澄清**：助手会追问影响能不能用的关键尺寸（比如手机多大），并给出建议值；你可以直接回答“可以”。
-2. **确认**：需求单完整后，助手把需求单展示给你，标出每个参数是“用户给的”还是“智能体建议”的。回复「确认」才会开始建模；如果回复里夹带了修改（比如“可以，但角度改成 70”），不算确认，会把这句话原样交给助手处理。
-3. **建模和检查**：助手写特征和检查项，程序运行并测量。检查不过会自动修改重试，最多 3 次，仍不过就停下来把原因告诉你。
-4. **交付**：全部检查通过且每个你给的尺寸都有检查时，程序自动导出 STEP 和截图，并显示检查结果表和文件路径。
-5. **修改**：直接提出修改（比如“支撑角度改成 70 度”），助手只改你提到的条目，之前的检查会保留，用来确认没改的需求依然满足。
-
-### 命令
-
-| 命令 | 作用 |
-|---|---|
-| `/view` | 用 `sca edit` 在浏览器里打开当前会话的模型（退出本程序时自动关闭编辑器） |
-| `/diff` | 对比最近两个版本：参数变化 + 两张截图的路径 |
-| `/versions` | 列出所有已交付的版本和各自的变化 |
-| `/help` | 显示命令说明 |
-| `/quit` | 退出（也可以按 Ctrl+C 或 Ctrl+Z 回车） |
-
-## 会话目录
-
-每次运行在 `sessions/<日期-时间>/` 下留下全部记录（目录位置可在配置的 `sessions_dir` 里改）：
-
-```text
-sessions/20261109-153000/
-  log.jsonl          每条用户消息、模型回复、工具调用、结果、耗时、token，以及启动时的软件和模型版本
-  brief.json         当前需求单
-  features.json      当前的特征列表（slug、角色、代码）
-  checks.json        当前的检查项
-  model.py           当前工作中的模型（marimo notebook，参数化源文件，可以用 sca edit 打开）
-  versions/
-    v1/  model.py  model.step  view.png  checks.json  brief.json  changes.md
-    v2/  ...
-```
-
-## 评测
-
-`benchmarks/` 里有 3 个开发任务（手机支架、法兰盘、带加强筋的 L 形安装支架）和 2 个留出任务（电路板小盒、阶梯轴；只用来测，不许为它们调提示词），第二版又加了 3 个中等任务（轴承座、电池盒、直齿轮）和 3 个困难任务（散热器、三通管接头、支架臂），每个任务有一句话的初始需求、“用户心里的完整需求”、修改请求和人工写的验收检查。评测时由一个模拟用户（也是大模型）扮演提需求的人：
-
-```powershell
-.venv\Scripts\python -m benchmarks.run --config config.toml                      # 开发任务各跑 1 遍
-.venv\Scripts\python -m benchmarks.run --config config.toml --set dev --repeat 3  # 开发任务各跑 3 遍
-.venv\Scripts\python -m benchmarks.run --config config.toml --set holdout         # 留出任务（--set all 两组都跑）
-.venv\Scripts\python -m benchmarks.run --tasks phone_stand flange --config config.toml
-.venv\Scripts\python -m benchmarks.run --config config.toml --set medium          # 第二版中等任务（--set hard 困难任务，--set v2 全部 11 个）
-```
-
-结果写到 `benchmarks/results/<时间>/results.json` 和 `results.md`：`results.md` 开头是按任务汇总的表（成功次数 / 遍数、平均费用、平均耗时、平均模型调用、平均输入和其中命中缓存、平均输出和其中思考），后面是每一遍的明细。费用按 `config.toml` 里的 `[llm.pricing]` 算，没填价目表时费用显示 `-`。评测会调用真实的大模型，需要先设置好 API key，会产生费用。
-
-另外两个参数：
-
-- `--budget <元>`：花费上限。每跑完一个任务，把这个任务的费用（智能体的加上模拟用户的）累加起来，累计到上限后就不再开始新任务；正在跑的那个任务会跑完，所以实际花费可能比上限略多一点。没跑的任务在结果里记成"因预算跳过"，已经跑完的结果照常写出，最后打印一行 `已花费 ¥…，上限 ¥…`。**必须先在配置里填好 `[llm.pricing]`**，否则直接报错退出（返回码 2）。
-- `--cases on|off`：规划时用不用案例库，默认 `on`。`off` 用来做"有案例库 / 无案例库"的对照。
-
-### ¥15 以内的评测套餐
+每个任务有一句话的初始需求、"用户心里的完整需求"、修改请求和人工写的验收检查，由一个模拟用户（也是大模型）扮演提需求的人。
 
 ```powershell
 .venv\Scripts\python -m benchmarks.run --config config.toml --set v2 --repeat 1 --budget 15
 ```
 
-- 这条命令**会调用真实的大模型，会花钱**（简单 5 个、中等 3 个、困难 3 个任务各跑 1 遍，开着案例库）。什么时候运行，由你自己决定；开发和测试过程中都没有运行过它。
-- 跑之前先在 `config.toml` 的 `[llm.pricing]` 里照模型服务的价目页填好价目表。
-- 结果出来之前，不能说第二版的成功率是多少：现在的测试只证明"关卡按设计工作、流程表达得了这些零件"，不证明"真模型做得好"。
+这是备好的 **¥15 以内的评测套餐**：11 个任务各跑 1 遍，开着案例库，累计花费到 ¥15 就不再开始新任务。
 
-两次评测结果的前后对比（Markdown 表和总费用之比）：
+- **这条命令会调用真实的大模型，会花钱。** 什么时候运行，由你自己决定；开发和测试过程中都没有运行过它。
+- 跑之前要先在 `config.toml` 的 `[llm.pricing]` 里照价目页填好价目表，否则 `--budget` 直接报错退出。
+- 其他参数：
+  - `--set dev|holdout|medium|hard|v2|all` 选任务；
+  - `--cases on|off` 做"有案例库 / 无案例库"的对照；
+  - `python -m benchmarks.compare 旧\results.json 新\results.json` 对比两次结果。
 
-```powershell
-.venv\Scripts\python -m benchmarks.compare 旧目录\results.json 新目录\results.json --out compare.md
-```
-
-第 1.1 版的完整评测结果、成功标准的对照和没做到的地方见 `docs/results-v1.1.md`。
-
-## 桌面端（卡尺 Caliper）
-
-第二版的主界面是一个桌面窗口。现在还没有一行命令的安装脚本（计划 4 才做），先在项目目录里用虚拟环境启动：
-
-```
-.venv\Scripts\python -m pip install -e ".[dev]"
-.venv\Scripts\caliper
-```
-
-- `caliper`：打开桌面窗口（Windows 上用系统自带的 WebView2）。窗口打不开时会说明原因，自动改用浏览器。
-- `caliper --browser`：改用默认浏览器打开，终端里按 Ctrl+C 退出。
-- `caliper --cli`：终端对话模式；不给 `--config` 时用设置页里的服务和钥匙串里的密钥。
-- 第一次打开、还没有密钥时进引导页：选模型服务 → 填密钥（存进系统钥匙串，不写进任何文件）→ 测试连接。任何一步都可以先看示例。
-- 数据（设置、会话、案例、日志）在 `%LOCALAPPDATA%\Caliper`，可以用环境变量 `CALIPER_HOME` 改。
-
-窗口分三栏，界面是"图纸 / 蓝图"的样子（浅色是米白图纸，深色是深蓝蓝图，右上角切换）：
-
-- **左：会话。** 历史会话（零件名、时间、版本数），可以新建、改名、删除；点开旧会话可以接着做。底部是案例库。
-- **中：对话。** 模型的回复逐字出现；工具调用显示成一棵树（阶段是树干，工具是分支，通过的阶段折叠成一行）；提问、确认需求单、交付各有一张卡片。顶上一条带刻度的尺寸线标出走到哪个阶段。运行时发送按钮变成"停止"。
-- **右：工作台。** 四个页签：
-  - 模型：3D 视图，带外形尺寸、线框、截图；下面的阶段刻度可以点，看零件一个阶段一个阶段长出来。
-  - 检查：通过数、每条检查的实测和期望、参数扰动验证、看图审查。
-  - 参数：交付之后可以直接改数值（输入框或滑块），点"应用"由程序重新验证全部阶段、存成新版本，**不调用模型**；没通过时数值退回原样，可以点"让助手处理"把这次改动发给助手。
-  - 版本：缩略图、变化说明、下载 STEP / STL / 源文件；勾两个版本对比参数和截图；"存为案例"。
-  - 右下角的标题栏：零件、版本、阶段、模型、费用、缓存命中率、日期。
-- **示例会话：** 左栏"示例"里的"桌面看视频小支架"是 1.1 版的一次真实录制，只读，不需要密钥，可以转 3D、看检查和版本。
-
-开发和走查用：`caliper --demo-script scripts\demo_script.json` 把模型换成一份假模型剧本（带孔的安装板：提问 → 确认 → 两个阶段 → 交付 → 孔径改成 8），沙盒是真的，不需要密钥、不花钱。
-
-## 在线示例
-
-旧的网页界面（`cad_agent/web/`、`start_web.bat`、`start_replay.bat`）在第二版计划 4 里退役了，界面统一用上面的桌面端。GitHub Pages 上现在是产品主页（`site/index.html`）和一个在线示例（`site/demo/`：`demo/phone_stand` 那次 1.1 版真实会话的只读回放，可以转 3D、看检查和版本对比；不花钱，也不碰 key）。
-
-- 界面改了以后，运行 `.venv\Scripts\python -m cad_agent.desk.export cad_agent/desk/demo_data/phone_stand site/demo` 重新导出，提交并推送后会自动发布。
-- 旧会话的版本没有 `model.stl` 时，先运行 `.venv\Scripts\python scripts\backfill_stl.py <会话目录>` 补出来（只在本地用 SCA，不调用大模型）。
-
-## 测试
-
-单元测试用脚本化的假模型，不花钱，不需要 key：
-
-```powershell
-.venv\Scripts\python -m pytest -q                # 全部测试
-.venv\Scripts\python -m pytest -q -m "not sca"   # 跳过需要真实运行 SCA 的较慢测试
-```
-
-## 常见问题
-
-- **项目路径里有中文**：SCA 运行模型一律在英文临时目录里进行，产物再复制回会话目录，所以中文路径下 STEP 和截图都能正常生成。唯一的限制是 notebook 的**文件名**必须是英文（程序固定用 `model.py`）。如果某台机器上中文路径仍然出问题，把配置里的 `sessions_dir` 改成纯英文路径（例如 `D:/cad-sessions`）。
-- **模型 API 断网或限流**：会先自动重试（间隔 1 秒、2 秒），仍然失败就告诉你，需求单和已写好的特征都不会丢，稍后重发上一句话就行。
-- **运行报错**：给模型看的是翻译后的简短信息（哪个特征、什么问题、相关数值），完整过程可以在 `log.jsonl` 里查。
-
-## 项目结构
+**项目结构：**
 
 ```text
 cad_agent/
-  cli.py  config.py  brief.py  notebook.py  session.py  tools.py  tool_specs.py
-  agent/    loop.py（主循环）  state.py（状态消息）  api_docs.py（查 SCA 文档）  prompts/（系统提示词、SCA 速查表）
-  checks/   spec.py（检查项格式）  engine.py（测量）
-  sandbox/  guard.py（静态检查）  runner.py（子进程入口）  execute.py（启动子进程、超时）
-  llm/      client.py（OpenAI 兼容接口）  fake.py（测试用假模型）
-benchmarks/ tasks/*.yaml  sim_user.py  run.py
-scripts/    probe_sca.py（SCA 摸底脚本）
-docs/       设计文档、实施计划、sca-api-notes.md（实测过的 SCA 用法）、deviations.md、progress.md
-tests/
+  app.py  doctor.py  maintenance.py   caliper 命令、自检、更新和卸载
+  agent/  staged/  tools.py  gates.py 主循环、分阶段流程、工具、关卡
+  checks/  sandbox/                   检查格式和测量、沙盒（静态检查 + 子进程）
+  llm/  providers.toml  keystore.py  settings.py   模型接口、服务预设、钥匙串、设置
+  desk/                               桌面端：本机服务、事件流、页面（static/）、静态导出（export.py）
+  case_data/                          自带的 8 个案例
+benchmarks/  scripts/  tests/  site/（产品主页和在线示例）
+install.ps1  install.sh               一行安装脚本
+docs/        设计文档、实施计划、各种实测笔记、偏离记录、进度记录
 ```
+
+**四个流程开关**写在配置文件的 `[agent]` 里，默认全开，可以逐个关掉做对照：
+
+```toml
+[agent]
+staged = true          # 分阶段流程；关掉就退回 1.2 版的单阶段流程
+mutation_check = true  # 终检的参数扰动验证
+visual_review = true   # 看图审查
+cases = true           # 案例库
+```
+
+桌面端的设置页里也能改这四个开关。
+
+## 验证到什么程度
+
+- **测试**：全部测试在 Windows 和 Mac（GitHub Actions，`macos-15`，Apple 芯片）上通过。持续集成里还用源码跑了安装脚本、`caliper doctor --offline`、无窗口启动，并且再装一次。
+  - 持续集成的 Mac 机器是 macOS 15。GitHub 已经不提供 Apple 芯片的 macOS 14 了，所以 macOS 14 本身没有自动测试。
+- **Windows 实机**：在一台 Windows 11 上走过完整流程，用的是假模型剧本加真实的 SCA 沙盒，记录在 `docs/walkthrough-windows.md`。也在这台电脑上用安装脚本实际装过，见 `docs/install-notes.md`。
+- **Mac 界面**：还没有人工看过，等有 M 芯片 Mac 的组员按 `docs/mac-checklist.md` 做一遍。
+- **成功率**：第二版没有做过真实模型的成功率评测。上面这些证明的是"关卡按设计工作、流程表达得了这些零件"，不证明"真模型做得好"。第 1.1 版的真实评测结果在 `docs/results-v1.1.md`；第二版的数字要等运行了上面的 ¥15 套餐之后才有。
+- **已知的限制：**
+  - 只做单个零件，不做装配体；
+  - 不支持 Intel 芯片的 Mac 和 Linux；
+  - 用户名是中文的 Windows 没有实机测过（程序会自动改用纯英文的工作目录，自检会查这一项）；
+  - 国内镜像只核对过镜像上能找到对应的文件，没有在一台全新的电脑上完整走过一遍；
+  - Windows 上窗口左上角的小图标是 Python 的默认图标；
+  - 界面只有中文。
+
+## 参考与致谢
+
+- [SimpleCADAPI](https://github.com/PhySpace/SimpleCADAPI)（Apache License 2.0）：建模内核。卡尺借鉴了它安装包里自带的官方 Agent Skill 的方法：分阶段、先定验证再建模、用故意做错的例子证明检查有效、渲染图交给没参与建模的审查者。这些文档在运行时从用户本机的 SCA 安装包里按需读取，没有复制进本仓库。工具定义、流程和关卡、检查和测量、参数扰动验证、沙盒、界面都是自己写的。
+- [three.js](https://threejs.org/) r160（MIT 许可证）：3D 视图。
+- [uv](https://docs.astral.sh/uv/)：安装脚本用它准备 Python 环境。
+- [pywebview](https://pywebview.flowrl.com/)：桌面窗口。
+- 课程作业：[AICG Project 3](https://github.com/syby119/AICG-projects/tree/main/projects/project3)。设计和计划文档在 `docs/superpowers/`。

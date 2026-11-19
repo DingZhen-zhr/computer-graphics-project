@@ -917,3 +917,43 @@
 **全部测试**：1109 个通过（含 `sca`，用时 10 分 51 秒）。比 Task 4 时的 1116 个少，是因为删了 `test_web.py` 的 37 个；加回来的有：`test_desk_export.py` 13 个、`test_desk_legacy.py` 11 个，核对时新补的 5 个在 `test_desk_workbench.py`、1 个在 `test_desk_server.py`。node 测试从 37 个变成 47 个。
 
 **和这次一起提交的**：持续集成的 Mac 机器从 `macos-14` 改成 `macos-15`（偏离 D18，用户定的；`ci.yml` 和 `test_ci_workflow.py` 的断言一起改，先看到断言失败再改 `ci.yml`）。这样提交的内容和上面跑全部测试的那一份完全一样。
+
+## 第二版 计划 4 Task 5 Step 5：推送并更新 GitHub Pages
+
+- 用户同意后推送了 `4a447a4`（`2d2a72d..4a447a4`）。"发布产品主页"运行 44566371595 成功。
+- 在浏览器面板里打开了线上的两个页面，都正常，控制台没有错误：
+  - 主页 <https://dingzhen-zhr.github.io/computer-graphics-project/>；
+  - 在线示例 `…/demo/`：放在子路径下，3D、对话、标题栏都显示出来了。
+- 请用户自己也打开主页看一眼。
+
+## 第二版 计划 4 Task 7：README 重写和 Mac 清单 —— 完成
+
+- **`README.md`**：整个重写，11 个标题照计划的顺序。
+  - 主界面截图用的是计划 3 走查时截的 `docs/walkthrough/07-delivered-v1.jpg`，复制成 `docs/images/caliper-main.jpg`。
+  - 内容都对照代码和实测核对过：
+    - 设置页里的按钮叫"更换"，不叫"替换"；
+    - 各家服务的 key 环境变量名取自 `providers.toml`；
+    - 评测的 `--set` 选项取自 `benchmarks/run.py`；
+    - 会话目录里有 `plan.json`；
+    - 镜像和超时取自 `docs/install-notes.md`。
+  - "装不上怎么办"写了这几件事：
+    - 镜像开关 `CALIPER_MIRROR=1`；
+    - 下载压缩包、把 `CALIPER_SOURCE` 指到解压目录再装；
+    - 本地运行 `install.ps1` 要用 `Get-Content -Raw -Encoding UTF8 … | iex`（D17）；
+    - 没有 git 时会自动改用压缩包（D16）；
+    - 提示"卡尺正在运行"时怎么办；
+    - Windows 缺 WebView2 时怎么办；
+    - `caliper doctor` 十项各查什么。
+  - "它是怎么保证质量的"四条，每条都写了拦得住什么、拦不住什么。
+  - "模型服务和密钥"写明三处未用真实接口验证：Claude、DeepSeek 以外的预设、看图审查。
+  - "给开发者"写了 ¥15 套餐的命令，并加粗写明"会花钱"。
+  - "验证到什么程度"写的是：
+    - 持续集成用的是 macos-15，macOS 14 本身没有自动测试（D18）；
+    - Mac 界面还没有人工看过；
+    - 第二版没有做过真实模型的成功率评测，1.1 版的数字在 `docs/results-v1.1.md`；
+    - 已知的限制。
+- **`docs/mac-checklist.md`**：16 项，每项一个勾选框和一行"看到了什么"，最后是签名和日期。项目按计划列的顺序，另加两项：示例会话、最小窗口（Windows 走查时在最小窗口发现过问题）。整个过程用假模型剧本，不需要 key，不花钱。
+- **`CLAUDE.md`**：只在"命令环境"那一条后面加了一句怎么启动。从源码启动用 `.venv\Scripts\caliper`；终端里的 `caliper` 是安装版。
+- **测试**：`tests/test_readme.py` 10 个。计划 6 个，另加 4 个：截图存在、"装不上怎么办"一节写全了、命令一节、开发者一节有花钱提醒和四个开关。先运行，10 个全部失败；写好后通过。
+- **全部测试**：1119 个通过（含 `sca`，用时 11 分 47 秒）。
+- **还差 Step 3**：请有 M 芯片 Mac 的组员按 `docs/mac-checklist.md` 做一遍，把填好的清单发回来。清单回来之前，README 写的是"Mac 界面还没有人工看过"。

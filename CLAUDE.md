@@ -41,7 +41,7 @@
      3. 同步修改受影响的后续任务描述（包括后面几份计划里用到这个接口的地方）。
 4. **照抄的内容就照抄。** 计划和提示词文档里 ```text 和 ```json 框起来的内容逐字复制，不改写、不润色。
 5. **SCA 用法不凭记忆写。** 只用 `docs/sca-api-notes.md` 里实测过的写法；笔记里没有的，先写一小段探测代码跑通，再补进笔记，然后才能用。模型接口同理，以 `docs/llm-api-notes.md` 为准；uv 和安装相关的用法以 `docs/install-notes.md` 为准。
-6. **命令环境：** Windows PowerShell。Python 一律用 `.venv\Scripts\python`，不要往系统 Python 里装包。
+6. **命令环境：** Windows PowerShell。Python 一律用 `.venv\Scripts\python`，不要往系统 Python 里装包。从源码启动桌面端用 `.venv\Scripts\caliper`（旧的 `start_web.bat` 已经删了）；终端里直接敲的 `caliper` 是用安装脚本装的那一份，改了代码要重新运行安装脚本它才会变。
 7. **每个任务收尾：**
    - 运行全部测试 `.venv\Scripts\python -m pytest -q`，全部通过才能提交；
    - 提交信息用计划里给的；
