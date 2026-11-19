@@ -689,3 +689,17 @@
   - 没有读取或打印真实的 API key；
   - 测试里没碰真实的系统钥匙串（用的是内存里的假后端；走查用的是空后端）；
   - 除 pywebview 外没有加新依赖，也没有加前端库。
+
+## 第二版 计划 4 Task 1：自检命令 —— 完成
+
+- 做了什么：`cad_agent/doctor.py`（`CheckItem`、`run_doctor`、`render_doctor`、`doctor_exit_code`，另有命令行入口 `doctor_main`）；`app.py` 接上 `caliper doctor [--offline] [--json]` 和隐藏参数 `--smoke`（不开窗口，起服务，请求一次首页和 `/api/boot`，都是 200 就打印 `smoke ok`）。帮助里的说明多一句"另有子命令：caliper doctor（自检）"。
+- 十项按计划的顺序查，每项自己捕获异常。由我定的细节：
+  1. `sandbox` 用沙盒建 10×20×30 的方块，量外形尺寸；`workdir` 用的备用目录就是沙盒自己用的 `paths.work_root()`，并真的往里写一个小文件再删掉。
+  2. `window` 在 Windows 上照微软的说法查 EdgeUpdate 注册表里 WebView2 运行时的 `pv`（HKLM 的 WOW6432Node、HKLM、HKCU 三处，只读）。本机查到 HKLM 的 157.0.4341.60，HKCU 没有。查法写进 `docs/install-notes.md`（Task 3）。
+  3. `keyring` 用服务名 `caliper-doctor` 写一条随机值，读回、删掉、再确认删掉了；出错只报异常类型，不转述原文。
+  4. `provider` 只建立一次 TCP 连接（5 秒超时），不发任何内容；设置文件读不了时按默认设置。
+  5. `key` 只说来源（环境变量名 / 系统钥匙串 / 没有）。
+  6. 输出被重定向到不支持 ✓ 的编码时，`doctor` 把无法编码的字符换成 `?`，不至于崩。
+- 测试：`tests/test_doctor.py` 28 个（计划 14 个，另加：纯英文临时目录是 ok、WebView2 在时是 ok、`webview` 导入失败是 warn、钥匙串测试项用自己的服务名、模型服务能连上是 ok、没有 key 是 warn、数据目录写不进是 fail、平台、Python 版本、SCA 版本、方块尺寸不对、命令行报告、`--smoke` 不在帮助里）。钥匙串都用内存里的假后端，网络和沙盒都换成假的；只有 `test_all_ok_on_this_machine`（`sca`）真的建方块。先运行看到"没有 doctor 模块"的失败，再实现。
+- 本机用内存钥匙串跑 `caliper doctor --offline`：九项 ✓ 或 —，`密钥` 一项是 !（没有 key），最后一行"有 1 项需要注意"，返回码 0。
+- 全部测试 1065 个通过（含 `sca`，用时 9 分 57 秒）。

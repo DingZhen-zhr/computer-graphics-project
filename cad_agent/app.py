@@ -4,6 +4,8 @@
     caliper --browser        改用默认浏览器打开，终端里按 Ctrl+C 退出
     caliper --cli [--config 文件]   终端对话模式
     caliper --demo-script 剧本.json  开发用：模型换成假模型剧本，沙盒是真的，不需要密钥
+    caliper doctor [--offline] [--json]   自检
+    caliper --smoke          持续集成用（不在帮助里）：不开窗口，起服务，请求一次首页和 /api/boot
 
 没有密钥也能启动（界面会进引导页）；智能体第一次要调用模型时才需要密钥，没有就让这一轮以 failed 结束，提示去设置里填。
 密钥只从环境变量或系统钥匙串取，不打印、不写日志。
@@ -12,14 +14,16 @@
 from __future__ import annotations
 
 import argparse
+import http.client
 import logging
 import os
+import sys
 import threading
 import time
 import webbrowser
 from pathlib import Path
 
-from cad_agent import cli, paths
+from cad_agent import cli, doctor, paths
 from cad_agent.agent.loop import Agent
 from cad_agent.brief import Brief
 from cad_agent.cases import load_cases
@@ -176,13 +180,48 @@ def _run_cli(config_file: str | None) -> int:
     return cli.main([], config=config)
 
 
+SUBCOMMANDS = {"doctor": doctor.doctor_main}
+
+
+def _start(settings: Settings, script: Path | None) -> tuple[Hub, object, str]:
+    hub = build_hub(settings, script=script)
+    server, token = make_desk_server(hub, make_settings_routes(hub, make_llm_for=make_llm_for))
+    threading.Thread(target=server.serve_forever, daemon=True, name="caliper-server").start()
+    return hub, server, token
+
+
+def _smoke(port: int, token: str) -> int:
+    """自己请求一次首页和 /api/boot，都是 200 才算通过。令牌不打印。"""
+    for path, label, headers in ((f"/?t={token}", "/", {}), ("/api/boot", "/api/boot", {"X-Caliper-Token": token})):
+        conn = http.client.HTTPConnection("127.0.0.1", port, timeout=60)
+        try:
+            conn.request("GET", path, headers=headers)
+            resp = conn.getresponse()
+            resp.read()
+        except OSError as e:
+            print(f"smoke 失败：请求 {label} 时出错（{type(e).__name__}）")
+            return 1
+        finally:
+            conn.close()
+        if resp.status != 200:
+            print(f"smoke 失败：{label} 返回 {resp.status}")
+            return 1
+    print("smoke ok")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(prog="caliper", description="卡尺 Caliper：用平常话做 CAD 零件，每一步都由程序实测。",
+    argv = list(sys.argv[1:] if argv is None else argv)
+    if argv and argv[0] in SUBCOMMANDS:
+        return SUBCOMMANDS[argv[0]](argv[1:])
+    parser = argparse.ArgumentParser(prog="caliper", description="卡尺 Caliper：用平常话做 CAD 零件，每一步都由程序实测。"
+                                     "另有子命令：caliper doctor（自检）。",
                                      epilog="--demo-script <剧本文件>：开发用，模型换成假模型剧本，不需要密钥。")
     parser.add_argument("--browser", action="store_true", help="不开桌面窗口，改用默认浏览器打开")
     parser.add_argument("--cli", action="store_true", help="终端对话模式")
     parser.add_argument("--config", metavar="文件", help="终端对话模式用的配置文件；不给就用设置和钥匙串里的密钥")
     parser.add_argument("--demo-script", type=Path, help=argparse.SUPPRESS)
+    parser.add_argument("--smoke", action="store_true", help=argparse.SUPPRESS)
     args = parser.parse_args(argv)
     _setup_logging()
     if args.cli:
@@ -192,11 +231,11 @@ def main(argv: list[str] | None = None) -> int:
     except ConfigError as e:
         print(f"{e}\n先用默认设置启动，可以在设置页里改。")
         settings = Settings()
-    hub = build_hub(settings, script=args.demo_script)
-    server, token = make_desk_server(hub, make_settings_routes(hub, make_llm_for=make_llm_for))
-    threading.Thread(target=server.serve_forever, daemon=True, name="caliper-server").start()
+    hub, server, token = _start(settings, args.demo_script)
     url = f"http://127.0.0.1:{server.server_address[1]}/?t={token}"
     try:
+        if args.smoke:
+            return _smoke(server.server_address[1], token)
         if args.browser or not _window(url):
             _browser(url)
     finally:
