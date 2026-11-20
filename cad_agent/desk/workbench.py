@@ -15,6 +15,7 @@ import threading
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+from cad_agent import brand
 from cad_agent.agent.manual import ManualResult, apply_params as manual_apply
 from cad_agent.cases import save_case as save_user_case
 from cad_agent.desk.bus import EventBus
@@ -26,7 +27,7 @@ from cad_agent.session import Session
 if TYPE_CHECKING:
     from cad_agent.agent.loop import Agent
 
-logger = logging.getLogger("caliper.desk")
+logger = logging.getLogger(f"{brand.COMMAND}.desk")
 
 CRASH_TEXT = "处理这条消息时出了意外的错误。需求单和已经写好的内容都还在，可以再发一次；一直这样的话，可以开一个新会话。"
 DEMO_TEXT = "示例会话只能看，不能改。"
@@ -197,7 +198,7 @@ class Workbench:
         if not isinstance(text, str) or not text.strip():
             raise ValueError("消息不能为空")
         self._claim()
-        self._thread = threading.Thread(target=self._work, args=(text.strip(),), daemon=True, name="caliper-turn")
+        self._thread = threading.Thread(target=self._work, args=(text.strip(),), daemon=True, name=f"{brand.COMMAND}-turn")
         self._thread.start()
 
     def _work(self, text: str) -> None:

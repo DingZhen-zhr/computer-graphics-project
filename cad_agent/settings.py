@@ -15,7 +15,7 @@ from dataclasses import dataclass, field, fields
 from pathlib import Path
 from typing import Literal
 
-from cad_agent import paths
+from cad_agent import brand, paths
 from cad_agent.config import Config, ConfigError, PhaseOverride, _parse_pricing
 from cad_agent.gates import Gates
 from cad_agent.llm.client import Pricing
@@ -122,7 +122,7 @@ def _toml_value(value: object) -> str:
 
 
 def render_settings(s: Settings) -> str:
-    lines = ["# 卡尺的设置。API key 不在这里：它在环境变量或系统钥匙串里。"]
+    lines = [f"# {brand.PRODUCT} 的设置。API key 不在这里：它在环境变量或系统钥匙串里。"]
     for f in fields(Settings):
         if f.name not in ("pricing", "gates"):
             lines.append(f"{f.name} = {_toml_value(getattr(s, f.name))}")

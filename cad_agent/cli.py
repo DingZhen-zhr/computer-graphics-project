@@ -90,7 +90,7 @@ def _banner(config: Config, session: Session) -> tuple[str, dict]:
 
 def main(argv: list[str] | None = None, input_fn: Callable[[str], str] = input, print_fn: Callable[..., None] = print,
          config: Config | None = None) -> int:
-    """config 不为空时（caliper --cli 不给 --config）直接用它，不读配置文件。"""
+    """config 不为空时（datum --cli 不给 --config）直接用它，不读配置文件。"""
     parser = argparse.ArgumentParser(prog="python -m cad_agent", description="CAD 建模智能体")
     parser.add_argument("--config", default="config.toml", help="配置文件路径，默认 config.toml")
     args = parser.parse_args(argv)

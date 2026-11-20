@@ -16,7 +16,7 @@ import { applyEvent, dispatch, emptyState, getState, onChange, setState } from "
 import { renderSidebar } from "./sidebar.js";
 import { THEME_LABELS, applyTheme, currentTheme, nextTheme, saveTheme } from "./theme.js";
 
-const LAST_KEY = "caliper.lastSession";
+const LAST_KEY = "datum.lastSession";
 export const app = { boot: null, sessions: [], currentId: null, renaming: null, unsubscribe: null, retrying: false };
 const views = [];
 const pages = {};
@@ -242,18 +242,18 @@ function renderTop(state) {
 
 // ---- 启动 ----
 function fatal(text) {
-  clear($("app"), h("div", { class: "fatal" }, h("p", {}, text), h("p", { class: "muted" }, "关掉这个窗口，重新打开卡尺再试。")));
+  clear($("app"), h("div", { class: "fatal" }, h("p", {}, text), h("p", { class: "muted" }, "关掉这个窗口，重新打开 Datum 再试。")));
 }
 
 async function start() {
-  configure({ token: new URLSearchParams(window.location.search).get("t") || "" });
-  $("brand-mark").append(icon("caliper"));
+  configure({ token: new URLSearchParams(window.location.search).get("t") || "", tokenHeader: document.documentElement.dataset.tokenHeader || "" });
+  $("brand-mark").append(icon("brand"));
   $("theme-btn").addEventListener("click", () => saveTheme(nextTheme(currentTheme())).then(() => renderTop(getState())));
   $("settings-btn").addEventListener("click", () => openPage("settings"));
   if (isStatic()) {
     // 在线示例：只有一个只读的示例会话；没有设置和引导，右上角换成回主页安装的链接
     document.body.classList.add("static-mode");
-    $("settings-btn").replaceWith(h("a", { class: "btn btn-text", href: "../" }, "安装卡尺"));
+    $("settings-btn").replaceWith(h("a", { class: "btn btn-text", href: "../" }, "安装 Datum"));
   }
   onChange((state) => {
     renderTop(state);

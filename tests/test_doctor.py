@@ -1,4 +1,4 @@
-"""caliper doctor 自检（第二版计划 4 Task 1）。
+"""datum doctor 自检（第二版计划 4 Task 1）。
 
 各项的探测函数都在测试里换掉；钥匙串用内存里的假后端，不碰真实的系统钥匙串；不连任何模型服务。
 只有 test_all_ok_on_this_machine（标记 sca）真的用沙盒建一个方块。
@@ -25,7 +25,7 @@ FAKE_KEY = "fake-doctor-key-7Q2W9E4R6T"
 @pytest.fixture
 def env(monkeypatch, tmp_path):
     """数据目录放到临时目录；清掉所有模型服务的 key 环境变量；钥匙串换成内存后端；沙盒和网络都换成假的。"""
-    monkeypatch.setenv("CALIPER_HOME", str(tmp_path / "home"))
+    monkeypatch.setenv("DATUM_HOME", str(tmp_path / "home"))
     for p in load_providers():
         monkeypatch.delenv(p.api_key_env, raising=False)
     previous = keyring.get_keyring()
@@ -43,7 +43,7 @@ def by_id(items: list[CheckItem]) -> dict[str, CheckItem]:
 
 @pytest.mark.sca
 def test_all_ok_on_this_machine(monkeypatch, tmp_path):
-    monkeypatch.setenv("CALIPER_HOME", str(tmp_path / "home"))
+    monkeypatch.setenv("DATUM_HOME", str(tmp_path / "home"))
     previous = keyring.get_keyring()
     keyring.set_keyring(MemoryKeyring())
     try:
@@ -106,7 +106,7 @@ def test_missing_webview2_is_a_warning_with_advice(env, monkeypatch):
     item = by_id(run_doctor(offline=True))["window"]
     assert item.status == "warn"
     assert "WebView2" in item.detail
-    assert "WebView2" in item.advice and "caliper --browser" in item.advice
+    assert "WebView2" in item.advice and "datum --browser" in item.advice
 
 
 def test_webview2_present_is_ok(env, monkeypatch):
@@ -123,7 +123,7 @@ def test_webview_import_failure_is_warn(env, monkeypatch):
 
     monkeypatch.setattr(doctor, "_import_webview", broken)
     item = by_id(run_doctor(offline=True))["window"]
-    assert item.status == "warn" and "caliper --browser" in item.advice
+    assert item.status == "warn" and "datum --browser" in item.advice
 
 
 def test_keyring_probe_cleans_up(env):
@@ -142,7 +142,7 @@ def test_keyring_probe_writes_under_its_own_service(env, monkeypatch):
 
     monkeypatch.setattr(MemoryKeyring, "set_password", spy)
     run_doctor(offline=True)
-    assert seen and all(service == "caliper-doctor" for service, _ in seen)
+    assert seen and all(service == "datum-doctor" for service, _ in seen)
 
 
 def test_keyring_unavailable_is_warn(env):
@@ -200,7 +200,7 @@ def test_key_item_never_shows_key(env, monkeypatch, capsys):
 
     # 钥匙串里的 key 也一样
     monkeypatch.delenv("DEEPSEEK_API_KEY")
-    keyring.set_password("caliper", "deepseek", FAKE_KEY)
+    keyring.set_password("datum", "deepseek", FAKE_KEY)
     items = run_doctor(offline=True)
     assert by_id(items)["key"].status == "ok" and "钥匙串" in by_id(items)["key"].detail
     text = render_doctor(items)

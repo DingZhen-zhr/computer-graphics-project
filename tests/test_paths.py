@@ -11,7 +11,7 @@ from cad_agent import paths
 
 def test_caliper_home_env_wins(monkeypatch, tmp_path):
     home = tmp_path / "卡尺数据"
-    monkeypatch.setenv("CALIPER_HOME", str(home))
+    monkeypatch.setenv("DATUM_HOME", str(home))
     assert paths.app_home() == home
     assert paths.settings_path() == home / "settings.toml"
     assert paths.sessions_dir() == home / "sessions"
@@ -20,25 +20,25 @@ def test_caliper_home_env_wins(monkeypatch, tmp_path):
 
 
 def test_default_home_per_platform(monkeypatch, tmp_path):
-    monkeypatch.delenv("CALIPER_HOME", raising=False)
+    monkeypatch.delenv("DATUM_HOME", raising=False)
     monkeypatch.setattr(sys, "platform", "win32")
     monkeypatch.setenv("LOCALAPPDATA", str(tmp_path / "Local"))
-    assert paths.app_home() == tmp_path / "Local" / "Caliper"
+    assert paths.app_home() == tmp_path / "Local" / "Datum"
     monkeypatch.setattr(Path, "home", classmethod(lambda cls: tmp_path / "me"))
     monkeypatch.setattr(sys, "platform", "darwin")
-    assert paths.app_home() == tmp_path / "me" / "Library" / "Application Support" / "Caliper"
+    assert paths.app_home() == tmp_path / "me" / "Library" / "Application Support" / "Datum"
     monkeypatch.setattr(sys, "platform", "linux")
-    assert paths.app_home() == tmp_path / "me" / ".caliper"
+    assert paths.app_home() == tmp_path / "me" / ".datum"
     monkeypatch.setattr(sys, "platform", "win32")
     monkeypatch.delenv("LOCALAPPDATA", raising=False)   # 没有 LOCALAPPDATA 时退回到用户目录下的 AppData\Local
-    assert paths.app_home() == tmp_path / "me" / "AppData" / "Local" / "Caliper"
+    assert paths.app_home() == tmp_path / "me" / "AppData" / "Local" / "Datum"
 
 
 def test_blank_caliper_home_is_ignored(monkeypatch, tmp_path):
-    monkeypatch.setenv("CALIPER_HOME", "   ")
+    monkeypatch.setenv("DATUM_HOME", "   ")
     monkeypatch.setattr(sys, "platform", "linux")
     monkeypatch.setattr(Path, "home", classmethod(lambda cls: tmp_path))
-    assert paths.app_home() == tmp_path / ".caliper"
+    assert paths.app_home() == tmp_path / ".datum"
 
 
 def test_is_ascii_path():
@@ -62,6 +62,6 @@ def test_work_root_fallback_for_non_ascii_temp(monkeypatch, tmp_path):
     monkeypatch.setattr(paths, "_ensure_dir", lambda p: made.append(p))
     monkeypatch.setattr(sys, "platform", "win32")
     root = paths.work_root()
-    assert root == Path("C:/ProgramData/Caliper/work") and paths.is_ascii_path(root) and made == [root]
+    assert root == Path("C:/ProgramData/Datum/work") and paths.is_ascii_path(root) and made == [root]
     monkeypatch.setattr(sys, "platform", "darwin")
     assert paths.work_root() == Path("/tmp")

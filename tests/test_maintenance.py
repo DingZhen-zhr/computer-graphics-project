@@ -26,10 +26,10 @@ QUESTION = "要把会话、案例和设置也一起删掉吗？输入 yes 确认
 def box(monkeypatch, tmp_path):
     """假的用户目录：数据目录、开始菜单、桌面、~/Applications 都在 tmp_path 里；钥匙串在内存里，放好两条假 key。"""
     home = tmp_path / "home"
-    data = home / "AppData" / "Local" / "Caliper"
+    data = home / "AppData" / "Local" / "Datum"
     (data / "sessions" / "s1").mkdir(parents=True)
     (data / "settings.toml").write_text('provider = "deepseek"\n', encoding="utf-8")
-    monkeypatch.setenv("CALIPER_HOME", str(data))
+    monkeypatch.setenv("DATUM_HOME", str(data))
     monkeypatch.setattr(maintenance, "_home", lambda: home)
     monkeypatch.setattr(maintenance, "_programs_dir", lambda: home / "Start Menu" / "Programs")
     monkeypatch.setattr(maintenance, "_desktop_dir", lambda: home / "Desktop")
@@ -39,8 +39,8 @@ def box(monkeypatch, tmp_path):
     previous = keyring.get_keyring()
     backend = MemoryKeyring()
     keyring.set_keyring(backend)
-    backend.set_password("caliper", "deepseek", FAKE)
-    backend.set_password("caliper", "glm", FAKE)
+    backend.set_password("datum", "deepseek", FAKE)
+    backend.set_password("datum", "glm", FAKE)
     backend.set_password("other-app", "deepseek", "not-ours")
     for p in shortcut_paths():
         p.parent.mkdir(parents=True, exist_ok=True)
@@ -64,18 +64,18 @@ class Recorder:
 
 
 def test_version_string(capsys):
-    assert __version__ == "2.0.0"
+    assert __version__ == "3.0.0"
     with pytest.raises(SystemExit) as e:
         app.main(["--version"])
     assert e.value.code == 0
-    assert capsys.readouterr().out.strip() == "卡尺 Caliper 2.0.0"
+    assert capsys.readouterr().out.strip() == "Datum 基准 3.0.0"
 
 
 def test_pyproject_name_and_version():
     data = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
-    assert data["project"]["name"] == "caliper-cad"
-    assert data["project"]["version"] == "2.0.0" == __version__
-    assert "卡尺" in data["project"]["description"]
+    assert data["project"]["name"] == "datum-cad"
+    assert data["project"]["version"] == "3.0.0" == __version__
+    assert "基准" in data["project"]["description"]
 
 
 def test_install_urls():
@@ -94,7 +94,7 @@ def test_update_runs_install_script_command(monkeypatch, system):
     text = " ".join(cmd)
     if system == "win32":
         # Windows 上正在运行的程序文件不能被替换（Task 3 实测：uv 报"拒绝访问"），
-        # 所以在一个新窗口里先等几秒、等这个 caliper 退出后再运行安装脚本；start 会立刻返回
+        # 所以在一个新窗口里先等几秒、等这个 datum 退出后再运行安装脚本；start 会立刻返回
         assert cmd[:3] == ["cmd", "/c", "start"]
         assert "powershell" in text and INSTALL_PS1 in text and "iex" in text and "Start-Sleep" in text
     else:
@@ -128,9 +128,9 @@ def test_shortcut_paths_per_platform(monkeypatch, tmp_path):
     monkeypatch.setattr(maintenance, "_programs_dir", lambda: tmp_path / "P")
     monkeypatch.setattr(maintenance, "_desktop_dir", lambda: tmp_path / "D")
     monkeypatch.setattr(maintenance, "_system", lambda: "win32")
-    assert shortcut_paths() == [tmp_path / "P" / "卡尺 Caliper.lnk", tmp_path / "D" / "卡尺 Caliper.lnk"]
+    assert shortcut_paths() == [tmp_path / "P" / "Datum 基准.lnk", tmp_path / "D" / "Datum 基准.lnk"]
     monkeypatch.setattr(maintenance, "_system", lambda: "darwin")
-    assert shortcut_paths() == [tmp_path / "Applications" / "Caliper.app"]
+    assert shortcut_paths() == [tmp_path / "Applications" / "Datum.app"]
 
 
 def test_uninstall_removes_shortcuts_and_keys(box):
@@ -138,7 +138,7 @@ def test_uninstall_removes_shortcuts_and_keys(box):
     run = Recorder()
     assert run_uninstall(delete_data=False, say=said.append, run=run) == 0
     assert all(not p.exists() for p in shortcut_paths())
-    assert ("caliper", "deepseek") not in box["keyring"].store and ("caliper", "glm") not in box["keyring"].store
+    assert ("datum", "deepseek") not in box["keyring"].store and ("datum", "glm") not in box["keyring"].store
     assert box["keyring"].store == {("other-app", "deepseek"): "not-ours"}   # 别人的钥匙串项不动
     text = "\n".join(said)
     assert all(str(p) in text for p in shortcut_paths())
@@ -147,7 +147,7 @@ def test_uninstall_removes_shortcuts_and_keys(box):
 
 def test_uninstall_mac_app_bundle(box, monkeypatch):
     monkeypatch.setattr(maintenance, "_system", lambda: "darwin")
-    app_dir = box["home"] / "Applications" / "Caliper.app"
+    app_dir = box["home"] / "Applications" / "Datum.app"
     (app_dir / "Contents" / "MacOS").mkdir(parents=True)
     (app_dir / "Contents" / "Info.plist").write_text("<plist/>", encoding="utf-8")
     run_uninstall(delete_data=False, say=lambda *_: None, run=Recorder())
@@ -210,20 +210,20 @@ def test_uninstall_spawns_detached_uv_uninstall(box):
     assert run_uninstall(delete_data=False, say=said.append, run=run) == 0
     assert len(run.calls) == 1
     cmd = " ".join(run.calls[0])
-    assert "uv" in cmd and "tool uninstall caliper-cad" in cmd
+    assert "uv" in cmd and "tool uninstall datum-cad" in cmd
     kw = run.kwargs[0]
     if hasattr(subprocess, "DETACHED_PROCESS"):   # Windows：不依附当前的控制台
         assert kw["creationflags"] & subprocess.DETACHED_PROCESS
     else:                                         # Mac：新的会话，当前进程退出也不受影响
         assert kw["start_new_session"] is True
-    assert any("uv tool uninstall caliper-cad" in s for s in said)
+    assert any("uv tool uninstall datum-cad" in s for s in said)
 
 
 def test_uninstall_prints_command_when_spawn_fails(box):
     said: list[str] = []
     code = run_uninstall(delete_data=False, say=said.append, run=Recorder(fail=True))
     assert code == 1
-    assert any("uv tool uninstall caliper-cad" in s and "自己运行" in s for s in said)
+    assert any("uv tool uninstall datum-cad" in s and "自己运行" in s for s in said)
 
 
 def test_uninstall_steps_are_printed_in_order(box):
@@ -237,7 +237,7 @@ def test_uninstall_never_touches_paths_outside_home(box, monkeypatch, tmp_path):
     elsewhere = tmp_path / "important" / "data"
     elsewhere.mkdir(parents=True)
     (elsewhere / "keep.txt").write_text("别删我", encoding="utf-8")
-    monkeypatch.setenv("CALIPER_HOME", str(elsewhere))
+    monkeypatch.setenv("DATUM_HOME", str(elsewhere))
     said: list[str] = []
     code = run_uninstall(delete_data=True, say=said.append, run=Recorder())
     assert (elsewhere / "keep.txt").exists()
@@ -245,7 +245,7 @@ def test_uninstall_never_touches_paths_outside_home(box, monkeypatch, tmp_path):
     assert any("不删" in s and str(elsewhere) in s for s in said)
     # 用户主目录本身，或它的上级，也不删
     for target in (box["home"], box["home"].parent):
-        monkeypatch.setenv("CALIPER_HOME", str(target))
+        monkeypatch.setenv("DATUM_HOME", str(target))
         assert run_uninstall(delete_data=True, say=lambda *_: None, run=Recorder()) == 1
         assert target.exists()
 
@@ -272,9 +272,9 @@ def test_update_command_line(monkeypatch, capsys):
 
 def test_every_provider_key_is_removed(box):
     for p in load_providers():
-        box["keyring"].set_password("caliper", p.id, FAKE)
+        box["keyring"].set_password("datum", p.id, FAKE)
     run_uninstall(delete_data=False, say=lambda *_: None, run=Recorder())
-    assert not any(service == "caliper" for service, _ in box["keyring"].store)
+    assert not any(service == "datum" for service, _ in box["keyring"].store)
 
 
 def test_update_on_windows_says_it_continues_in_a_new_window(monkeypatch):

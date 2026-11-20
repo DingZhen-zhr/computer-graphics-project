@@ -1,4 +1,4 @@
-# 卡尺 Caliper · Mac 人工验证清单
+# Datum 基准 · Mac 人工验证清单
 
 给有 **Apple 芯片（M1 及以后）Mac** 的组员照着做。持续集成只能自动跑测试和安装脚本，界面看起来、用起来对不对，要靠人看一遍。
 
@@ -25,10 +25,10 @@
   看到了什么：
 - [ ] 3. **"应用程序"里有 Caliper，能打开窗口**：访达 →"前往"→"个人"→"应用程序"，找到 Caliper，双击。记下：
   - 有没有被系统拦下（"无法打开"之类）；
-  - 窗口标题是不是"卡尺 Caliper"；
+  - 窗口标题是不是"Datum 基准"；
   - 图标是不是卡尺的图案。
   看到了什么：
-- [ ] 4. **`caliper doctor` 的输出**：在终端里运行 `caliper doctor`，把输出原样贴在下面。如果提示找不到 caliper，先关掉终端再开一个新的。
+- [ ] 4. **`datum doctor` 的输出**：在终端里运行 `datum doctor`，把输出原样贴在下面。如果提示找不到 datum，先关掉终端再开一个新的。
   看到了什么：
   ```
   （贴在这里）
@@ -40,7 +40,7 @@
   看到了什么：
 - [ ] 6. **示例会话**：左栏"示例"里的"桌面看视频小支架"。看对话、3D 和版本页能不能显示。
   看到了什么：
-- [ ] 7. **用 `caliper --demo-script` 走完整流程**：先关掉窗口，在终端里运行 `caliper --demo-script ~/Downloads/demo_script.json`，然后照 `docs/walkthrough-windows.md` 的步骤走一遍：
+- [ ] 7. **用 `datum --demo-script` 走完整流程**：先关掉窗口，在终端里运行 `datum --demo-script ~/Downloads/demo_script.json`，然后照 `docs/walkthrough-windows.md` 的步骤走一遍：
   1. 新会话，发"做一个安装板"；
   2. 回答两个问题；
   3. 点"确认"；
@@ -71,10 +71,10 @@
   看到了什么：
 - [ ] 15. **最小窗口**：把窗口拖到最小，看三栏有没有被切掉、文字有没有挤成一团。
   看到了什么：
-- [ ] 16. **卸载**：在终端里运行 `caliper uninstall`，问"要把会话、案例和设置也一起删掉吗"时直接回车（保留）。等几秒后看：
+- [ ] 16. **卸载**：在终端里运行 `datum uninstall`，问"要把会话、案例和设置也一起删掉吗"时直接回车（保留）。等几秒后看：
   - "应用程序"里的 Caliper 是否没了；
-  - `uv tool list` 里是否没有 `caliper-cad` 了；
-  - `~/Library/Application Support/Caliper` 是否还在（应该还在）。
+  - `uv tool list` 里是否没有 `datum-cad` 了；
+  - `~/Library/Application Support/Datum` 是否还在（应该还在）。
   看到了什么：
 
 ## 发现的问题

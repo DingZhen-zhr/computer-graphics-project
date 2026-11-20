@@ -1,4 +1,4 @@
-"""caliper update 和 caliper uninstall（第二版计划 4 Task 2，设计文档第 6.2 节）。
+"""datum update 和 datum uninstall（第二版计划 4 Task 2，设计文档第 6.2 节）。
 
 两个命令都会改用户电脑上的东西，所以每一步做之前先打印要做什么。
 更新就是重新运行最新的安装脚本，由它覆盖安装；卸载按顺序删快捷方式、钥匙串里的 key、（问过之后）数据目录，
@@ -19,19 +19,19 @@ from typing import Callable
 import keyring
 import keyring.errors
 
-from cad_agent import paths
+from cad_agent import brand, paths
 from cad_agent.keystore import SERVICE
 
 REPO = "DingZhen-zhr/computer-graphics-project"
 INSTALL_PS1 = f"https://raw.githubusercontent.com/{REPO}/master/install.ps1"
 INSTALL_SH = f"https://raw.githubusercontent.com/{REPO}/master/install.sh"
-DIST_NAME = "caliper-cad"
-WIN_SHORTCUT = "卡尺 Caliper.lnk"
-MAC_APP = "Caliper.app"
+DIST_NAME = brand.DIST
+WIN_SHORTCUT = f"{brand.DISPLAY}.lnk"
+MAC_APP = f"{brand.PRODUCT}.app"
 ASK_DELETE = "要把会话、案例和设置也一起删掉吗？输入 yes 确认删除，直接回车保留："
-UNINSTALL_WAIT_S = 3   # 后台卸载先等几秒，让当前这个 caliper 进程先退出（Windows 上正在运行的程序文件删不掉）
+UNINSTALL_WAIT_S = 3   # 后台卸载先等几秒，让当前这个 datum 进程先退出（Windows 上正在运行的程序文件删不掉）
 UPDATE_WAIT_S = 3
-UPDATE_TITLE = "卡尺 Caliper 更新"
+UPDATE_TITLE = f"{brand.DISPLAY} 更新"
 
 _spawn = subprocess.Popen   # 命令行入口用；测试里换掉
 _call = subprocess.call
@@ -101,8 +101,8 @@ def shortcut_paths() -> list[Path]:
 def update_command() -> list[str]:
     """这个平台上重新运行安装脚本的命令。
 
-    Windows 不让替换正在运行的程序文件（计划 4 Task 3 实测：卡尺开着时 uv 报"拒绝访问"），而 caliper update 本身就在运行，
-    所以用 start 开一个新窗口：先等几秒让这个 caliper 退出，再运行安装脚本；窗口留着，装完能看到结果。start 会立刻返回。
+    Windows 不让替换正在运行的程序文件（计划 4 Task 3 实测：程序开着时 uv 报"拒绝访问"），而 datum update 本身就在运行，
+    所以用 start 开一个新窗口：先等几秒让这个 datum 退出，再运行安装脚本；窗口留着，装完能看到结果。start 会立刻返回。
     """
     if _system() == "win32":
         script = f"Start-Sleep -Seconds {UPDATE_WAIT_S}; irm {INSTALL_PS1} -TimeoutSec 60 | iex"
@@ -113,7 +113,7 @@ def update_command() -> list[str]:
 
 def run_update(run: Callable = subprocess.call, say: Callable = print) -> int:
     cmd = update_command()
-    say("更新卡尺：重新运行最新的安装脚本，由它覆盖安装。会话、案例、设置和钥匙串里的 key 都不受影响。")
+    say(f"更新 {brand.PRODUCT}：重新运行最新的安装脚本，由它覆盖安装。会话、案例、设置和钥匙串里的 key 都不受影响。")
     say(f"将要运行：{subprocess.list2cmdline(cmd) if _system() == 'win32' else ' '.join(cmd)}")
     try:
         code = run(cmd)
@@ -121,8 +121,8 @@ def run_update(run: Callable = subprocess.call, say: Callable = print) -> int:
         say(f"没能运行这条命令（{type(e).__name__}）。可以把上面这条命令复制到终端里自己运行。")
         return 1
     if code == 0 and _system() == "win32":
-        say(f"更新会在一个新窗口里进行：等这个 caliper 退出 {UPDATE_WAIT_S} 秒后开始，结果在那个窗口里看。"
-            "开着的卡尺窗口请先关掉，不然 Windows 不让替换正在运行的程序。")
+        say(f"更新会在一个新窗口里进行：等这个 {brand.COMMAND} 退出 {UPDATE_WAIT_S} 秒后开始，结果在那个窗口里看。"
+            f"开着的 {brand.PRODUCT} 窗口请先关掉，不然 Windows 不让替换正在运行的程序。")
     if code != 0:
         say(f"更新没有成功（返回码 {code}），原因见上面安装脚本的输出。")
     return int(code)
@@ -171,17 +171,17 @@ def _remove_keys(say: Callable) -> bool:
         removed += 1
         say(f"  已删除「{p.name}」的 key")
     if removed == 0:
-        say("  钥匙串里没有卡尺存的 key，跳过")
-    say("  环境变量里的 key 不是卡尺设的，卡尺不动它们；不用了可以自己删掉。")
+        say(f"  钥匙串里没有 {brand.PRODUCT} 存的 key，跳过")
+    say(f"  环境变量里的 key 不是 {brand.PRODUCT} 设的，{brand.PRODUCT} 不动它们；不用了可以自己删掉。")
     return True
 
 
 def _safe_to_delete(data: Path) -> str | None:
-    """数据目录能不能删：不能删时返回原因。只删用户主目录里面、名字带 Caliper 的目录。"""
+    """数据目录能不能删：不能删时返回原因。只删用户主目录里面、名字带 Datum 的目录。"""
     home = _home().resolve()
     target = data.resolve()
-    if "caliper" not in target.name.lower():
-        return "这个目录的名字里没有 Caliper，可能不是卡尺自己建的"
+    if brand.HOME_DIR.lower() not in target.name.lower():
+        return f"这个目录的名字里没有 {brand.HOME_DIR}，可能不是 {brand.PRODUCT} 自己建的"
     if target == home or target in home.parents:
         return "这是用户主目录或它的上级"
     if home not in target.parents:
@@ -238,18 +238,18 @@ def run_uninstall(*, delete_data: bool | None, ask: Callable[[str], str] = input
     ok = True
     say("[1/4] 删除快捷方式")
     ok = _remove_shortcuts(say) and ok
-    say(f"[2/4] 删除系统钥匙串里卡尺存的 key（服务名 {SERVICE}）")
+    say(f"[2/4] 删除系统钥匙串里 {brand.PRODUCT} 存的 key（服务名 {SERVICE}）")
     ok = _remove_keys(say) and ok
     say("[3/4] 数据目录（会话、案例、设置、日志）")
     ok = _handle_data(delete_data, ask, say) and ok
     say(f"[4/4] 让 uv 卸载程序本身：uv tool uninstall {DIST_NAME}")
     if _system() == "win32":
-        say("  开着的卡尺窗口请先关掉：Windows 不让删除正在运行的程序文件。")
+        say(f"  开着的 {brand.PRODUCT} 窗口请先关掉：Windows 不让删除正在运行的程序文件。")
     cmd, kwargs = _uninstall_command()
     try:
         run(cmd, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, **kwargs)
     except OSError as e:
-        say(f"  没能在后台开始卸载（{type(e).__name__}）。请关掉卡尺后自己运行：uv tool uninstall {DIST_NAME}")
+        say(f"  没能在后台开始卸载（{type(e).__name__}）。请关掉 {brand.PRODUCT} 后自己运行：uv tool uninstall {DIST_NAME}")
         return 1
     say(f"  已在后台开始，几秒后完成。之后可以运行 uv tool list 确认 {DIST_NAME} 不在列表里了。")
     return 0 if ok else 1
@@ -259,12 +259,12 @@ def run_uninstall(*, delete_data: bool | None, ask: Callable[[str], str] = input
 
 
 def update_main(argv: list[str]) -> int:
-    argparse.ArgumentParser(prog="caliper update", description="更新到最新发布：重新运行安装脚本，覆盖安装。").parse_args(argv)
+    argparse.ArgumentParser(prog=f"{brand.COMMAND} update", description="更新到最新发布：重新运行安装脚本，覆盖安装。").parse_args(argv)
     return run_update(run=_call)
 
 
 def uninstall_main(argv: list[str]) -> int:
-    parser = argparse.ArgumentParser(prog="caliper uninstall", description="卸载卡尺：删除快捷方式、钥匙串里的 key 和程序本身。")
+    parser = argparse.ArgumentParser(prog=f"{brand.COMMAND} uninstall", description=f"卸载 {brand.PRODUCT}：删除快捷方式、钥匙串里的 key 和程序本身。")
     group = parser.add_mutually_exclusive_group()
     group.add_argument("--delete-data", action="store_true", help="同时删除会话、案例和设置")
     group.add_argument("--keep-data", action="store_true", help="保留会话、案例和设置")

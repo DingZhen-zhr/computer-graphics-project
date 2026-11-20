@@ -1,4 +1,4 @@
-"""API key 的存取（设计文档第 4.4 节）：先环境变量，后系统钥匙串（服务名 caliper，用户名是预设 id）。
+"""API key 的存取（设计文档第 4.4 节）：先环境变量，后系统钥匙串（服务名 datum，用户名是预设 id）。
 
 规矩：key 不打印、不写日志、不写文件；异常信息里不带 key，也不转述底层异常的原文（里面可能有 key）。
 钥匙串不可用时不退回到明文文件，而是告诉用户可以改用环境变量。
@@ -12,7 +12,9 @@ from typing import Literal
 import keyring
 import keyring.errors
 
-SERVICE = "caliper"
+from cad_agent import brand
+
+SERVICE = brand.KEYRING_SERVICE
 HINT_MIN_LEN = 8  # key 不到这么长时，提示里一位都不显示
 
 
@@ -69,7 +71,7 @@ def _env_name_for(provider_id: str) -> str | None:
 def _unavailable(provider_id: str, what: str) -> KeyStoreError:
     env = _env_name_for(provider_id)
     how = f"设置环境变量 {env}" if env else "把 key 放进环境变量（变量名见设置页）"
-    return KeyStoreError(f"{what}：这台电脑上没有可用的系统钥匙串。可以改用环境变量：{how}，然后重新打开卡尺。")
+    return KeyStoreError(f"{what}：这台电脑上没有可用的系统钥匙串。可以改用环境变量：{how}，然后重新打开 {brand.PRODUCT}。")
 
 
 def set_key(provider_id: str, key: str) -> None:

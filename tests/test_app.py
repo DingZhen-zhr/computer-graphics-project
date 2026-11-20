@@ -1,4 +1,4 @@
-"""caliper 命令和桌面窗口（第二版计划 3 Task 13）。不开真的窗口、不连任何模型服务；钥匙串用内存里的假后端。"""
+"""datum 命令和桌面窗口（第二版计划 3 Task 13）。不开真的窗口、不连任何模型服务；钥匙串用内存里的假后端。"""
 
 from __future__ import annotations
 
@@ -29,7 +29,7 @@ NO_KEY = '还没有可用的密钥。到右上角的"设置"里填好密钥，�
 
 @pytest.fixture
 def home(monkeypatch, tmp_path):
-    monkeypatch.setenv("CALIPER_HOME", str(tmp_path / "home"))
+    monkeypatch.setenv("DATUM_HOME", str(tmp_path / "home"))
     for p in load_providers():
         monkeypatch.delenv(p.api_key_env, raising=False)
     previous = keyring.get_keyring()
@@ -100,7 +100,7 @@ def test_main_browser_mode_starts_server(home, monkeypatch):
     monkeypatch.setattr(app, "wait_for_exit", fake_wait)
     assert app.main(["--browser"]) == 0
     assert seen["url"].startswith("http://127.0.0.1:") and "/?t=" in seen["url"]
-    assert seen["status"] == 200 and "卡尺".encode() in seen["body"]
+    assert seen["status"] == 200 and "基准".encode() in seen["body"]
     with pytest.raises(OSError):
         socket.create_connection(("127.0.0.1", seen["port"]), timeout=1).close()
 
@@ -112,7 +112,7 @@ def test_window_failure_falls_back_to_browser(home, monkeypatch, capsys):
     monkeypatch.setattr(app, "wait_for_exit", lambda: None)
     assert app.main([]) == 0
     out = capsys.readouterr().out
-    assert "桌面窗口打不开（" in out and "改用浏览器打开" in out and "caliper doctor" in out
+    assert "桌面窗口打不开（" in out and "改用浏览器打开" in out and "datum doctor" in out
     assert len(opened) == 1 and opened[0].startswith("http://127.0.0.1:")
 
 
@@ -132,7 +132,7 @@ def test_window_mode_opens_pywebview(home, monkeypatch):
     monkeypatch.setattr(app, "open_browser", lambda url: calls.setdefault("browser", url))
     assert app.main([]) == 0
     title, url, kw = calls["window"]
-    assert title == "卡尺 Caliper" and url.startswith("http://127.0.0.1:") and "/?t=" in url
+    assert title == "Datum 基准" and url.startswith("http://127.0.0.1:") and "/?t=" in url
     assert (kw["width"], kw["height"]) == (1360, 860) and tuple(kw["min_size"]) == (1100, 700)
     assert calls["started"] and "browser" not in calls
 
@@ -140,7 +140,7 @@ def test_window_mode_opens_pywebview(home, monkeypatch):
 def test_cli_mode_uses_keystore_when_no_config(home, monkeypatch):
     from cad_agent import cli
 
-    keyring.set_password("caliper", "deepseek", FAKE_KEY)
+    keyring.set_password("datum", "deepseek", FAKE_KEY)
     captured: dict = {}
     monkeypatch.setattr(cli, "main", lambda argv=None, **kw: captured.update(argv=argv, **kw) or 0)
     assert app.main(["--cli"]) == 0
@@ -170,7 +170,7 @@ def test_make_llm_for_without_key_is_a_config_error(home):
     with pytest.raises(ConfigError) as e:
         app.make_llm_for(Settings(), "clarify")
     assert "密钥" in str(e.value)
-    keyring.set_password("caliper", "deepseek", FAKE_KEY)
+    keyring.set_password("datum", "deepseek", FAKE_KEY)
     llm = app.make_llm_for(Settings(), "clarify")   # 只造客户端，不发请求
     assert llm is not None and FAKE_KEY not in repr(vars(llm).get("model", ""))
 
@@ -186,8 +186,8 @@ def test_help_mentions_demo_script_only_as_dev(capsys):
 
 def test_entry_points_declared():
     data = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
-    assert data["project"]["scripts"]["caliper"] == "cad_agent.app:main"
-    assert data["project"]["gui-scripts"]["caliper-app"] == "cad_agent.app:gui_main"
+    assert data["project"]["scripts"]["datum"] == "cad_agent.app:main"
+    assert data["project"]["gui-scripts"]["datum-app"] == "cad_agent.app:gui_main"
     assert any(d.startswith("pywebview") for d in data["project"]["dependencies"])
 
 

@@ -15,7 +15,7 @@ import sys
 import threading
 from typing import Any, Callable
 
-from cad_agent import __version__, keystore, paths
+from cad_agent import __version__, brand, keystore, paths
 from cad_agent.cases import BUILTIN_DIR, load_cases
 from cad_agent.config import ConfigError
 from cad_agent.desk.hub import Hub
@@ -88,7 +88,7 @@ def _with_timeout(fn: Callable[[], Any]) -> tuple[bool, Any]:
         except BaseException as e:  # noqa: BLE001 - 交给调用方按类型处理
             box["error"] = e
 
-    t = threading.Thread(target=run, daemon=True, name="caliper-ping")
+    t = threading.Thread(target=run, daemon=True, name=f"{brand.COMMAND}-ping")
     t.start()
     t.join(TIMEOUT_S)
     if t.is_alive():

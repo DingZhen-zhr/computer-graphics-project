@@ -6,7 +6,7 @@ const KEY_NOTE = "密钥只保存在这台电脑的系统钥匙串里（Windows 
 const ENV_NOTE = (name) => `已经从环境变量 ${name} 读到密钥，不用再填。`;
 const STEPS = ["模型服务", "密钥", "完成"];
 const BLURB = {
-  deepseek: "默认的服务，卡尺主要按它调过。",
+  deepseek: "默认的服务，Datum 主要按它调过。",
   glm: "智谱的 OpenAI 兼容接口。",
   kimi: "月之暗面的 OpenAI 兼容接口。",
   qwen: "阿里云百炼的 OpenAI 兼容接口。",
@@ -30,7 +30,7 @@ export function renderOnboarding(el, actions) {
     if (st.step === 0) {
       body = [
         h("h1", { class: "page-title" }, "先选一个模型服务"),
-        h("p", { class: "muted" }, "卡尺用你自己的大模型账号来理解需求、写建模代码。以后可以在设置里换。"),
+        h("p", { class: "muted" }, "Datum 用你自己的大模型账号来理解需求、写建模代码。以后可以在设置里换。"),
         h("div", { class: "choice-list", role: "radiogroup", "aria-label": "模型服务" }, providers.map((p) => {
           const on = p.id === st.provider;
           return h("button", { type: "button", role: "radio", "aria-checked": String(on), class: `choice${on ? " on" : ""}`,
@@ -95,7 +95,7 @@ export function renderOnboarding(el, actions) {
     } else {
       body = [
         h("h1", { class: "page-title" }, "可以开始了"),
-        h("p", { class: "muted" }, "说说你想做什么零件，卡尺会先问清楚尺寸，再一个阶段一个阶段地建模，每一步都由程序实测。"),
+        h("p", { class: "muted" }, "说说你想做什么零件，Datum 会先问清楚尺寸，再一个阶段一个阶段地建模，每一步都由程序实测。"),
         h("div", { class: "page-actions" }, button("开始第一个零件", () => actions.start(), { kind: "primary" }), skip),
       ];
     }

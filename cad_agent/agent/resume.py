@@ -11,6 +11,7 @@ import logging
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+from cad_agent import brand
 from cad_agent.agent.context import compact_text
 from cad_agent.brief import Brief
 from cad_agent.notebook import FeatureList
@@ -21,7 +22,7 @@ from cad_agent.tools import Workspace
 if TYPE_CHECKING:
     from cad_agent.agent.loop import Agent
 
-logger = logging.getLogger("caliper.desk")
+logger = logging.getLogger(f"{brand.COMMAND}.desk")
 END_KINDS = ("reply", "question", "confirm", "delivered", "failed", "stopped")   # 一轮的结局（AgentTurn.kind）
 LEGACY_TITLE = "整体"
 LEGACY_DONE_WHEN = "零件完成"

@@ -155,3 +155,24 @@
 - 实际情况：2026-11-20 清单还没有交回（16 项都没勾）。持续集成在 Windows 和 Mac（macOS 15，Apple 芯片）上都已通过。没有标签，README 里公开的那一行安装命令装不上。
 - 怎么改：用户本人决定先发布，原话是"先发布，Mac 后补"。由规划会话执行：发布前重跑全部测试，推送 master，打 `v2.0.0` 标签并推送，再从 GitHub 按公开的安装命令实际装一次做验证。README"验证到什么程度"一节本来就写着"Mac 界面还没有人工看过"，不用改。
 - 影响：Task 8 Step 2（根据 Mac 清单更新 README）挪到清单交回之后再做；清单里发现的问题按需要发 `v2.0.1` 之类的补丁版本。成功标准里"Mac 清单勾完"这一条暂时没有达成。
+
+## D22（3.0 计划 1 Task 1）清单里两个测试文件多改了一处名字；在线示例跟着重新导出
+
+- 原计划："要改的旧测试"清单里，`tests/test_desk_server.py` 只写了请求头 `X-Caliper-Token` → `X-Datum-Token`；`tests/test_maintenance.py` 写了数据目录、版本号、包名、快捷方式名等。Task 1 的文件清单里没有 `site/demo/`。
+- 实际情况：
+  1. `test_desk_server.py::test_reload_without_token_gets_recovery_page` 断言恢复页里有"从卡尺的窗口里打开"。Task 1 的新测试 `test_no_old_name_outside_migration` 要求 `cad_agent/` 里除迁移代码外不能有"卡尺"两个字，两条测试不能同时满足。
+  2. `test_maintenance.py::test_pyproject_name_and_version` 断言描述里有"卡尺"；计划要求描述改成 Datum 的一句话。Mac 应用名 `Caliper.app` 也在这个文件里，计划没单列。
+  3. `test_desk_export.py::test_site_is_up_to_date` 要求 `site/demo/` 和重新导出的结果逐字节相同。页面标题、脚本改了名字以后，不重新导出这条测试必然失败。
+- 怎么改：
+  1. 恢复页那条断言改成"从 Datum 的窗口里打开"；
+  2. 描述那条改成断言有"基准"，`Caliper.app` 改成 `Datum.app`（和 Task 5 的 Interfaces 一致）。
+  都只是把旧名字换成新名字，断言的其余部分一个字没动。这两个文件本来就在清单里，只是"改什么"一栏没写全，所以没有停下来问。
+  3. 用测试提示的命令 `python -m cad_agent.desk.export cad_agent/desk/demo_data/phone_stand site/demo` 重新导出，变化只有 8 个文件里的名字和令牌请求头的写法。只提交到本地；更新 GitHub Pages 仍是计划 5 的事。
+- 影响：计划 5 Task 5 重写主页、README 时还会再导出一次在线示例，不受影响。
+
+## D23（3.0 计划 1 Task 1）安装脚本的默认来源提前改成 v3.0.0
+
+- 原计划：安装脚本的默认来源改成 `@v3.0.0`（压缩包备用地址同步改），写在 Task 5 的 Interfaces 里。
+- 实际情况：旧测试 `test_install_scripts.py::test_default_source_is_the_release_tag` 断言默认来源是 `@v{__version__}`。Task 1 把版本号改成 3.0.0 以后，这条测试马上变红。它不在"要改的旧测试"清单里，而且断言本身是对的，只能改实现。
+- 怎么改：Task 1 里只改两个脚本的三处：默认来源 `@v3.0.0`、压缩包地址 `datum-cad @ …/v3.0.0.zip`（v3 的压缩包里包名是 `datum-cad`，名字对不上 uv 会报错）、开头注释里的标签。其余（环境变量、快捷方式、进程名、发现旧版）仍在 Task 5 做。
+- 影响：Task 1 到 Task 4 的提交里，安装脚本装的是 `datum-cad`，但快捷方式、自检那几步还在找 `caliper` 的文件，真的运行会在第 4 步出问题。这几个提交只在本地，不推送；Task 5 一起改齐。Task 5 的新测试 `test_default_source_is_v3_tag` 写好时就会通过，这是预料之中的，不说明测试没用。

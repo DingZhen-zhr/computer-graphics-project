@@ -3,9 +3,10 @@
 // 写操作一律返回"只读"，不开事件流。
 
 let token = "";
+let tokenHeader = "";   // 请求头的名字由服务端写在页面的 <html data-token-header> 上，main.js 取来传进来
 
-export const OFFLINE = "连不上卡尺的本机服务。可以稍等一下再试，或者重新打开卡尺。";
-export const READ_ONLY = "这是只读的在线示例，不能修改。想自己做零件，请先安装卡尺。";
+export const OFFLINE = "连不上 Datum 的本机服务。可以稍等一下再试，或者重新打开 Datum。";
+export const READ_ONLY = "这是只读的在线示例，不能修改。想自己做零件，请先安装 Datum。";
 const STATIC_MISSING = "在线示例里没有这一项。";
 const STATIC_OFFLINE = "在线示例的数据没有加载出来，可以刷新页面再试。";
 let staticState = null;
@@ -16,10 +17,11 @@ export function isStatic() {
 
 export function configure(opts) {
   token = String((opts && opts.token) || "");
+  tokenHeader = String((opts && opts.tokenHeader) || "");
   if (isStatic()) return;
   // 只存在这个标签页自己的 sessionStorage 里（别的网站读不到）：按 F5 重新加载时服务端的小页面靠它重新进来
   try {
-    if (token) sessionStorage.setItem("caliper.token", token);
+    if (token) sessionStorage.setItem("datum.token", token);
   } catch { /* 存不了：重新加载时只能从窗口重开 */ }
   // 令牌不留在地址栏里，免得被复制出去
   if (typeof window !== "undefined" && window.history && window.location.search.includes("t=")) {
@@ -34,7 +36,7 @@ export function tokenParam() {
 }
 
 async function request(method, path, body) {
-  const init = { method, headers: { "X-Caliper-Token": token } };
+  const init = { method, headers: tokenHeader ? { [tokenHeader]: token } : {} };
   if (body !== undefined) {
     init.headers["Content-Type"] = "application/json";
     init.body = JSON.stringify(body);

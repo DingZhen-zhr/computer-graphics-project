@@ -10,7 +10,7 @@ from cad_agent.maintenance import INSTALL_PS1, INSTALL_SH
 ROOT = Path(__file__).resolve().parent.parent
 README = ROOT / "README.md"
 MAC = ROOT / "docs" / "mac-checklist.md"
-HEADINGS = ["# 卡尺 Caliper", "## 安装", "## 装不上怎么办", "## 怎么用", "## 它是怎么保证质量的", "## 命令", "## 模型服务和密钥",
+HEADINGS = ["# Datum 基准", "## 安装", "## 装不上怎么办", "## 怎么用", "## 它是怎么保证质量的", "## 命令", "## 模型服务和密钥",
             "## 数据放在哪", "## 给开发者", "## 验证到什么程度", "## 参考与致谢"]
 
 
@@ -59,7 +59,7 @@ def test_readme_mentions_unverified_parts():
 
 def test_readme_trouble_section():
     section = _section("## 装不上怎么办")
-    for word in ("CALIPER_MIRROR", "CALIPER_SOURCE", "WebView2", "caliper doctor", "Get-Content -Raw -Encoding UTF8"):
+    for word in ("CALIPER_MIRROR", "CALIPER_SOURCE", "WebView2", "datum doctor", "Get-Content -Raw -Encoding UTF8"):
         assert word in section, word
     for item in ("platform", "python", "sca", "sandbox", "workdir", "window", "keyring", "data", "provider", "key"):
         assert f"`{item}`" in section, item
@@ -67,7 +67,7 @@ def test_readme_trouble_section():
 
 def test_readme_commands_section():
     section = _section("## 命令")
-    for cmd in ("caliper", "caliper --browser", "caliper --cli", "caliper doctor", "caliper update", "caliper uninstall"):
+    for cmd in ("datum", "datum --browser", "datum --cli", "datum doctor", "datum update", "datum uninstall"):
         assert f"`{cmd}" in section, cmd
 
 
@@ -88,8 +88,8 @@ def test_mac_checklist_has_all_items():
     text = MAC.read_text(encoding="utf-8")
     items = [line for line in text.splitlines() if line.lstrip().startswith("- [ ]")]
     assert len(items) >= 15
-    for word in ("系统版本", "芯片", "安装命令", "应用程序", "caliper doctor", "引导", "--demo-script", "旋转", "阶段刻度",
-                 "参数", "深色", "字体", "STEP", "在文件夹中显示", "重开", "caliper uninstall"):
+    for word in ("系统版本", "芯片", "安装命令", "应用程序", "datum doctor", "引导", "--demo-script", "旋转", "阶段刻度",
+                 "参数", "深色", "字体", "STEP", "在文件夹中显示", "重开", "datum uninstall"):
         assert any(word in item for item in items), word
     assert all("看到了什么" in item or "看到了什么" in text for item in items)
     tail = text.strip().splitlines()[-4:]

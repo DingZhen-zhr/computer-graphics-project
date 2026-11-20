@@ -5,7 +5,7 @@
 #   curl -fsSL https://raw.githubusercontent.com/DingZhen-zhr/computer-graphics-project/master/install.sh | sh
 #
 # 选项都用环境变量传（"下载后直接执行"的用法传不了参数），写在 sh 前面：
-#   CALIPER_SOURCE         从哪里装：一个 git 地址，或本地目录。默认是本仓库的发布标签 v2.0.0
+#   CALIPER_SOURCE         从哪里装：一个 git 地址，或本地目录。默认是本仓库的发布标签 v3.0.0
 #   CALIPER_MIRROR=1       PyPI 和 Python 的下载走国内镜像
 #   CALIPER_NO_SHORTCUT=1  不建"应用程序"里的 Caliper
 #   CALIPER_DRY_RUN=1      只打印每一步要做什么，不执行
@@ -16,8 +16,8 @@
 
 set -u
 
-DEFAULT_SOURCE="git+https://github.com/DingZhen-zhr/computer-graphics-project@v2.0.0"
-ARCHIVE_SOURCE="caliper-cad @ https://github.com/DingZhen-zhr/computer-graphics-project/archive/refs/tags/v2.0.0.zip"
+DEFAULT_SOURCE="git+https://github.com/DingZhen-zhr/computer-graphics-project@v3.0.0"
+ARCHIVE_SOURCE="datum-cad @ https://github.com/DingZhen-zhr/computer-graphics-project/archive/refs/tags/v3.0.0.zip"
 UV_INSTALLER="https://astral.sh/uv/install.sh"
 PYPI_MIRROR="https://pypi.tuna.tsinghua.edu.cn/simple"
 PYTHON_MIRROR="https://registry.npmmirror.com/-/binary/python-build-standalone"

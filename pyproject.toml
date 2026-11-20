@@ -3,9 +3,9 @@ requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "caliper-cad"
-version = "2.0.0"
-description = "卡尺 Caliper：用平常话做 CAD 零件，每一步都由程序实测（基于 SimpleCADAPI，AICG Project 3）"
+name = "datum-cad"
+version = "3.0.0"
+description = "Datum 基准：用平常话做 CAD 零件和会动的多零件产品，每一步都由程序实测（基于 SimpleCADAPI，AICG Project 3）"
 requires-python = ">=3.10,<3.14"
 dependencies = [
     "simplecadapi[editor,verify]==2.2.7",
@@ -17,10 +17,10 @@ dependencies = [
 ]
 
 [project.scripts]
-caliper = "cad_agent.app:main"
+datum = "cad_agent.app:main"
 
 [project.gui-scripts]
-caliper-app = "cad_agent.app:gui_main"
+datum-app = "cad_agent.app:gui_main"
 
 [project.optional-dependencies]
 dev = ["pytest>=8"]

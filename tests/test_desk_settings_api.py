@@ -53,7 +53,7 @@ class Maker:
 
 @pytest.fixture
 def env(monkeypatch, tmp_path):
-    monkeypatch.setenv("CALIPER_HOME", str(tmp_path / "home"))
+    monkeypatch.setenv("DATUM_HOME", str(tmp_path / "home"))
     for p in load_providers():
         monkeypatch.delenv(p.api_key_env, raising=False)
     previous = keyring.get_keyring()
@@ -130,13 +130,13 @@ def test_set_key_then_hint(env, tmp_path):
     api = Api(tmp_path)
     status, body = api("POST", "/api/key", {"provider": "deepseek", "key": FAKE_KEY})
     assert status == 200 and body == {"source": "keyring", "hint": "…WXYZ", "env": "DEEPSEEK_API_KEY"}
-    assert env.store[("caliper", "deepseek")] == FAKE_KEY and api.refreshed == 1
+    assert env.store[("datum", "deepseek")] == FAKE_KEY and api.refreshed == 1
 
 
 def test_key_is_trimmed(env, tmp_path):
     api = Api(tmp_path)
     api("POST", "/api/key", {"provider": "deepseek", "key": f"  {FAKE_KEY}\r\n"})
-    assert env.store[("caliper", "deepseek")] == FAKE_KEY
+    assert env.store[("datum", "deepseek")] == FAKE_KEY
 
 
 def test_blank_key_is_400(env, tmp_path):

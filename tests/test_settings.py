@@ -20,7 +20,7 @@ TOP_KEYS = {"provider", "model", "base_url", "temperature", "vision", "review_pr
 @pytest.fixture(autouse=True)
 def home(monkeypatch, tmp_path):
     h = tmp_path / "数据目录"
-    monkeypatch.setenv("CALIPER_HOME", str(h))
+    monkeypatch.setenv("DATUM_HOME", str(h))
     return h
 
 
@@ -116,7 +116,7 @@ def test_custom_provider_needs_address_and_model(home):
     with pytest.raises(ConfigError, match="模型"):
         to_config(Settings(provider="custom", base_url="http://localhost:9/v1"))
     c = to_config(Settings(provider="custom", base_url="http://localhost:9/v1", model="m"))
-    assert c.api_key_env == "CALIPER_API_KEY" and c.vision is False
+    assert c.api_key_env == "DATUM_API_KEY" and c.vision is False
 
 
 def test_vision_auto(home):

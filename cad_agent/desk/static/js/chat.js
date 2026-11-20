@@ -9,7 +9,7 @@ const EMPTY = "说说你想做什么零件。不用一次说全，缺的尺寸�
 const EXAMPLES = ["做一个放在桌上看视频的手机支架", "做一个法兰盘，外径 120，上面一圈 6 个螺栓孔", "做一个装电路板的小盒子，外形 80×50×30"];
 const PLACEHOLDER = "说说要做什么，或者要怎么改";
 const DEMO_NOTE = '这是一段录制好的示例，只能看。想自己做一个，点左上角的"新会话"。';
-const STATIC_NOTE = '这是一段录制好的示例，只能看。想自己做一个，点右上角的"安装卡尺"。';
+const STATIC_NOTE = '这是一段录制好的示例，只能看。想自己做一个，点右上角的"安装 Datum"。';
 const FLOW = [["clarify", "澄清"], ["confirm", "确认"], ["planning", "规划"], ["modeling", "建模"], ["delivered", "交付"]];
 
 let ui = null;   // 这一栏的元素和缓存

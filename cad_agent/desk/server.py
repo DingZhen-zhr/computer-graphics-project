@@ -1,7 +1,7 @@
 """桌面端的本机 HTTP 服务（第二版计划 3 Task 6）：页面、静态文件、接口、SSE、版本文件。只用标准库。
 
 保护：只监听 127.0.0.1；Host 必须是 127.0.0.1:<端口> 或 localhost:<端口>；带了 Origin 时必须是这两个之一；
-所有 /api/ 和 /files/ 请求必须带本次启动的随机令牌（请求头 X-Caliper-Token；查询参数 t 只给 SSE 和文件下载用），
+所有 /api/ 和 /files/ 请求必须带本次启动的随机令牌（请求头 X-Datum-Token，名字在 brand.py；查询参数 t 只给 SSE 和文件下载用），
 页面本身要 ?t=。不满足一律 403。这样别的网页和本机其他程序都调不了这些接口（包括写 key 的接口）。
 
 extra 是另外一组路由（设置、key、案例），签名 extra(method, path, query, body) -> (状态码, 数据) | None，None 表示不归它管。
@@ -26,10 +26,11 @@ from pathlib import Path
 from typing import Any, Callable
 from urllib.parse import parse_qs, unquote, urlsplit
 
+from cad_agent import brand
 from cad_agent.desk.hub import Hub
 from cad_agent.desk.routes import ApiError, session_api, translate, version_file
 
-logger = logging.getLogger("caliper.desk")
+logger = logging.getLogger(f"{brand.COMMAND}.desk")
 
 STATIC_DIR = Path(__file__).parent / "static"
 VENDOR_DIR = STATIC_DIR / "vendor" / "three"   # three.js r160（计划 4 Task 6 从旧网页包搬到这里）
@@ -41,18 +42,20 @@ KEEPALIVE_S = 15.0
 MAX_BODY = 200_000
 SSE_PATH = re.compile(r"^/api/sessions/[^/]+/events$")
 INLINE_SCRIPT = re.compile(r"<script(?![^>]*\bsrc=)[^>]*>(.*?)</script>", re.S)
-BAD_TOKEN = "令牌不对，拒绝访问。请从卡尺的窗口里打开这个页面。"
+BAD_TOKEN = f"令牌不对，拒绝访问。请从 {brand.PRODUCT} 的窗口里打开这个页面。"
 BAD_ORIGIN = "请求的来源不对，拒绝访问。"
 Extra = Callable[[str, str, dict, Any], "tuple[int, Any] | None"]
 # 地址栏里没有令牌的页面请求（页面加载后会把令牌从地址栏去掉，按 F5 时就是这样）：
-# 用这个标签页自己存的令牌重新进来；存的也没有，就说明要从卡尺的窗口里打开。页面里没有令牌。
-RECOVER_PAGE = """<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><title>卡尺 Caliper</title></head>
+# 用这个标签页自己存的令牌重新进来；存的也没有，就说明要从 Datum 的窗口里打开。页面里没有令牌。
+RECOVER_PAGE = """<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><title>__DISPLAY__</title></head>
 <body><p id="m"></p><script>
 var t = null;
-try { t = sessionStorage.getItem("caliper.token"); } catch (e) {}
+try { t = sessionStorage.getItem("__TOKEN_KEY__"); } catch (e) {}
 if (t) { location.replace("/?t=" + encodeURIComponent(t)); }
-else { document.getElementById("m").textContent = "这个页面要从卡尺的窗口里打开。请关掉它，重新打开卡尺。"; }
+else { document.getElementById("m").textContent = "这个页面要从 __PRODUCT__ 的窗口里打开。请关掉它，重新打开 __PRODUCT__。"; }
 </script></body></html>"""
+RECOVER_PAGE = (RECOVER_PAGE.replace("__DISPLAY__", brand.DISPLAY).replace("__PRODUCT__", brand.PRODUCT)
+                .replace("__TOKEN_KEY__", f"{brand.COMMAND}.token"))   # 和 static/js/api.js 存令牌用的名字一致
 
 
 def _content_type(path: Path) -> str:
@@ -83,7 +86,7 @@ def make_desk_server(hub: Hub, extra: Callable | None, *, port: int = 0, token: 
 
     class Handler(BaseHTTPRequestHandler):
         protocol_version = "HTTP/1.1"
-        server_version = "Caliper"
+        server_version = brand.PRODUCT
 
         def log_message(self, format: str, *args: Any) -> None:  # noqa: A002 - 终端保持干净
             pass
@@ -123,7 +126,7 @@ def make_desk_server(hub: Hub, extra: Callable | None, *, port: int = 0, token: 
             return origin is None or origin in {f"http://{n}" for n in self._local_names()}
 
         def _token_ok(self, query: dict, allow_query: bool) -> bool:
-            given = self.headers.get("X-Caliper-Token") or (query.get("t", [""])[0] if allow_query else "")
+            given = self.headers.get(brand.TOKEN_HEADER) or (query.get("t", [""])[0] if allow_query else "")
             return bool(given) and hmac.compare_digest(given.encode("utf-8"), token.encode("utf-8"))
 
         def _body(self) -> Any:
@@ -212,6 +215,8 @@ def make_desk_server(hub: Hub, extra: Callable | None, *, port: int = 0, token: 
         # ---- 页面和文件 ----
         def _page(self) -> None:
             html = (STATIC_DIR / "index.html").read_text(encoding="utf-8")
+            # 令牌请求头的名字写进页面，脚本从这里取（不在脚本里写死）
+            html = html.replace("<html ", f'<html data-token-header="{brand.TOKEN_HEADER}" ', 1)
             self._send(200, html.encode("utf-8"), "text/html; charset=utf-8", extra={"Content-Security-Policy": _csp(html)})
 
         def _static(self, rel: str) -> None:

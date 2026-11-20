@@ -1168,3 +1168,17 @@
 - 从 GitHub 实际装一次（装到临时目录，没动这台电脑上原来装好的那一份）：`uv tool install --python 3.12 --force git+https://github.com/DingZhen-zhr/computer-graphics-project@v2.0.0`，24 秒（uv 有缓存），返回码 0；`caliper --version` 是 `卡尺 Caliper 2.0.0`；`caliper doctor --offline` 全部正常（模型服务一项按离线跳过）。装完把临时目录删了。
 - 从 GitHub 下载公开的 `install.ps1`，用 `CALIPER_DRY_RUN=1` 跑了一遍：五步都打印正常，装的来源是 `@v2.0.0`。
 - 还没做：Task 8 Step 4 要求的"在一台没装过卡尺的电脑（或一个新的 Windows 用户）上完整装一次"——上面这次用了本机已有的 uv 和缓存，不算全新机器；Mac 人工清单（D21）。
+
+## 3.0 计划 1 Task 1：名字集中到一处
+
+- 新建 `cad_agent/brand.py`，放产品名、命令、包名、版本、数据目录名、环境变量、钥匙串服务名、令牌请求头，以及三个 `OLD_` 开头的旧名字。`cad_agent.__version__` 从它取；`pyproject.toml` 改成 `datum-cad` 3.0.0，入口 `datum`、`datum-app`。
+- `cad_agent/` 里写死的旧名字全部改成从 `brand` 取：窗口标题、`--version`、帮助、日志名（`datum.log`）、doctor、keystore、maintenance、paths、settings、桌面端服务、`providers.toml` 里自定义服务的 `DATUM_API_KEY`。注释和面向用户的文字里的"卡尺"改成"Datum"。
+- 前端：页面标题 `Datum 基准`，顶栏 `Datum` + `基准`，图标名从 `caliper` 改成 `brand`。令牌请求头不在脚本里写死：服务端发页面时在 `<html>` 上写 `data-token-header`，`main.js` 取来交给 `api.js`。恢复页和 `api.js` 存令牌用同一个名字 `datum.token`。
+- 新测试 `tests/test_brand.py` 3 个：先看到 `ImportError`（没有 brand），建好 brand 后看到版本号 `2.0.0 != 3.0.0` 和一长串旧名字两处失败，改完通过。
+- 按清单改了旧测试（只换名字和版本号）：`test_app.py`、`test_desk_export.py`（导出页标题那一处）、`test_desk_server.py`、`test_desk_settings_api.py`、`test_doctor.py`、`test_maintenance.py`、`test_paths.py`、`test_settings.py`、`test_readme.py`（标题和命令名；安装脚本的环境变量等 Task 5）。`test_install_scripts.py`、`test_ci_workflow.py` 留到 Task 5。清单"改什么"一栏没写全的两处记成 D22。
+- README 和 `docs/mac-checklist.md`：只改这次已经变了的事实（标题、命令名、数据目录、服务名、包名、窗口标题）。安装脚本的环境变量和快捷方式名等 Task 5；文字里其余的"卡尺"等计划 5 重写 README。
+- 在线示例 `site/demo/` 按测试提示的命令重新导出（D22），只在本地。
+- 第一次全量跑时 `test_default_source_is_the_release_tag` 失败：它要求安装脚本的默认来源跟着版本号走。改实现：两个脚本的默认来源和压缩包地址提前改成 `v3.0.0`（D23）。
+- `.venv` 里先 `pip uninstall caliper-cad` 再 `pip install --no-deps -e .`，没装新东西；现在从源码启动用 `.venv\Scripts\datum`。
+- 用一个临时数据目录、剧本假模型起了一次桌面端服务，在内置浏览器里打开：标题和顶栏是 Datum，`/api/boot`、`/api/sessions` 等请求都是 200（新请求头被接受），控制台没有错误；刷新页面后恢复页用存的令牌重新进来了。没有连任何模型服务。
+- 全部测试：1126 个通过（9 分 54 秒）。Task 2、3 的测试文件这时已经写好但没实现，这次全量运行用 `--ignore` 排除了它们，它们也不在这次提交里。

@@ -4,7 +4,7 @@
 #   irm https://raw.githubusercontent.com/DingZhen-zhr/computer-graphics-project/master/install.ps1 | iex
 #
 # 选项都用环境变量传（"下载后直接执行"的用法传不了参数），先设好再运行上面那一行：
-#   CALIPER_SOURCE       从哪里装：一个 git 地址，或本地目录。默认是本仓库的发布标签 v2.0.0
+#   CALIPER_SOURCE       从哪里装：一个 git 地址，或本地目录。默认是本仓库的发布标签 v3.0.0
 #   CALIPER_MIRROR=1     PyPI 和 Python 的下载走国内镜像
 #   CALIPER_NO_SHORTCUT=1  不建开始菜单和桌面的快捷方式
 #   CALIPER_DRY_RUN=1    只打印每一步要做什么，不执行
@@ -18,8 +18,8 @@
 #   Get-Content -Raw -Encoding UTF8 .\install.ps1 | iex
 
 & {
-    $DefaultSource = 'git+https://github.com/DingZhen-zhr/computer-graphics-project@v2.0.0'
-    $ArchiveSource = 'caliper-cad @ https://github.com/DingZhen-zhr/computer-graphics-project/archive/refs/tags/v2.0.0.zip'
+    $DefaultSource = 'git+https://github.com/DingZhen-zhr/computer-graphics-project@v3.0.0'
+    $ArchiveSource = 'datum-cad @ https://github.com/DingZhen-zhr/computer-graphics-project/archive/refs/tags/v3.0.0.zip'
     $UvInstaller = 'https://astral.sh/uv/install.ps1'
     $PypiMirror = 'https://pypi.tuna.tsinghua.edu.cn/simple'
     $PythonMirror = 'https://registry.npmmirror.com/-/binary/python-build-standalone'

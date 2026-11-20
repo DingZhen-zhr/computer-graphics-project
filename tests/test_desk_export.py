@@ -44,7 +44,7 @@ def test_export_layout(exported):
     assert (exported / "state.json").is_file() and (exported / "files").is_dir()
     html = (exported / "index.html").read_text(encoding="utf-8")
     assert 'data-mode="static"' in html
-    assert f"<title>{DEMO_TITLE} · 卡尺 Caliper</title>" in html
+    assert f"<title>{DEMO_TITLE} · Datum 基准</title>" in html
     assert '"/static/' not in html and "'/static/" not in html   # 都是相对路径，放在子目录里也能用
     # import map 里的相对地址必须以 ./ 开头，写成 static/… 浏览器会当成无效地址，three.js 加载不了
     m = re.search(r'<script type="importmap">(.*?)</script>', html, re.S)

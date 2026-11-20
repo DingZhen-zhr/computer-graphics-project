@@ -26,7 +26,7 @@ export async function renderCases(el, actions) {
     };
     clear(el, h("div", { class: "page-narrow cases-page" },
       h("div", { class: "page-top" }, h("h1", { class: "page-title" }, "案例库"), button("返回", () => actions.close(), { kind: "text" })),
-      h("p", { class: "muted" }, "规划一个新零件时，卡尺会从这里挑最相似的一两个给模型参考。尺寸和结构仍以你的需求单为准。"),
+      h("p", { class: "muted" }, "规划一个新零件时，Datum 会从这里挑最相似的一两个给模型参考。尺寸和结构仍以你的需求单为准。"),
       error ? h("p", { role: "alert" }, status("bad", error)) : null,
       h("section", { "aria-labelledby": "h-cases-builtin" }, sectionHead("01", "自带", `${builtin.length} 个`, "h-cases-builtin"),
         h("ol", { class: "case-list" }, builtin.map((c) => caseRow(c, remove)))),

@@ -1,4 +1,4 @@
-"""caliper doctor 用到的探测函数（从 doctor.py 拆出来，让它不超过 300 行）。
+"""datum doctor 用到的探测函数（从 doctor.py 拆出来，让它不超过 300 行）。
 
 doctor.py 按名字把这些函数导入进去，各项检查调用的是 doctor 模块里的名字，
 所以测试里用 monkeypatch.setattr(doctor, "_connect", ...) 换掉的照样生效。
@@ -15,7 +15,7 @@ import sys
 import tempfile
 from pathlib import Path
 
-from cad_agent import paths
+from cad_agent import brand, paths
 
 BOX = (10.0, 20.0, 30.0)
 WEBVIEW2_GUID = "{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}"   # WebView2 运行时（常青版）在 EdgeUpdate 里的编号
@@ -76,7 +76,7 @@ def _fallback_dir() -> Path:
 def _try_write(path: Path) -> None:
     """建目录，写一个小文件再删掉；做不到就抛 OSError。"""
     path.mkdir(parents=True, exist_ok=True)
-    probe = path / f".caliper-doctor-{secrets.token_hex(4)}.tmp"
+    probe = path / f".{brand.DOCTOR_SERVICE}-{secrets.token_hex(4)}.tmp"
     probe.write_text("ok", encoding="utf-8")
     probe.unlink()
 

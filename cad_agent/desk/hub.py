@@ -17,6 +17,7 @@ from collections import OrderedDict
 from pathlib import Path
 from typing import TYPE_CHECKING, Callable
 
+from cad_agent import brand
 from cad_agent.agent.resume import resume_agent
 from cad_agent.desk.view import session_title
 from cad_agent.desk.workbench import Busy, Workbench
@@ -25,7 +26,7 @@ from cad_agent.session import Session
 if TYPE_CHECKING:
     from cad_agent.agent.loop import Agent
 
-logger = logging.getLogger("caliper.desk")
+logger = logging.getLogger(f"{brand.COMMAND}.desk")
 
 ID_RE = re.compile(r"^[A-Za-z0-9-]+$")
 DEMO_PREFIX = "demo-"

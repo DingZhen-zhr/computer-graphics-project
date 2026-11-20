@@ -30,7 +30,7 @@ class Client:
 
     def call(self, method: str, path: str, body=None, *, token: bool = True, headers: dict | None = None, raw: bytes | None = None):
         conn = http.client.HTTPConnection("127.0.0.1", self.port, timeout=10)
-        h = {"X-Caliper-Token": self.token} if token else {}
+        h = {"X-Datum-Token": self.token} if token else {}
         payload = raw if raw is not None else (json.dumps(body, ensure_ascii=False).encode("utf-8") if body is not None else None)
         if payload is not None:
             h["Content-Type"] = "application/json"
@@ -120,7 +120,7 @@ def test_requests_without_token_are_rejected(serve):
                          ("GET", f"/api/sessions/{sid}/events?since=0&t=wrong"), ("DELETE", f"/api/sessions/{sid}")):
         status, body, _ = c.call(method, path, token=False)
         assert status == 403 and "令牌" in body["error"], (method, path)
-    assert c.call("GET", "/api/sessions", headers={"X-Caliper-Token": "wrong"}, token=False)[0] == 403
+    assert c.call("GET", "/api/sessions", headers={"X-Datum-Token": "wrong"}, token=False)[0] == 403
     assert (hub.sessions_dir / sid).is_dir()
 
 
@@ -359,7 +359,7 @@ def test_error_bodies_are_chinese_json(serve):
 def test_responses_do_not_leak_referrer(serve):
     c, hub = serve()
     conn = http.client.HTTPConnection("127.0.0.1", c.port, timeout=5)
-    conn.request("GET", "/api/sessions", headers={"X-Caliper-Token": c.token})
+    conn.request("GET", "/api/sessions", headers={"X-Datum-Token": c.token})
     resp = conn.getresponse()
     resp.read()
     assert resp.getheader("Referrer-Policy") == "no-referrer" and resp.getheader("X-Content-Type-Options") == "nosniff"
@@ -372,7 +372,7 @@ def test_reload_without_token_gets_a_recovery_page(serve):
     status, body, kind = c.call("GET", "/", token=False, headers={"Accept": "text/html,application/xhtml+xml"})
     assert status == 403 and kind.startswith("text/html")
     text = body.decode("utf-8")
-    assert "sessionStorage" in text and c.token not in text and "从卡尺的窗口里打开" in text
+    assert "sessionStorage" in text and c.token not in text and "从 Datum 的窗口里打开" in text
     status, body, kind = c.call("GET", "/", token=False)   # 不是浏览器：照旧是 JSON
     assert status == 403 and body["error"]
 

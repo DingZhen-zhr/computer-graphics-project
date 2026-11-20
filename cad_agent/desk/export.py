@@ -21,6 +21,7 @@ import sys
 from pathlib import Path
 from typing import Any
 
+from cad_agent import brand
 from cad_agent.cli import _load_brief, diff_briefs
 from cad_agent.desk.routes import STAGE_FILE_RE, VERSION_FILES
 from cad_agent.desk.server import STATIC_DIR
@@ -73,7 +74,7 @@ def _page(title: str) -> str:
     html = (STATIC_DIR / "index.html").read_text(encoding="utf-8")
     html = html.replace('"/static/', '"./static/')   # import map 里的地址必须以 ./ 开头，不然解析不出来
     html = re.sub(r"<html ([^>]*)>", lambda m: f'<html {m.group(1)} data-mode="static">', html, count=1)
-    return re.sub(r"<title>.*?</title>", f"<title>{title} · 卡尺 Caliper</title>", html, count=1)
+    return re.sub(r"<title>.*?</title>", f"<title>{title} · {brand.DISPLAY}</title>", html, count=1)
 
 
 def _copy_static(out_dir: Path) -> None:

@@ -1,4 +1,4 @@
-# 卡尺 Caliper
+# Datum 基准
 
 说出你要的零件，它来建模，每一步都实测。
 
@@ -30,9 +30,9 @@ curl -fsSL https://raw.githubusercontent.com/DingZhen-zhr/computer-graphics-proj
 2. 准备 [uv](https://docs.astral.sh/uv/)：电脑上没有就运行 uv 的官方安装脚本。不需要预先装 Python。
 3. 用 uv 准备一个独立的 Python 3.12 环境，装上卡尺（第一次要下载几百 MB）。
 4. 建快捷方式：Windows 是开始菜单和桌面上的"卡尺 Caliper"；Mac 是"应用程序"里的 Caliper。
-5. 运行一次自检 `caliper doctor`，把结果打印出来。
+5. 运行一次自检 `datum doctor`，把结果打印出来。
 
-它只往当前用户的目录里写东西，不需要管理员权限。装好后，双击"卡尺 Caliper"打开；或者在终端里输入 `caliper`（提示找不到时，关掉终端再开一个新的）。
+它只往当前用户的目录里写东西，不需要管理员权限。装好后，双击"卡尺 Caliper"打开；或者在终端里输入 `datum`（提示找不到时，关掉终端再开一个新的）。
 
 **第一次打开**会进引导页：
 
@@ -83,11 +83,11 @@ CALIPER_SOURCE=~/Downloads/computer-graphics-project-2.0.0 sh ~/Downloads/comput
 - `CALIPER_NO_SHORTCUT=1`：不建快捷方式。
 - `CALIPER_DRY_RUN=1`：只打印每一步要做什么，什么都不执行。
 
-**提示"卡尺正在运行"。** Windows 不让替换正在运行的程序。关掉所有卡尺窗口，以及终端里运行着的 `caliper`，再装一次。
+**提示"卡尺正在运行"。** Windows 不让替换正在运行的程序。关掉所有卡尺窗口，以及终端里运行着的 `datum`，再装一次。
 
-**Windows 上窗口打不开（多见于 Windows 10）。** 通常是缺少 Microsoft Edge WebView2 运行时。到 <https://developer.microsoft.com/microsoft-edge/webview2/> 下载"常青版"装上。装好之前，可以先用 `caliper --browser` 在默认浏览器里打开同样的界面。
+**Windows 上窗口打不开（多见于 Windows 10）。** 通常是缺少 Microsoft Edge WebView2 运行时。到 <https://developer.microsoft.com/microsoft-edge/webview2/> 下载"常青版"装上。装好之前，可以先用 `datum --browser` 在默认浏览器里打开同样的界面。
 
-**`caliper doctor` 每一项是什么意思：**
+**`datum doctor` 每一项是什么意思：**
 
 | 项 | 查什么 | 不通过时 |
 |---|---|---|
@@ -95,14 +95,14 @@ CALIPER_SOURCE=~/Downloads/computer-graphics-project-2.0.0 sh ~/Downloads/comput
 | `python` | Python 版本在 3.10 到 3.13 之间 | 不能用：重新运行安装命令 |
 | `sca` | 能找到 simplecadapi，版本是 2.2.7 | 不能用：重新运行安装命令 |
 | `sandbox` | 用沙盒真的建一个 10×20×30 的方块，量出来对不对 | 不能用 |
-| `workdir` | 沙盒的工作目录是不是纯英文路径。用户名是中文时，系统临时目录会带中文，程序会自动改用 `C:\ProgramData\Caliper\work` | 改用了备用目录是"需要注意"；备用目录也建不了才是"不能用" |
-| `window` | 窗口组件能不能用（Windows 上还要有 WebView2） | 需要注意：先用 `caliper --browser` |
+| `workdir` | 沙盒的工作目录是不是纯英文路径。用户名是中文时，系统临时目录会带中文，程序会自动改用 `C:\ProgramData\Datum\work` | 改用了备用目录是"需要注意"；备用目录也建不了才是"不能用" |
+| `window` | 窗口组件能不能用（Windows 上还要有 WebView2） | 需要注意：先用 `datum --browser` |
 | `keyring` | 系统钥匙串能不能写、读、删（用一条测试项，查完就删） | 需要注意：可以改用环境变量存 key |
 | `data` | 数据目录能不能建、能不能写 | 不能用 |
 | `provider` | 能不能连上设置里的模型服务（只建立连接，不发请求；`--offline` 时跳过） | 需要注意：检查网络和接口地址 |
 | `key` | 有没有可用的 key，只说它来自环境变量还是钥匙串，不显示任何一位 | 需要注意：在设置里填，或者设环境变量 |
 
-`caliper doctor --json` 输出同样的内容，方便发给别人看。有"不能用"的项时返回码是 1。
+`datum doctor --json` 输出同样的内容，方便发给别人看。有"不能用"的项时返回码是 1。
 
 ## 怎么用
 
@@ -162,13 +162,13 @@ CALIPER_SOURCE=~/Downloads/computer-graphics-project-2.0.0 sh ~/Downloads/comput
 
 | 命令 | 作用 |
 |---|---|
-| `caliper` | 打开桌面窗口 |
-| `caliper --browser` | 不开窗口，改用默认浏览器打开同样的界面（终端里按 Ctrl+C 退出） |
-| `caliper --cli` | 终端对话模式。不给 `--config` 时，用设置页里的服务和钥匙串里的 key |
-| `caliper doctor` | 自检，见上面的表；`--offline` 不连模型服务，`--json` 输出 JSON |
-| `caliper update` | 更新到最新发布：重新运行安装脚本覆盖安装，会话、设置和 key 都不受影响 |
-| `caliper uninstall` | 依次删除快捷方式、钥匙串里卡尺存的 key、问过你之后删除数据，最后让 uv 卸载程序本身。`--delete-data` 直接删数据，`--keep-data` 保留数据；不在终端里运行时不问，按保留处理 |
-| `caliper --version` | 显示版本号 |
+| `datum` | 打开桌面窗口 |
+| `datum --browser` | 不开窗口，改用默认浏览器打开同样的界面（终端里按 Ctrl+C 退出） |
+| `datum --cli` | 终端对话模式。不给 `--config` 时，用设置页里的服务和钥匙串里的 key |
+| `datum doctor` | 自检，见上面的表；`--offline` 不连模型服务，`--json` 输出 JSON |
+| `datum update` | 更新到最新发布：重新运行安装脚本覆盖安装，会话、设置和 key 都不受影响 |
+| `datum uninstall` | 依次删除快捷方式、钥匙串里卡尺存的 key、问过你之后删除数据，最后让 uv 卸载程序本身。`--delete-data` 直接删数据，`--keep-data` 保留数据；不在终端里运行时不问，按保留处理 |
+| `datum --version` | 显示版本号 |
 
 ## 模型服务和密钥
 
@@ -184,7 +184,7 @@ CALIPER_SOURCE=~/Downloads/computer-graphics-project-2.0.0 sh ~/Downloads/comput
 
 **key 存在哪：**
 
-- 在界面里填的 key 存进系统钥匙串（Windows 凭据管理器 / Mac 钥匙串），服务名 `caliper`，用户名是服务的编号，比如 `deepseek`。
+- 在界面里填的 key 存进系统钥匙串（Windows 凭据管理器 / Mac 钥匙串），服务名 `datum`，用户名是服务的编号，比如 `deepseek`。
 - 也可以用环境变量，环境变量优先。每家的变量名不同，比如 `DEEPSEEK_API_KEY`、`ANTHROPIC_API_KEY`，设置页里有写。
 - key 不写进任何文件、日志、会话记录；界面上只显示最后四位。
 
@@ -202,14 +202,14 @@ CALIPER_SOURCE=~/Downloads/computer-graphics-project-2.0.0 sh ~/Downloads/comput
 
 ## 数据放在哪
 
-- Windows：`%LOCALAPPDATA%\Caliper`；Mac：`~/Library/Application Support/Caliper`。可以用环境变量 `CALIPER_HOME` 改到别处。
+- Windows：`%LOCALAPPDATA%\Datum`；Mac：`~/Library/Application Support/Datum`。可以用环境变量 `DATUM_HOME` 改到别处。
 - 里面有：`settings.toml`（除 key 以外的全部设置）、`sessions/`（每个会话一个目录）、`cases/`（你存的案例）、`logs/`（程序日志）。
 - 一个会话目录里有：
   - `log.jsonl`：每条消息、工具调用、结果、耗时、token，以及启动时的软件和模型版本；
   - `brief.json`（需求单）、`plan.json`（计划）、`features.json`、`checks.json`；
   - `versions/v1/`、`v2/`…：每个版本的 `model.py`（参数化源文件，可以用 `sca edit` 打开）、`model.step`、`model.stl`、`view.png`、检查结果，以及各阶段的 STL。
-- 沙盒运行时的临时文件放在系统临时目录；那个目录带中文时，改放在 `C:\ProgramData\Caliper\work`。
-- 程序本身由 uv 管理：Windows 在 `%APPDATA%\uv\tools\caliper-cad`，命令在 `%USERPROFILE%\.local\bin`；Mac 在 `~/.local/share/uv/tools/caliper-cad`，命令在 `~/.local/bin`。
+- 沙盒运行时的临时文件放在系统临时目录；那个目录带中文时，改放在 `C:\ProgramData\Datum\work`。
+- 程序本身由 uv 管理：Windows 在 `%APPDATA%\uv\tools\datum-cad`，命令在 `%USERPROFILE%\.local\bin`；Mac 在 `~/.local/share/uv/tools/datum-cad`，命令在 `~/.local/bin`。
 
 ## 给开发者
 
@@ -218,8 +218,8 @@ CALIPER_SOURCE=~/Downloads/computer-graphics-project-2.0.0 sh ~/Downloads/comput
 ```powershell
 python -m venv .venv
 .venv\Scripts\python -m pip install -e ".[dev]"
-.venv\Scripts\caliper                                              # 桌面窗口
-.venv\Scripts\caliper --demo-script scripts\demo_script.json       # 模型换成假模型剧本，不需要 key、不花钱，沙盒是真的
+.venv\Scripts\datum                                                # 桌面窗口
+.venv\Scripts\datum --demo-script scripts\demo_script.json         # 模型换成假模型剧本，不需要 key、不花钱，沙盒是真的
 .venv\Scripts\python -m cad_agent --config config.toml             # 旧的命令行用法，评测脚本也用它
 ```
 
@@ -259,7 +259,7 @@ python -m venv .venv
 
 ```text
 cad_agent/
-  app.py  doctor.py  maintenance.py   caliper 命令、自检、更新和卸载
+  app.py  doctor.py  maintenance.py   datum 命令、自检、更新和卸载
   agent/  staged/  tools.py  gates.py 主循环、分阶段流程、工具、关卡
   checks/  sandbox/                   检查格式和测量、沙盒（静态检查 + 子进程）
   llm/  providers.toml  keystore.py  settings.py   模型接口、服务预设、钥匙串、设置
@@ -284,7 +284,7 @@ cases = true           # 案例库
 
 ## 验证到什么程度
 
-- **测试**：全部测试在 Windows 和 Mac（GitHub Actions，`macos-15`，Apple 芯片）上通过。持续集成里还用源码跑了安装脚本、`caliper doctor --offline`、无窗口启动，并且再装一次。
+- **测试**：全部测试在 Windows 和 Mac（GitHub Actions，`macos-15`，Apple 芯片）上通过。持续集成里还用源码跑了安装脚本、`datum doctor --offline`、无窗口启动，并且再装一次。
   - 持续集成的 Mac 机器是 macOS 15。GitHub 已经不提供 Apple 芯片的 macOS 14 了，所以 macOS 14 本身没有自动测试。
 - **Windows 实机**：在一台 Windows 11 上走过完整流程，用的是假模型剧本加真实的 SCA 沙盒，记录在 `docs/walkthrough-windows.md`。也在这台电脑上用安装脚本实际装过，见 `docs/install-notes.md`。
 - **Mac 界面**：还没有人工看过，等有 M 芯片 Mac 的组员按 `docs/mac-checklist.md` 做一遍。

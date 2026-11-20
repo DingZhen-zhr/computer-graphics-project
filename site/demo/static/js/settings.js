@@ -159,8 +159,8 @@ export function renderSettings(el, actions) {
 
   function about() {
     return block("about", "08", "关于", h("table", { class: "table about" }, h("tbody", {},
-      [["卡尺", boot.version], ["SimpleCADAPI", boot.sca_version || "没装好"], ["Python", boot.python]].map(([k, v]) => h("tr", {}, h("td", {}, k), h("td", { class: "mono" }, v))))),
-      h("p", { class: "muted small" }, "更新到最新版：在终端里运行 ", h("code", {}, "caliper update")));
+      [["Datum", boot.version], ["SimpleCADAPI", boot.sca_version || "没装好"], ["Python", boot.python]].map(([k, v]) => h("tr", {}, h("td", {}, k), h("td", { class: "mono" }, v))))),
+      h("p", { class: "muted small" }, "更新到最新版：在终端里运行 ", h("code", {}, "datum update")));
   }
 
   function draw() {

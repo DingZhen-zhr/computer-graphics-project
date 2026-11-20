@@ -1,14 +1,14 @@
-"""caliper 命令（第二版计划 3 Task 13）：起本机服务，开 pywebview 窗口加载页面；窗口开不了就改用浏览器。
+"""datum 命令（第二版计划 3 Task 13；3.0 改名）：起本机服务，开 pywebview 窗口加载页面；窗口开不了就改用浏览器。
 
-    caliper                  打开桌面窗口
-    caliper --browser        改用默认浏览器打开，终端里按 Ctrl+C 退出
-    caliper --cli [--config 文件]   终端对话模式
-    caliper --demo-script 剧本.json  开发用：模型换成假模型剧本，沙盒是真的，不需要密钥
-    caliper doctor [--offline] [--json]   自检
-    caliper update           更新到最新发布
-    caliper uninstall [--delete-data | --keep-data]   卸载
-    caliper --version        显示版本号
-    caliper --smoke          持续集成用（不在帮助里）：不开窗口，起服务，请求一次首页和 /api/boot
+    datum                    打开桌面窗口
+    datum --browser          改用默认浏览器打开，终端里按 Ctrl+C 退出
+    datum --cli [--config 文件]   终端对话模式
+    datum --demo-script 剧本.json  开发用：模型换成假模型剧本，沙盒是真的，不需要密钥
+    datum doctor [--offline] [--json]   自检
+    datum update             更新到最新发布
+    datum uninstall [--delete-data | --keep-data]   卸载
+    datum --version          显示版本号
+    datum --smoke            持续集成用（不在帮助里）：不开窗口，起服务，请求一次首页和 /api/boot
 
 没有密钥也能启动（界面会进引导页）；智能体第一次要调用模型时才需要密钥，没有就让这一轮以 failed 结束，提示去设置里填。
 密钥只从环境变量或系统钥匙串取，不打印、不写日志。
@@ -26,7 +26,7 @@ import time
 import webbrowser
 from pathlib import Path
 
-from cad_agent import __version__, cli, doctor, maintenance, paths
+from cad_agent import __version__, brand, cli, doctor, maintenance, paths
 from cad_agent.agent.loop import Agent
 from cad_agent.brief import Brief
 from cad_agent.cases import load_cases
@@ -45,12 +45,12 @@ from cad_agent.settings import Settings, load_settings, to_config
 from cad_agent.tools import ToolBox, Workspace
 
 DEMO_DIR = Path(__file__).parent / "desk" / "demo_data"
-TITLE = "卡尺 Caliper"
+TITLE = brand.DISPLAY
 WINDOW_SIZE = (1360, 860)
 MIN_SIZE = (1100, 700)
 NO_KEY_TEXT = '还没有可用的密钥。到右上角的"设置"里填好密钥，再发一次。'
-WINDOW_FAIL = "桌面窗口打不开（{reason}），改用浏览器打开。Windows 上通常是缺少 WebView2 运行时，可以运行 caliper doctor 查看。"
-logger = logging.getLogger("caliper")
+WINDOW_FAIL = "桌面窗口打不开（{reason}），改用浏览器打开。Windows 上通常是缺少 WebView2 运行时，可以运行 " + brand.COMMAND + " doctor 查看。"
+logger = logging.getLogger(brand.COMMAND)
 
 
 class _FailingLLM:
@@ -149,18 +149,18 @@ def _window(url: str) -> bool:
 
 
 def _browser(url: str) -> None:
-    print(f"卡尺已经在浏览器里打开：{url}\n关掉终端或按 Ctrl+C 退出。")
+    print(f"{brand.PRODUCT} 已经在浏览器里打开：{url}\n关掉终端或按 Ctrl+C 退出。")
     open_browser(url)
     wait_for_exit()
 
 
 def _setup_logging() -> None:
-    root = logging.getLogger("caliper")
+    root = logging.getLogger(brand.COMMAND)
     if root.handlers:
         return
     try:
         paths.logs_dir().mkdir(parents=True, exist_ok=True)
-        handler = logging.FileHandler(paths.logs_dir() / "caliper.log", encoding="utf-8")
+        handler = logging.FileHandler(paths.logs_dir() / f"{brand.COMMAND}.log", encoding="utf-8")
     except OSError:
         return   # 日志写不了不影响使用
     handler.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(name)s %(message)s"))
@@ -189,13 +189,13 @@ SUBCOMMANDS = {"doctor": doctor.doctor_main, "update": maintenance.update_main, 
 def _start(settings: Settings, script: Path | None) -> tuple[Hub, object, str]:
     hub = build_hub(settings, script=script)
     server, token = make_desk_server(hub, make_settings_routes(hub, make_llm_for=make_llm_for))
-    threading.Thread(target=server.serve_forever, daemon=True, name="caliper-server").start()
+    threading.Thread(target=server.serve_forever, daemon=True, name=f"{brand.COMMAND}-server").start()
     return hub, server, token
 
 
 def _smoke(port: int, token: str) -> int:
     """自己请求一次首页和 /api/boot，都是 200 才算通过。令牌不打印。"""
-    for path, label, headers in ((f"/?t={token}", "/", {}), ("/api/boot", "/api/boot", {"X-Caliper-Token": token})):
+    for path, label, headers in ((f"/?t={token}", "/", {}), ("/api/boot", "/api/boot", {brand.TOKEN_HEADER: token})):
         conn = http.client.HTTPConnection("127.0.0.1", port, timeout=60)
         try:
             conn.request("GET", path, headers=headers)
@@ -217,10 +217,11 @@ def main(argv: list[str] | None = None) -> int:
     argv = list(sys.argv[1:] if argv is None else argv)
     if argv and argv[0] in SUBCOMMANDS:
         return SUBCOMMANDS[argv[0]](argv[1:])
-    parser = argparse.ArgumentParser(prog="caliper", description="卡尺 Caliper：用平常话做 CAD 零件，每一步都由程序实测。"
-                                     "另有子命令：caliper doctor（自检）、caliper update（更新）、caliper uninstall（卸载）。",
+    cmd = brand.COMMAND
+    parser = argparse.ArgumentParser(prog=cmd, description=f"{brand.DISPLAY}：用平常话做 CAD 零件，每一步都由程序实测。"
+                                     f"另有子命令：{cmd} doctor（自检）、{cmd} update（更新）、{cmd} uninstall（卸载）。",
                                      epilog="--demo-script <剧本文件>：开发用，模型换成假模型剧本，不需要密钥。")
-    parser.add_argument("--version", action="version", version=f"卡尺 Caliper {__version__}", help="显示版本号")
+    parser.add_argument("--version", action="version", version=f"{brand.DISPLAY} {__version__}", help="显示版本号")
     parser.add_argument("--browser", action="store_true", help="不开桌面窗口，改用默认浏览器打开")
     parser.add_argument("--cli", action="store_true", help="终端对话模式")
     parser.add_argument("--config", metavar="文件", help="终端对话模式用的配置文件；不给就用设置和钥匙串里的密钥")
@@ -250,5 +251,5 @@ def main(argv: list[str] | None = None) -> int:
 
 
 def gui_main() -> None:
-    """caliper-app：不带黑窗口的入口。"""
+    """datum-app：不带黑窗口的入口。"""
     main([])
