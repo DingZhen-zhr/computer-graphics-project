@@ -1316,3 +1316,6 @@
 
 ## 3.0 计划 4 Task 3：说人话的提示词
 - `system_voice.md` 照抄计划，接在 `system_multipart.md` 后面。旧测试：按清单改了 `test_system_prompt_order`；`test_full_system_prompt_v2` 计划漏列，问过用户同意后改了（D38）。新测试 `tests/test_prompts_voice.py` 2 个。
+
+## 3.0 计划 5 Task 2：提示词与工具定义文档
+- `scripts/export_prompts.py` 从代码生成 `docs/prompts-and-tools.md`（6 段系统提示词、17 个工具、程序生成的消息和 hint、模拟用户的提示词）。测试 `tests/test_prompts_doc.py` 3 个：重新生成一遍和仓库里的逐字相同、17 个工具都在、没有 key 和本机路径。先做了 Task 2 再做 Task 1（Task 1 的提交材料要用这份文档）。
