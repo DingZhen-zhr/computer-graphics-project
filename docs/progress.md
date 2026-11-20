@@ -1313,3 +1313,6 @@
 ## 3.0 计划 4 Task 2：任务分组和作业要求的统计
 - `V3_DEV`（10 个）、`V3_HOLDOUT`（4 个）和 `v3dev`、`v3holdout`、`v3all` 三组，分组搬到 `benchmarks/task_sets.py`（run.py 照样能导入）；`benchmarks/report_v3.py` 出四张表（开发 / 留出 × 单零件 / 多零件）和覆盖情况表；每个任务多记一项"模型问过几次"。账本模式跑完会多写一份 `results-v3.md`。
 - 测试 `tests/test_benchmarks_v3.py` 4 个；第一次运行抓到一个真问题：耗时 100 秒被写成"1"（去掉末尾 0 时没看小数点），已修。
+
+## 3.0 计划 4 Task 3：说人话的提示词
+- `system_voice.md` 照抄计划，接在 `system_multipart.md` 后面。旧测试：按清单改了 `test_system_prompt_order`；`test_full_system_prompt_v2` 计划漏列，问过用户同意后改了（D38）。新测试 `tests/test_prompts_voice.py` 2 个。

@@ -11,7 +11,7 @@ PROMPT_DIR = Path(__file__).parent / "prompts"
 SNAPSHOT_TITLE = "【当前状态（程序生成，不是用户说的话）】"
 
 
-V2_PARTS = ("system_v2.md", "system_multipart.md", "references_index.md", "sca_cheatsheet.md", "sca_cheatsheet_more.md")
+V2_PARTS = ("system_v2.md", "system_multipart.md", "system_voice.md", "references_index.md", "sca_cheatsheet.md", "sca_cheatsheet_more.md")
 
 
 def load_system_prompt(staged: bool = False) -> str:

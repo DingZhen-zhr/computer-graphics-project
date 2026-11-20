@@ -83,7 +83,8 @@ def test_read_reference_before_confirmation():
 def test_full_system_prompt_v2():
     full = load_system_prompt(True)
     parts = [(PROMPT_DIR / n).read_text(encoding="utf-8").rstrip("\n")
-             for n in ("system_v2.md", "system_multipart.md", "references_index.md", "sca_cheatsheet.md", "sca_cheatsheet_more.md")]   # 3.0：5 段
+             for n in ("system_v2.md", "system_multipart.md", "system_voice.md", "references_index.md", "sca_cheatsheet.md",
+                       "sca_cheatsheet_more.md")]   # 3.0：6 段（计划 4 加了说人话的一段，偏离 D38，用户同意）
     assert full == "\n\n".join(parts) + "\n"
     assert load_system_prompt() == load_system_prompt(False)
     assert "set_plan" not in load_system_prompt(False) and "set_plan" in full

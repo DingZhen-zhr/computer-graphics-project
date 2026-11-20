@@ -27,7 +27,7 @@ def test_system_multipart_verbatim():
 
 def test_system_prompt_order():
     full = load_system_prompt(True)
-    names = ("system_v2.md", "system_multipart.md", "references_index.md", "sca_cheatsheet.md", "sca_cheatsheet_more.md")
+    names = ("system_v2.md", "system_multipart.md", "system_voice.md", "references_index.md", "sca_cheatsheet.md", "sca_cheatsheet_more.md")   # 计划 4 Task 3
     heads = [(PROMPT_DIR / n).read_text(encoding="utf-8").strip().splitlines()[0] for n in names]
     pos = [full.index(h) for h in heads]
     assert pos == sorted(pos)

@@ -277,3 +277,7 @@
 - 原计划：`--budget` 换成 `--cap`、`--label`；改 `test_benchmarks_budget.py` 里"任务开始前才检查上限"的测试。
 - 实际：`--budget` 有 9 条旧测试，换掉要改其中好几条。
 - 改法：`--budget` 原样保留（第二版的行为不变，旧测试一条没改）；给了 `--label` 就走新的账本模式（`benchmarks/metered_run.py`）：开跑前检查账本、两段价格、空闲时段，每次调用后按调用结束时刻的价格记账，到上限当前任务立刻停。3.0 的评测命令都带 `--label`。`Config.price_at(now)` 照计划返回价格，另加 `Config.is_offpeak(now)` 给账本记"空闲 / 高峰"。key 只在环境变量里没有时，从钥匙串取出来放进这个进程的环境变量（沙盒子进程照样去掉它）。
+
+## D38（3.0 计划 4 Task 3）改 `test_full_system_prompt_v2`（计划漏列，用户同意）
+- 实际：系统提示词多了 `system_voice.md` 一段，`tests/test_staged_extras.py::test_full_system_prompt_v2` 写死了各段文件的列表。
+- 改法（用户同意）：期望的列表在 `system_multipart.md` 后面加 `system_voice.md`，其余不变。计划清单里的 `test_system_prompt_order` 同样加上这一段。
