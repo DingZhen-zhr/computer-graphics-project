@@ -283,6 +283,41 @@ def test_sh_variables_are_braced():
     assert bare == [], bare[:5]
 
 
+def _code(text: str) -> str:
+    return "\n".join(line for line in text.splitlines() if not line.lstrip().startswith("#"))
+
+
+def _reinstall_problems(ps1: str, sh: str) -> list[str]:
+    """再装一次会不会动到用户的数据：脚本不能碰数据目录、设置文件和钥匙串；删的只能是临时文件和旧的 Caliper.app。"""
+    problems = []
+    for name, text in (("install.ps1", _code(ps1)), ("install.sh", _code(sh))):
+        for word in ("LOCALAPPDATA", "Application Support", "/.caliper", "settings.toml", "keyring", "uv tool uninstall"):
+            if word in text:
+                problems.append(f"{name} 提到了 {word}")
+    if re.search(r"Remove-Item|\bdel\b|\brmdir\b", _code(ps1)):
+        problems.append("install.ps1 删了东西")
+    deleted = set(re.findall(r"\brm\s+-[a-z]+\s+(\S+)", _code(sh)))
+    if deleted - {'"${TMP_SCRIPT}"', '"${APP}"'}:
+        problems.append(f"install.sh 删了 {sorted(deleted)}")
+    if 'APP="${HOME}/Applications/Caliper.app"' not in sh:
+        problems.append("install.sh 里的 APP 不是 ~/Applications/Caliper.app")
+    return problems
+
+
+def test_reinstall_keeps_data():
+    """Review Focus 3：已经装过再运行安装命令，数据目录、设置、钥匙串里的 key 都不受影响。
+    计划在 Review Focus 里写了这个测试名，但 Task 3 的测试清单里没有定义它（Step 4 说本机"再装一次"是它的人工版）。
+    这里检查脚本本身不会动到数据；装程序用的是 uv tool install --force，只换 uv 的工具环境。
+    "再装一次能成功"由持续集成的"再跑一次安装脚本"那两步验证；本机再装一次时会话和设置都还在（install-notes 第 5 节）。"""
+    ps1, sh = _text(PS1), _text(SH)
+    assert _reinstall_problems(ps1, sh) == []
+    assert "@('tool', 'install', '--python', '3.12', '--force', $Source)" in ps1
+    assert '"${UV}" tool install --python 3.12 --force "${SOURCE}"' in sh
+    # 检查本身管用：在脚本里加一行删数据目录、或删设置文件，都要被查出来
+    assert _reinstall_problems(ps1 + "\nRemove-Item -Recurse (Join-Path $env:LOCALAPPDATA 'Caliper')\n", sh)
+    assert _reinstall_problems(ps1, sh + '\nrm -f "${HOME}/Library/Application Support/Caliper/settings.toml"\n')
+
+
 # 快捷方式函数在 install.ps1 里夹在这两行注释之间，测试把它单独取出来运行
 SHORTCUT_BEGIN, SHORTCUT_END = "# >>> 建快捷方式", "# <<< 建快捷方式"
 

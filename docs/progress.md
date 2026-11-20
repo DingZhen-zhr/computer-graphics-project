@@ -1014,3 +1014,144 @@
 - `install.sh` 本身没有问题。
 
 **全部测试**：1122 个通过（含 `sca`，用时 9 分 41 秒）。
+
+## 第二版 计划 4 Task 4 Step 5：持续集成在两个平台上通过
+
+- 用户同意后推送了 `2cef4b9`（`c4dc7ac..2cef4b9`）。
+- 持续集成运行 44664671826 两个平台全部通过：<https://github.com/DingZhen-zhr/computer-graphics-project/actions/runs/44664671826>。
+  - **Windows（windows-latest）**：测试 1122 个通过。安装脚本（PowerShell 5.1）装好、建了两个快捷方式；`caliper doctor --offline` 返回 0；`caliper --smoke` 通过；再装一次也成功。
+  - **Mac（macos-15，macOS 15.8.2，arm64）**：测试 1118 个通过、4 个跳过（都是只在 Windows 上跑的 PowerShell 测试：语法检查、两个演示模式、快捷方式）。安装脚本装好、建了 `Caliper.app`；`caliper doctor --offline` 返回 0；`caliper --smoke` 通过；再装一次也成功。
+  - 两边的自检：前八项都是 ✓（Python 3.12.10、SCA 2.2.7、沙盒建出 10 × 20 × 30 mm 的方块、钥匙串能写能读能删；Windows 上 WebView2 156.0.4314.58）；"模型服务"是离线模式没有连；"密钥"是 `!`（持续集成里本来就没有 key）。
+- 这是安装、自检、smoke 这几步第一次在持续集成上跑到。前三次运行一共找出 5 个问题，都改了（见上面三段）：
+  1. 导出依赖文件时间；
+  2. 示例数据的换行；
+  3. Mac 的 bash 3.2 把中文字节当成变量名；
+  4. 英文 Windows 上 `WScript.Shell` 存不了中文名字的快捷方式（D20）；
+  5. 测试里假的 `uname` 没有可执行权限。
+- Node 测试 47 个通过（本机 `node --test cad_agent/desk/static/js/tests/*.test.js`；pytest 里的 `test_node_tests_pass` 也会跑它们）。
+
+## 第二版 计划 4 整体复查（自己做的）和复查后的两处修改
+
+照计划的 Review Focus 和 `CLAUDE.md` 的规矩逐条核对，发现两处问题，都改了。
+
+1. **`cad_agent/doctor.py` 有 376 行，超过了 300 行。** Task 1 时没注意到。
+   - 改法：把探测函数（`_platform_info` 到 `_connect`，还有 `BOX`、`WEBVIEW2_GUID`）原样搬到新文件 `cad_agent/doctor_probes.py`（111 行），`doctor.py` 按名字导入回来，现在 289 行。
+   - 各项检查调用的仍是 `doctor` 模块里的名字，所以测试里 `monkeypatch.setattr(doctor, "_connect", …)` 照样生效。
+   - Interfaces 里的 `CheckItem`、`run_doctor`、`render_doctor`、`doctor_exit_code` 都还在 `doctor.py`。
+   - 计划 2 拆 `loop.py` 时也是这样做的。
+   - 改后：`test_doctor.py`、`test_app.py`、`test_maintenance.py` 共 69 个通过；从源码运行 `caliper doctor --offline`，结果和改前一样，全部正常。
+2. **Review Focus 3 写的 `test_reinstall_keeps_data` 不存在。** 计划在 Review Focus 里写了这个测试名，但 Task 3 的测试清单里没有定义它；Task 3 Step 4 说本机"再装一次"是它的人工版。持续集成里"再跑一次安装脚本"只验证再装一次能成功，没验证数据还在。
+   - 补了这个测试，放在 `tests/test_install_scripts.py`。它检查两个安装脚本：
+     - 不提数据目录（`LOCALAPPDATA`、`Application Support`、`~/.caliper`）、`settings.toml`、钥匙串、`uv tool uninstall`；
+     - `install.ps1` 不删任何东西；`install.sh` 删的只有临时文件和旧的 `~/Applications/Caliper.app`；
+     - 装程序用的是 `uv tool install --force`，只换 uv 的工具环境。
+   - 为了证明这条检查管用，测试里还故意给脚本加一行删数据目录或删设置文件，确认能被查出来。
+   - 如实写：脚本本来就是这样写的，所以这个测试第一次运行就通过了，不是先看到失败再改的。第一次运行时它把 Mac 应用的编号 `io.github.dingzhen-zhr.caliper` 误当成了数据目录，改成只匹配 `/.caliper` 之后才通过。
+
+另外，几个测试文件超过了 300 行：`tests/test_desk_server.py` 385、`tests/test_desk_workbench.py` 394、`tests/test_doctor.py` 327、`tests/test_install_scripts.py` 357。复查后全部测试 1123 个通过（含 `sca`，用时 9 分 35 秒）。前两个在计划 3 结束时就已经超过了（377、310）。前几份计划都只把代码文件按 300 行算，这次也没有拆这几个测试文件。
+
+## 第二版 计划 4 Task 8 Step 1：停在这里，还差 Mac 清单
+
+逐项确认：
+
+- 全部测试通过：是。本机 1123 个（含复查时补的一个），持续集成两个平台都过（那次运行时是 1122 个）。
+- 持续集成在两个平台上通过：是，运行 44664671826。
+- `docs/walkthrough-windows.md` 写完：是，计划 3 Task 14 写的。
+- **Mac 清单已经填好交回：没有。** `docs/mac-checklist.md` 的 16 项都没有勾，签名和日期是空的。
+
+所以按计划停在 Step 1。还差的事：
+
+1. **请有 M 芯片 Mac（macOS 14 及以上）的组员按 `docs/mac-checklist.md` 做一遍，把填好的清单交回来。** 整个过程用假模型剧本，不需要 key，不花钱。清单回来后做 Step 2：更新 README 里关于 Mac 的那一句，清单里发现的问题逐条处理或写进已知限制。
+2. **Step 3：推送并打 `v2.0.0` 标签之前要单独问用户。**
+   - 安装脚本默认装的就是这个标签；现在还没有这个标签，所以 README 里公开的那一行安装命令在 Windows 和 Mac 上都**还装不上**（会报找不到 `v2.0.0`）。
+   - 持续集成用的是检出的源码，不受影响。
+3. **Step 4：在一台没装过卡尺的 Windows 电脑（或一个新的 Windows 用户）上，用 README 的那一行命令从 GitHub 实际装一次。** 要打了标签之后才能做，怎么安排要问用户。
+
+本地还有一个没推送的提交（就是这段记录所在的提交），等 Step 3 一起问。
+
+## 第二版小结
+
+（写于 2026-11-20，计划 4 停在 Task 8 Step 1。Task 8 的 Step 2 到 4 做完后，这一节里标着"还没有"的地方要更新。）
+
+### 各计划的测试数
+
+| 计划 | 结束时的测试数（pytest，全部通过，含真实 SCA 的） | 新增 |
+|---|---|---|
+| 开工前（1.2 版和网页前端） | 512 | |
+| 计划 1 内核 | 781 | +269 |
+| 计划 2 模型接口与设置 | 912 | +131 |
+| 计划 3 桌面端 | 1037 | +125（Task 1 按计划清单删了 8 个） |
+| 计划 4 安装与分发 | 1123 | +86（Task 6 按计划清单删了 `tests/test_web.py`，删前逐条核对过覆盖） |
+
+- Node 测试：计划 3 结束时 37 个，现在 47 个。
+- 持续集成（运行 44664671826）：Windows 1122 个通过；Mac 1118 个通过、4 个只在 Windows 上跑的跳过。
+
+### 偏离
+
+第二版的偏离是 D10 到 D20，第一版到 1.2 版的是 D1 到 D9。详情都在 `docs/deviations.md`。
+
+- 计划 1：D10、D11、D12、D13。D13 是自带案例 `gear-rack` 换成 `ring-gear`，用户本人还没有表态。
+- 计划 2：D14。
+- 计划 3：D15。
+- 计划 4：
+  - D16：没有 git 时改用压缩包；
+  - D17：`install.ps1` 不带 BOM，本地用 UTF-8 读进来再执行；
+  - D18：Mac 机器改成 macos-15，用户定的；
+  - D19：静态检查跳过 three.js；
+  - D20：Windows 快捷方式改用 IShellLinkW。
+
+### 六条成功标准
+
+1. **全部测试在 Windows 和 Mac 上通过；旧测试除 9.3 节列出的以外不删、不放松**：达成。
+   - 持续集成运行 44664671826 两个平台都过。
+   - 删掉的只有计划清单里的：计划 3 Task 1 的 8 个、计划 4 Task 6 的 `test_web.py`。
+   - 改过的旧测试都记成了偏离（D7、D8、D9、D15、D19），断言没有放松。
+   - 说明：Mac 是 macOS 15，macOS 14 本身没有自动测试（D18）。
+2. **6 个新评测任务各有分阶段标准答案，用真实 SCA 建得出来，并通过人工写的验收**：达成（计划 1 Task 13）。
+3. **两个历史失败被新关卡拦住，有测试为证**：达成（计划 1）。
+   - 壁厚被写死的盒子，终检报 `wall` 没被约束；
+   - 孔径没被真正检查的板，终检报 `hole_d` 没被约束。
+4. **干净的 Windows 和 GitHub Actions 的 Mac 上，一行安装命令能装好，`caliper doctor` 全部通过**：**只达成了一部分**。
+   - Mac：持续集成的 macos-15 上，安装脚本从检出的源码装好，`caliper doctor --offline` 返回 0，再装一次也成功。
+   - Windows：持续集成的 windows-latest（一台新机器、英文系统）上同样通过；本机（中文 Windows 11）实测装过两次。
+   - **还没有做**：从 GitHub 用 README 的那一行命令、装发布标签的情况。原因：
+     - `v2.0.0` 标签还没打（要问用户，Task 8 Step 3）；
+     - 干净 Windows 的实际安装还没安排（Task 8 Step 4）。
+   - 持续集成里 `doctor` 用的是 `--offline`，"模型服务"一项没有连，"密钥"一项是 `!`（没有 key）。这两项在没 key、不联网的机器上本来就不会是 ✓。
+5. **假模型剧本加真实 SCA 沙盒，在桌面窗口里完整走通**：
+   - Windows 达成（计划 3 Task 14，`docs/walkthrough-windows.md`，那里列了 5 处没走到或没看全的地方）。
+   - **Mac 没有达成**：组员还没有交回清单。
+6. **key 不出现在任何文件、日志、测试、提交里**：就能查到的范围，达成。
+   - 2026-11-20 用正则（`sk-` 加 20 位以上字母数字，以及 `sk-ant-` 开头的）搜了：仓库里所有被跟踪的文件、全部提交历史（`git log --all -p`）、`site/` 和包里的示例数据。三处都是 0 处。只数了个数，没有打印任何匹配内容。
+   - 测试里的钥匙串一律是内存里的假后端；`caliper doctor` 只说 key 的来源，不显示任何一位。
+   - 这台电脑上设了 `DEEPSEEK_API_KEY` 环境变量，整个第二版没有读取或打印过它的值。
+
+**没有付费运行之前，不能对外宣称第二版的成功率。** 上面几条证明的是"关卡按设计工作、流程表达得了这些零件、能装能开"，不是"真模型做得好"。README 是照这个说法写的。
+
+### 没有用真实接口验证的部分
+
+1. **Claude 适配层**：只经过假服务端测试。认证头、思考块原样放回、缓存命中、用量换算，都没有验证。
+2. **DeepSeek 以外各服务的预设**：GLM、Kimi、通义千问、OpenAI、Claude 的地址和模型名只对照了官方文档，没有连过。DeepSeek 的流式用量字段也没有实测。
+3. **识图测试**：没有对真实模型跑过。
+4. **看图审查**：只用假审查模型走通了流程，在真模型上会不会误报没有数据。
+5. **整个分阶段流程在真模型上的效果**：完全没有数据。
+
+还有几处没有在真实环境里验证，不是模型接口的问题：
+
+- Mac 上的界面：等组员的清单。
+- 国内镜像（`CALIPER_MIRROR=1`）没有完整装过一次：地址只对照了文档。
+- 用户名里有中文的 Windows：没有实测过安装。D20 用泰文验证了快捷方式这一步，其余步骤没有验证。
+- 公开的一行安装命令：等 `v2.0.0` 标签。
+
+### 付费评测
+
+**还没有做。** README 里的 ¥15 套餐由用户决定什么时候运行。运行之后把结果写成 `docs/results-v2.md`，并更新 README"验证到什么程度"一节。第二版目前没有任何真实模型的成功率数字；1.1 版的数字在 `docs/results-v1.1.md`。
+
+### 复查
+
+计划 4 的整体复查是我自己做的，没有另外请独立的复查者，比独立复查弱。核对的结果：
+
+- Review Focus 6 条现在都有测试。第 3 条是复查时补的。
+- 代码文件都不超过 300 行。`doctor.py` 是复查时拆的；测试文件有 4 个超过，见上一段。
+- 没有打印 key 的地方。
+- 推送、更新 Pages 都是每次单独问过用户的。

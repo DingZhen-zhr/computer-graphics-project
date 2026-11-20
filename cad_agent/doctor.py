@@ -2,28 +2,36 @@
 
 按顺序查十项，每项自己捕获异常：某一项查的过程中出错，这一项记 fail，其余项照常查。
 不显示 key 的任何一位，只说它从哪里来；查模型服务只建立一次连接（5 秒超时），不发请求内容。
-各项用到的探测函数（_temp_dir、_connect 等）都是模块级的，测试里可以换掉。
+各项用到的探测函数（_temp_dir、_connect 等）放在 doctor_probes.py，按名字导入到这里，测试里可以换掉。
 """
 
 from __future__ import annotations
 
 import argparse
-import importlib.metadata
-import importlib.util
 import json
-import platform
 import secrets
-import socket
 import sys
-import tempfile
 from dataclasses import asdict, dataclass
-from pathlib import Path
 from typing import Callable, Literal
 from urllib.parse import urlsplit
 
 import keyring
 
 from cad_agent import paths
+from cad_agent.doctor_probes import (  # noqa: F401 - 测试按 doctor 里的名字换掉它们
+    BOX,
+    _connect,
+    _fallback_dir,
+    _import_webview,
+    _platform_info,
+    _python_version,
+    _sandbox_box,
+    _sca_version,
+    _system,
+    _temp_dir,
+    _try_write,
+    _webview2_version,
+)
 
 Status = Literal["ok", "warn", "fail", "skip"]
 Result = tuple[Status, str, str]   # (status, detail, advice)
@@ -32,11 +40,9 @@ SCA_VERSION = "2.2.7"
 PYTHON_RANGE = ((3, 10), (3, 13))
 MAC_MIN = 14
 WIN_MIN = 10
-BOX = (10.0, 20.0, 30.0)
 PROBE_SERVICE = "caliper-doctor"
 CONNECT_TIMEOUT_S = 5
 WEBVIEW2_URL = "https://developer.microsoft.com/microsoft-edge/webview2/"
-WEBVIEW2_GUID = "{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}"   # WebView2 运行时（常青版）在 EdgeUpdate 里的编号
 SYMBOLS = {"ok": "✓", "warn": "!", "fail": "✗", "skip": "—"}
 SUPPORTED = "支持的系统：Windows 10/11（64 位）；Apple 芯片的 Mac，macOS 14 及以上。"
 
@@ -48,99 +54,6 @@ class CheckItem:
     status: Literal["ok", "warn", "fail", "skip"]
     detail: str                                 # 一句中文：看到了什么
     advice: str = ""                            # 不是 ok 时：怎么办
-
-
-# ---------------------------------------------------------------- 探测（测试里会换掉）
-
-
-def _platform_info() -> tuple[str, str, str]:
-    """(sys.platform, 芯片, 系统版本号)。"""
-    if sys.platform == "darwin":
-        return sys.platform, platform.machine(), platform.mac_ver()[0]
-    return sys.platform, platform.machine(), platform.version()
-
-
-def _system() -> str:
-    return sys.platform
-
-
-def _python_version() -> tuple[int, int, int]:
-    return sys.version_info[:3]
-
-
-def _sca_version() -> str | None:
-    if importlib.util.find_spec("simplecadapi") is None:
-        return None
-    try:
-        return importlib.metadata.version("simplecadapi")
-    except importlib.metadata.PackageNotFoundError:
-        return None
-
-
-def _sandbox_box() -> tuple[float, float, float]:
-    """用沙盒建一个 10×20×30 的方块，返回量出来的外形尺寸。建不出来抛 RuntimeError（信息是中文）。"""
-    from cad_agent.brief import Param
-    from cad_agent.notebook import Feature, render_notebook
-    from cad_agent.sandbox.execute import run_job
-
-    params = [Param("w", BOX[0], "mm", "user"), Param("h", BOX[1], "mm", "user"), Param("t", BOX[2], "mm", "user")]
-    box = Feature("box", "build", "box = scad.make_box_rsolid(width=w, height=h, depth=t, bottom_face_center=(0, 0, 0))")
-    result = run_job(render_notebook(params, [box]), [], set(), timeout_s=180)
-    if result.timed_out:
-        raise RuntimeError("沙盒超时了（3 分钟内没建完）")
-    if not result.ok or not result.facts.get("size"):
-        err = result.error or {}
-        raise RuntimeError(f"沙盒没建出来：{err.get('type', '未知错误')} {str(err.get('message', ''))[:120]}".strip())
-    x, y, z = (float(v) for v in result.facts["size"])
-    return x, y, z
-
-
-def _temp_dir() -> Path:
-    return Path(tempfile.gettempdir())
-
-
-def _fallback_dir() -> Path:
-    """系统临时目录带中文时沙盒改用的目录（和沙盒用的是同一个函数，不存在就建）。"""
-    root = paths.work_root()
-    return root if root is not None else _temp_dir()
-
-
-def _try_write(path: Path) -> None:
-    """建目录，写一个小文件再删掉；做不到就抛 OSError。"""
-    path.mkdir(parents=True, exist_ok=True)
-    probe = path / f".caliper-doctor-{secrets.token_hex(4)}.tmp"
-    probe.write_text("ok", encoding="utf-8")
-    probe.unlink()
-
-
-def _import_webview() -> None:
-    import webview  # noqa: F401 - 只看能不能导入
-
-
-def _webview2_version() -> str | None:
-    """Windows 上 WebView2 运行时的版本号；没装返回 None。按微软文档查 EdgeUpdate 的注册表项（只读）。"""
-    import winreg
-
-    places = [
-        (winreg.HKEY_LOCAL_MACHINE, rf"SOFTWARE\WOW6432Node\Microsoft\EdgeUpdate\Clients\{WEBVIEW2_GUID}"),
-        (winreg.HKEY_LOCAL_MACHINE, rf"SOFTWARE\Microsoft\EdgeUpdate\Clients\{WEBVIEW2_GUID}"),
-        (winreg.HKEY_CURRENT_USER, rf"Software\Microsoft\EdgeUpdate\Clients\{WEBVIEW2_GUID}"),
-    ]
-    for hive, sub in places:
-        try:
-            with winreg.OpenKey(hive, sub) as key:
-                value, _ = winreg.QueryValueEx(key, "pv")
-        except OSError:
-            continue
-        value = str(value or "").strip()
-        if value and value != "0.0.0.0":
-            return value
-    return None
-
-
-def _connect(host: str, port: int, timeout: float) -> None:
-    """只建立一次 TCP 连接就关掉，不发任何内容。连不上抛 OSError。"""
-    socket.create_connection((host, port), timeout=timeout).close()
 
 
 # ---------------------------------------------------------------- 各项
