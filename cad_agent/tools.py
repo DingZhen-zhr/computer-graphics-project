@@ -156,6 +156,7 @@ class ToolBox(LegacyTools):
 
     # ---- 澄清阶段 ----
     def _update_brief(self, args: dict) -> ToolOutcome:
+        before_values = self.ws.brief.param_values()
         try:
             changes = self.ws.brief.apply_patch(args)
         except BriefError as e:
@@ -163,7 +164,11 @@ class ToolBox(LegacyTools):
         ok, why = self.ws.brief.can_build()
         if changes:  # 什么都没改的 update_brief 不算改动
             self.unbuilt_edits = True
-            if self.gates.staged and self.ws.plan is not None:  # 需求单变了：全部阶段都要重新验证
+            if self.gates.staged and self.ws.parts:   # 多零件：用到改动参数的零件、以及装配，都要重新验证
+                from cad_agent.product.gate import invalidate_for_brief
+
+                invalidate_for_brief(self.ws, before_values)
+            elif self.gates.staged and self.ws.plan is not None:  # 需求单变了：全部阶段都要重新验证
                 self.ws.plan.invalidate_all()
         body: dict[str, Any] = {"changes": changes, "can_build": ok}
         if not ok:

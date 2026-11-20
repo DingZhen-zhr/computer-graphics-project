@@ -80,6 +80,24 @@ def range_only(ws: "Workspace") -> set[str]:
     return in_range - elsewhere
 
 
+def invalidate_for_brief(ws: "Workspace", before: dict[str, float]) -> None:
+    """需求单改了之后：数值变了的参数用到的零件变回没做完（计划全部重新验证），装配结果作废。
+    只改了关节范围这类参数时，零件不动，只有装配要重新检查。增删了参数时，全部零件重做。"""
+    from .tools import invalidate_assembly
+
+    now = ws.brief.param_values()
+    changed = [n for n in now if before.get(n) != now[n]]
+    if ws.active is not None:
+        select_part(ws, ws.active)
+    structural = set(before) != set(now)
+    for pid, st in ws.parts.items():
+        if structural or any(pid in users_of(ws, n) for n in changed):
+            st.done = False
+            if st.plan is not None:
+                st.plan.invalidate_all()
+    invalidate_assembly(ws)
+
+
 def product_coverage_gaps(ws: "Workspace") -> list[str]:
     """哪些用户参数没有被任何零件的检查、也没有被装配检查用到（只在关节范围里的参数不算缺）。"""
     refs: set[str] = set(range_only(ws))

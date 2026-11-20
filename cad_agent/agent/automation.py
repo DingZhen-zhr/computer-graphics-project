@@ -75,6 +75,7 @@ def should_auto_build(ws: Workspace, calls: list[tuple[str, bool]], before: Brie
         and not ws.brief.open_questions
         and bool(ws.features.items)
         and bool(ws.checks_raw)
+        and not ws.brief.is_multipart()   # 多零件：受影响的零件和装配由模型重新 build（ToolBox 已经把它们标成没做完）
     )
 
 
