@@ -9,9 +9,11 @@ import re
 from dataclasses import dataclass, field
 from typing import Any, Literal
 
+from .brief_parts import PartInfo, parse_parts, render_parts
+
 UNITS = ("mm", "deg", "1")
 SOURCES = ("user", "suggested")
-PATCH_KEYS = ("part", "set_params", "remove_params", "features", "open_questions", "relations")
+PATCH_KEYS = ("part", "set_params", "remove_params", "features", "open_questions", "parts", "motions", "relations")
 NAME_STOPS = "，,；;：:（("  # 组成部分的名字到这些符号为止
 NAME_RE = re.compile(r"^[a-z][a-z0-9_]*$")
 # 这些名字会和 notebook 里已有的名字或检查表达式里的函数冲突，不能当参数名
@@ -33,6 +35,7 @@ class Param:
     unit: str
     source: Literal["user", "suggested"]
     note: str = ""
+    part: str | None = None   # 只属于某一个零件时是零件编号；产品参数（几个零件共用）是 None
 
 
 def _num(v: float) -> float | int:
@@ -65,7 +68,15 @@ def _parse_param(raw: Any) -> Param:
     note = raw.get("note", "")
     if not isinstance(note, str):
         raise BriefError(f"参数 {name} 的 note 必须是文字")
-    return Param(name, float(value), unit, source, note)
+    part = raw.get("part")
+    if part is not None and not isinstance(part, str):
+        raise BriefError(f"参数 {name} 的 part 必须是零件编号")
+    return Param(name, float(value), unit, source, note, part or None)
+
+
+def _param_line(p: Param) -> str:
+    note = f"　{p.note}" if p.note else ""
+    return f"  - {p.name} = {_fmt(p.value)} {p.unit}　［{SOURCE_LABEL[p.source]}］{note}"
 
 
 def feature_name(text: str) -> str:
@@ -90,6 +101,8 @@ class Brief:
     confirmed: bool = False
     relations: list[str] = field(default_factory=list)       # 各部分怎么相接，每条一句话
     require_relations: bool = field(default=False, compare=False)  # 分阶段时由 ToolBox 打开；不写进 to_dict
+    parts: list[PartInfo] = field(default_factory=list)       # 多零件时每个零件一项；单零件为空
+    motions: list[str] = field(default_factory=list)          # 每个会动的地方一句话
 
     # ---- 查询 ----
     def can_build(self) -> tuple[bool, str]:
@@ -99,11 +112,23 @@ class Brief:
             return False, "需求单还未确认，请先用 request_confirmation 请用户确认"
         return True, ""
 
+    def is_multipart(self) -> bool:
+        return len(self.parts) >= 2
+
+    def params_of(self, part_id: str | None) -> list[Param]:
+        """part_id 为 None 时是产品参数；否则是这个零件自己的参数。"""
+        return [p for p in self.params if p.part == part_id]
+
     def missing_relations(self) -> list[str]:
-        """除第一个部分外，名字没有在任何一条 relations 里出现的部分；不要求位置关系时总是空表。"""
-        if not self.require_relations or len(self.features) < 2:
+        """除第一个部分（多零件时是第一个零件）外，名字没有在任何一条 relations 里出现的；不要求位置关系时总是空表。"""
+        if not self.require_relations:
             return []
-        names = [feature_name(f) for f in self.features[1:]]
+        if self.is_multipart():
+            names = [p.name for p in self.parts[1:]]
+        elif len(self.features) >= 2:
+            names = [feature_name(f) for f in self.features[1:]]
+        else:
+            return []
         return [n for n in names if not any(n in r for r in self.relations)]
 
     def user_param_names(self) -> set[str]:
@@ -182,6 +207,25 @@ class Brief:
                 work.confirmed = False  # 确认之后改了相接方式，要重新确认
                 lines.append("位置关系有改动")
 
+        if "parts" in patch:
+            new_parts = parse_parts(patch["parts"], BriefError)
+            if new_parts != work.parts:
+                work.parts = new_parts
+                work.confirmed = False
+                lines.append("零件: " + ("；".join(f"{p.id} {p.name}" for p in new_parts) if new_parts else "（已清空）"))
+
+        if "motions" in patch:
+            new_motions = _str_list(patch["motions"], "motions") if patch["motions"] else []
+            if new_motions != work.motions:
+                work.motions = new_motions
+                work.confirmed = False
+                lines.append("会动的地方: " + ("；".join(new_motions) if new_motions else "（没有）"))
+
+        ids = {p.id for p in work.parts}
+        stray = [f"{p.name}（{p.part}）" for p in work.params if p.part is not None and p.part not in ids]
+        if stray:
+            raise BriefError(f"这些参数写的零件不存在：{'、'.join(stray)}。part 要写 parts 里已有的零件编号")
+
         if "open_questions" in patch:
             new_questions = _str_list(patch["open_questions"], "open_questions")
             if new_questions != work.open_questions:
@@ -200,11 +244,14 @@ class Brief:
         return {
             "part": {"name": self.part_name, "purpose": self.purpose},
             "params": [
-                {"name": p.name, "value": _num(p.value), "unit": p.unit, "source": p.source, "note": p.note}
+                {"name": p.name, "value": _num(p.value), "unit": p.unit, "source": p.source, "note": p.note,
+                 **({"part": p.part} if p.part is not None else {})}
                 for p in self.params
             ],
             "features": list(self.features),
             **({"relations": list(self.relations)} if self.relations else {}),
+            **({"parts": [p.to_dict() for p in self.parts]} if self.parts else {}),
+            **({"motions": list(self.motions)} if self.motions else {}),
             "open_questions": list(self.open_questions),
             "confirmed": self.confirmed,
         }
@@ -215,28 +262,34 @@ class Brief:
         return cls(
             part_name=part.get("name", ""),
             purpose=part.get("purpose", ""),
-            params=[Param(p["name"], float(p["value"]), p["unit"], p["source"], p.get("note", "")) for p in d.get("params", [])],
+            params=[Param(p["name"], float(p["value"]), p["unit"], p["source"], p.get("note", ""), p.get("part")) for p in d.get("params", [])],
             features=list(d.get("features", [])),
             open_questions=list(d.get("open_questions", [])),
             confirmed=bool(d.get("confirmed", False)),
             relations=list(d.get("relations", [])),
+            parts=[PartInfo.from_dict(x) for x in d.get("parts", [])],
+            motions=list(d.get("motions", [])),
         )
 
     def render_text(self) -> str:
         """给用户看的中文需求单，标出每个参数是用户给的还是智能体建议的。"""
         out = ["【需求单】", f"零件：{self.part_name or '（未命名）'}" + (f"（{self.purpose}）" if self.purpose else "")]
         out.append("参数：")
-        if self.params:
-            for p in self.params:
-                note = f"　{p.note}" if p.note else ""
-                out.append(f"  - {p.name} = {_fmt(p.value)} {p.unit}　［{SOURCE_LABEL[p.source]}］{note}")
+        if self.params and self.is_multipart():
+            groups = [("产品参数", self.params_of(None))] + [(f"{p.name}的参数", self.params_of(p.id)) for p in self.parts]
+            for title, items in groups:
+                if items:
+                    out.append(f"  {title}：")
+                    out.extend("  " + _param_line(p) for p in items)
+        elif self.params:
+            out.extend(_param_line(p) for p in self.params)
         else:
             out.append("  （还没有）")
-        out.append("组成部分：")
-        if self.features:
-            out.extend(f"  {i}. {f}" for i, f in enumerate(self.features, 1))
+        if self.is_multipart():
+            out.extend(render_parts(self.parts, self.motions))
         else:
-            out.append("  （还没有）")
+            out.append("组成部分：")
+            out.extend([f"  {i}. {f}" for i, f in enumerate(self.features, 1)] or ["  （还没有）"])
         if self.relations:
             out.append("位置关系：")
             out.extend(f"  - {r}" for r in self.relations)

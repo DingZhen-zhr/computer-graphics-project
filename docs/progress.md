@@ -1218,3 +1218,7 @@
 - `scripts/probe_assembly.py`，结论写进笔记第 23–27 节。零件 notebook 用 `scad.use` 组装能跑通；摆放用 OCP 的 `gp_Trsf`（SCA 的 Solid 不能从 OCP 形状构造，摆好的零件只用 OCP 量）；重叠体积用 OCP 的 `BRepAlgoAPI_Common`（SCA 的 `intersect_rsolid` 不重叠时直接抛错、齿轮要 7 秒，不用）。
 - 材料颜色要写成 0～1 的三个浮点数，赋材料要用 `make_part_rpart`。整个产品的 STEP 只能运行装配 notebook 后 capture。
 - 三个常量：`CONTACT_TOL_MM3 = 0.5`（接触实测都是 0，取最小正值）；默认取样 24；闭环没有测（用户要求省时间），本计划不做。
+
+## 3.0 计划 2 Task 2：需求单写零件和运动
+- `Param.part`、`PartInfo`、`Brief.parts/motions/is_multipart/params_of`，多零件时 `missing_relations` 看零件名字，`render_text` 分组列参数、列零件和会动的地方。单零件的 `to_dict` 不变。
+- 新测试 `tests/test_brief_parts.py` 13 个（先看到全部失败）。快速全量通过。偏离 D26（键的顺序、拆出 `brief_parts.py`）。

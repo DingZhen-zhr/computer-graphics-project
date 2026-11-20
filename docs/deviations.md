@@ -200,3 +200,10 @@
   3. 先把提示旧版的那句原文（`OLD_VERSION_HINT`）去掉再查，`uv tool uninstall` 不能作为命令执行。查的词从 `uv tool uninstall` 改成 `tool uninstall`，`"${UV}" tool uninstall` 这种写法也能查出来，比原来更严。
   原有两条反向检查不动；新加两条：在脚本里真的执行卸载旧版（PowerShell 和 sh 各一条），要被查出来。
 - 影响：只影响这一条测试和 Task 5 的两个安装脚本。
+
+## D26（3.0 计划 2 Task 2）`parts`、`motions` 放在 `PATCH_KEYS` 的 `relations` 前面
+- 原计划：`PATCH_KEYS` 末尾加 `"parts"`、`"motions"`。
+- 实际：第二版的旧测试 `test_patch_keys_end_with_relations` 要求最后一个是 `relations`，它不在"要改的旧测试"清单里。
+- 改法：两个新键插在 `relations` 前面。键的顺序只影响报错里列出可用字段的顺序。
+- 另外：`brief.py` 加完会超过 300 行，零件的解析和显示放进新文件 `cad_agent/brief_parts.py`；材料表 `cad_agent/product/materials.py` 提前在本任务建好（Task 3 只加测试）。
+- 影响：无。
