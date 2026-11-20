@@ -1270,3 +1270,8 @@
 - 速查表加 `## 装配的写法` 4 条（两个面贴在一起、铰链、抽屉、齿轮联动），例子的编号和 Task 14 的标准答案一致。
 - 旧测试：按清单改了 3 个；`test_review_pass_then_deliver`、`test_cheatsheet_more_sections` 计划漏列，问过用户同意后改了（偏离 D30、D31）。上一次提交时快速全量里 `test_cheatsheet_more_sections` 失败了没注意到，这次补上。
 - 新测试 `tests/test_prompts_multipart.py` 6 个。这次是先改的提示词再写测试，没有先看到失败。快速全量 1093 通过。
+
+## 3.0 计划 2 Task 12：多零件的参数直改（裁掉选中几何和预览，偏离 D32）
+- `cad_agent/product/manual.py`：改过的参数影响到的零件各自从头重做，再装配检查，全过才存新版本；没过就全部退回（需求单、各零件计划和结果、装配状态）。
+- 测试 `tests/test_manual_multipart.py` 2 个。第一次运行时退回逻辑有个顺序问题（切零件时把改过的计划又存了回去），已修。
+- 快速全量第一次有 1 个失败：`test_desk_server.py::test_foreign_origin_and_host_are_rejected` 连接超时（`ConnectionAbortedError`），重跑通过，是这台电脑上偶发的网络测试问题，和本次改动无关。

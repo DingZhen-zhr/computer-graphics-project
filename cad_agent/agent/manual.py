@@ -65,6 +65,10 @@ def _restore(agent: "Agent", backup: tuple) -> None:
 
 def apply_params(agent: "Agent", values: dict[str, float]) -> ManualResult:
     ws, box = agent.ws, agent.toolbox
+    if box.gates.staged and ws.brief.is_multipart():   # 多零件（3.0）：影响到的零件重做，再装配检查
+        from cad_agent.product.manual import apply_params_multi
+
+        return apply_params_multi(agent, values)
     if not box.gates.staged or ws.plan is None or not ws.plan.complete() or not agent.session.versions():
         return ManualResult(ok=False, text=NOT_AVAILABLE)
     problem = _check_values(agent, values)

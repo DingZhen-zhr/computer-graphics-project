@@ -239,3 +239,9 @@
 ## D31（3.0 计划 2 Task 11）改 `test_cheatsheet_more_sections`（计划漏列，用户同意）
 - 实际：速查表补充末尾多了"## 装配的写法"，`tests/test_prompts_v2.py::test_cheatsheet_more_sections` 要求小节标题和第二版文档的列表完全相同。
 - 改法（用户同意）：期望值改成第二版的列表后面接"## 装配的写法"，前面的小节照样逐个比对。
+
+## D32（3.0 计划 2 Task 12）只做多零件的参数直改，不做检查结果的选中几何和"只生成不检查"的预览
+- 原计划：Task 12 三件事：`CheckResult.selected`（界面在模型上画尺寸标注用）、`preview_product`（参数面板拖动时先看一眼）、多零件的参数直改。
+- 实际：用户要求在本会话里快做完，"有些不必要的东西就不用做了"。前两件只是界面上的锦上添花，不影响建模质量和作业要求。
+- 改法：只做多零件的参数直改（`cad_agent/product/manual.py`，`agent/manual.py` 多零件时转过去）。`selected`、`preview_product` 不做；计划 3 里用到它们的地方（尺寸标注、改参数前的预览）也不做，参数面板直接走"应用"重建。
+- 影响：计划 3 Task 中涉及 `selected` 和 `/preview` 的部分跳过。
