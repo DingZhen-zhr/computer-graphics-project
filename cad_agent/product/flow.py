@@ -123,5 +123,6 @@ class ProductFlow:
 
         body = json.loads(content)
         if "passed" in body:
+            first = body["failed_checks"][0]["detail"] if body["failed_checks"] else (body.get("error") or {}).get("message")
             self.agent.session.log("assembly", passed=body["passed"], failed=[f["id"] for f in body["failed_checks"]],
-                                   hits=body["hits"])
+                                   hits=body["hits"], reason=first)

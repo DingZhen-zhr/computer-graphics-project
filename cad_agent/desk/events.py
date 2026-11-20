@@ -66,6 +66,12 @@ def describe_event(kind: str, data: dict) -> str | None:
         if data.get("reason") == "turn_end":
             return "程序补跑一次检查"
         return "只改了参数，程序自动重新运行"
+    if kind == "part_done":
+        return f"{data.get('name', '')}做完了"
+    if kind == "assembly":
+        if data.get("passed"):
+            return "装好了，检查都过了"
+        return "装配没通过：" + _short(str(data.get("reason") or "、".join(data.get("failed") or [])))
     if kind == "stl_error":
         return "STL 导出失败，3D 预览改用截图"
     return None

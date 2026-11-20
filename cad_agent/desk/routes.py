@@ -19,7 +19,10 @@ VERSION_RE = re.compile(r"^v\d+$")
 STAGE_FILE_RE = re.compile(r"^s\d+\.stl$")
 ROUND_RE = re.compile(r"^round-\d+$")
 VIEW_RE = re.compile(r"^[a-z]+\.png$")
-VERSION_FILES = ("view.png", "model.step", "model.stl", "model.py", "checks.json", "gate.json", "review.json")
+VERSION_FILES = ("view.png", "model.step", "model.stl", "model.py", "checks.json", "gate.json", "review.json",
+                 "product.step", "assembly.py", "motion.json")   # 后三个是多零件（3.0）的
+PART_RE = re.compile(r"^[a-z0-9_]+$")
+PART_FILES = ("model.step", "model.stl", "model.py", "checks.json")
 NOT_FOUND = "没有这个会话"
 
 
@@ -146,6 +149,8 @@ def version_file(hub: Hub, sid: str, rest: list[str]) -> Path:
             path = v / tail[0]
         elif len(tail) == 2 and tail[0] == "stages" and STAGE_FILE_RE.fullmatch(tail[1]):
             path = v / "stages" / tail[1]
+        elif len(tail) == 3 and tail[0] == "parts" and PART_RE.fullmatch(tail[1]) and tail[2] in PART_FILES:
+            path = v / "parts" / tail[1] / tail[2]
     if path is None or not path.is_file():
         raise ApiError(404, "没有这个文件")
     return path

@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Any
 
 from cad_agent.brief import Brief
+from cad_agent.desk.product_view import multipart_checks, params_view, product_view
 from cad_agent.desk.stl_info import stl_facts
 from cad_agent.desk.transcript import build_transcript, turn_totals
 from cad_agent.session import Session
@@ -60,14 +61,17 @@ def _mtime(p: Path) -> str | None:
 
 
 def _checks(ws: Workspace | None, versions: list[Path]) -> list[dict]:
-    """最近一次验证的每条检查结果，带上它属于哪个阶段（从检查项里查）。"""
+    """最近一次验证的每条检查结果，带上它属于哪个阶段（从检查项里查）、哪个零件（单零件是 main）。"""
+    if ws is not None and ws.parts:
+        return multipart_checks(ws)
     if ws is not None and ws.last_run is not None:
         results = [c.to_dict() for c in ws.last_run.checks]
     else:
         raw = _read_json(versions[-1] / "checks.json") if versions else None
         results = [c for c in raw if isinstance(c, dict)] if isinstance(raw, list) else []
     stage_of = {c.get("id"): c.get("stage") for c in (ws.checks_raw if ws is not None else []) if isinstance(c, dict)}
-    return [{**c, "stage": c.get("stage") or stage_of.get(c.get("id"))} for c in results]
+    return [{**c, "stage": c.get("stage") or stage_of.get(c.get("id")), "part": c.get("part", "main"), "selected": None}
+            for c in results]
 
 
 def _last_row(rows: list[dict], kind: str) -> dict | None:
@@ -130,6 +134,8 @@ def build_state(session: Session, ws: Workspace | None, *, busy: bool, demo: boo
         "brief": brief,
         "plan": plan,
         "checks": _checks(ws, vdirs),
+        "product": product_view(session.dir.name, ws, brief, vdirs),
+        "params_view": params_view(ws.brief if ws is not None else Brief.from_dict(brief)),
         "gate": gate,
         "review": review,
         "versions": versions,

@@ -1275,3 +1275,8 @@
 - `cad_agent/product/manual.py`：改过的参数影响到的零件各自从头重做，再装配检查，全过才存新版本；没过就全部退回（需求单、各零件计划和结果、装配状态）。
 - 测试 `tests/test_manual_multipart.py` 2 个。第一次运行时退回逻辑有个顺序问题（切零件时把改过的计划又存了回去），已修。
 - 快速全量第一次有 1 个失败：`test_desk_server.py::test_foreign_origin_and_host_are_rejected` 连接超时（`ConnectionAbortedError`），重跑通过，是这台电脑上偶发的网络测试问题，和本次改动无关。
+
+## 3.0 计划 2 Task 13：给界面的状态
+- `cad_agent/desk/product_view.py`：`build_state` 多了 `product`（单零件是 null）、`params_view`，检查每条多 `part`（单零件 main、装配 assembly）和 `selected`（按 D32 一律是 null）。新事件 `part_done`、`assembly` 有平常话的说明；装配日志多记一条 `reason`（第一条没过的原因）。文件白名单加了 `product.step`、`assembly.py`、`motion.json`、`parts/<编号>/…` 四种；没有预览文件（D32）。
+- 状态多了字段，按测试提示重新生成了 `site/demo/state.json`。
+- 测试 `tests/test_desk_state_v3.py` 12 个，快速全量通过。
