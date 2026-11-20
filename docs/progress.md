@@ -1202,3 +1202,9 @@
 - 规划会话中途修订（D24）：每个服务只回退一次，记在数据目录的 `key_migration.json`；删 key 后也记上，删掉的 key 不会再从旧的复制回来。只有旧服务名里真有 key 时才写这个文件，旧测试不会碰到真实数据目录。
 - 测试 `tests/test_keystore_migrate.py` 14 个：先看到回退相关的失败，再实现。按规划会话的新规矩，跑了本任务测试和快速全量 `-m "not sca"`：1011 个通过（139 个 sca 跳过；Task 4 的测试文件未实现，`--ignore` 排除）。
 - 同时提交规划会话改好的 `CLAUDE.md`（测试规矩放宽，第 2、7、10 条）。
+
+## 3.0 计划 1 Task 4：桌面端会话记录软件和模型版本
+
+- 新建 `cad_agent/versions_info.py`：`collect_versions(config)` 返回 `datum`、`python`、`simplecadapi`、`openai`、`anthropic`、`platform`、`provider`、`model`、`models_by_phase`（clarify/modeling/review），另加一项 `base_url`（只留协议、主机、端口、路径，去掉账号密码、查询参数和锚点）。不含 key。
+- `cli._banner` 改用它，命令行和桌面端（`app.build_hub` 里新建、打开、换设置时造智能体的地方）都写 `{"kind": "startup", **collect_versions(config)}`，命令行原来的 `cases`、`case_problems` 两项还在。原来的 `cad_agent` 键换成了 `datum`；终端开场白里的地址也改成去掉查询参数的。
+- 测试 `tests/test_versions_info.py` 5 个，先看到 `ModuleNotFoundError`，实现后通过；快速全量 1016 个通过（139 个 sca 跳过）。

@@ -4,15 +4,12 @@ from __future__ import annotations
 
 import argparse
 import json
-import platform
 import shutil
 import subprocess
 import sys
-from importlib.metadata import version
 from pathlib import Path
 from typing import Callable
 
-from cad_agent import __version__
 from cad_agent.agent.loop import Agent
 from cad_agent.brief import Brief
 from cad_agent.cases import load_cases
@@ -21,6 +18,7 @@ from cad_agent.llm.factory import make_llm, make_review_llm, secret_env_names
 from cad_agent.notebook import FeatureList
 from cad_agent.session import Session
 from cad_agent.tools import ToolBox, Workspace
+from cad_agent.versions_info import collect_versions
 
 CONFIRM_HINT = "回复「确认」开始建模，或直接说要改什么"
 HELP = """可用命令：
@@ -78,12 +76,10 @@ def _load_brief(version_dir: Path) -> Brief:
 
 
 def _banner(config: Config, session: Session) -> tuple[str, dict]:
-    info = {
-        "python": platform.python_version(), "simplecadapi": version("simplecadapi"), "cad_agent": __version__,
-        "model": config.model, "base_url": config.base_url,
-    }
-    text = (f"Python {info['python']} | simplecadapi {info['simplecadapi']} | cad-agent {info['cad_agent']} | "
-            f"模型 {config.model}（{config.base_url}）\n会话目录：{session.dir}\n"
+    """开场白和启动日志的内容；版本信息由 collect_versions 统一收集（桌面端也用这个）。"""
+    info = collect_versions(config)
+    text = (f"Python {info['python']} | simplecadapi {info['simplecadapi']} | Datum {info['datum']} | "
+            f"模型 {config.model}（{info['base_url']}）\n会话目录：{session.dir}\n"
             "直接说出你想做的零件，例如：做一个放在桌上看视频的小支架。输入 /help 查看命令。")
     return text, info
 
