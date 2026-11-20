@@ -957,3 +957,34 @@
 - **测试**：`tests/test_readme.py` 10 个。计划 6 个，另加 4 个：截图存在、"装不上怎么办"一节写全了、命令一节、开发者一节有花钱提醒和四个开关。先运行，10 个全部失败；写好后通过。
 - **全部测试**：1119 个通过（含 `sca`，用时 11 分 47 秒）。
 - **还差 Step 3**：请有 M 芯片 Mac 的组员按 `docs/mac-checklist.md` 做一遍，把填好的清单发回来。清单回来之前，README 写的是"Mac 界面还没有人工看过"。
+
+## 第二版 计划 4 Task 4 第二次运行（推送 4a447a4 之后）和第二轮修改
+
+持续集成运行 44566370611：两个平台的测试这一步都没过，所以安装、自检、smoke 这几步又被跳过了。日志仍是在浏览器面板里只读看的。
+
+**Windows：1108 个通过，1 个失败。**
+
+- 失败的是 `test_desk_export.py::test_site_is_up_to_date`：现导出的 `site/demo/state.json` 和提交的不一样。
+- 原因：版本的 `created` 取的是版本目录的修改时间，换一台电脑检出代码就变了。
+- 改法：导出时改用会话日志里这个版本交付（或手动改参数）那一行的时间。
+- 先加了测试 `test_export_does_not_depend_on_file_times`：把一份副本的所有修改时间改成 2001 年再导出，两份 `state.json` 必须逐字节相同。先看到它失败，再改。
+
+**Mac（macos-15）：1100 个通过、3 个跳过、6 个失败。**
+
+1. `test_site_is_up_to_date`：同上。
+2. `test_desk_demo.py::test_demo_data_is_packaged`（计划 3 的测试）：它逐字节比对包里的 `cad_agent/desk/demo_data/` 和 `demo/phone_stand/`。
+   - `demo/**` 在 `.gitattributes` 里是原样保存的（CRLF），`desk/demo_data` 却会被 git 转换换行，所以只有在 Windows 上检出时两边才一样。
+   - 这不是测试写死了 Windows 写法，而是数据的保存方式不对。所以没有改测试，而是在 `.gitattributes` 里加了一行 `cad_agent/desk/demo_data/** -text`，再 `git add --renormalize`，让两份示例数据在仓库里逐字节相同（都是 CRLF）。
+3. 到 6. `test_install_scripts.py` 里 `install.sh` 的四条（演示模式、两种平台检查、Linux）：
+   - Mac 自带的 `/bin/sh`（bash 3.2）把 `"$MAC_VERSION，"` 里中文逗号的第一个字节当成了变量名的一部分，报 `MAC_VERSION?: unbound variable` 退出。
+   - **这是安装脚本在真 Mac 上一定会遇到的错误**，本机 Git 自带的 sh（bash 5）测不出来（试了 `LC_ALL=C` 也测不出来）。
+   - 改法：`install.sh` 里的变量一律写成 `${名字}`（用脚本统一改了 56 行，转义的 `\$@` 不动）。
+   - 加了测试 `test_sh_variables_are_braced`：脚本里不能有不带花括号的 `$名字`。先看到它失败，再改。
+
+**另外实测了 Windows 上的 `caliper update`**（安装脚本已经在 GitHub 的 master 上了）：
+
+- 设 `CALIPER_DRY_RUN=1` 后运行装好的 `caliper update`。它打印要运行的 `cmd /c start …` 命令和"更新会在一个新窗口里进行"，返回 0。
+- 随后弹出一个标题为"卡尺 Caliper 更新"的新窗口，等了 3 秒，用 `irm … | iex` 从 GitHub 取到安装脚本，按演示模式打印了五步。中文正常，开头没有红字。
+- 看完后我把这个窗口关掉了。
+
+**全部测试**：1121 个通过（含 `sca`，用时 9 分 17 秒）。

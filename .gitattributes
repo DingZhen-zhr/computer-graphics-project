@@ -8,3 +8,6 @@ demo/** -text
 install.sh text eol=lf
 *.sh text eol=lf
 install.ps1 text eol=crlf
+
+# 包里的示例会话是 demo/phone_stand 的原样副本（test_demo_data_is_packaged 逐字节比对），也原样保存，不做换行符转换
+cad_agent/desk/demo_data/** -text

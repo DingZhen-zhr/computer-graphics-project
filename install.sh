@@ -24,23 +24,23 @@ PYTHON_MIRROR="https://registry.npmmirror.com/-/binary/python-build-standalone"
 HELP_URL="https://github.com/DingZhen-zhr/computer-graphics-project#装不上怎么办"
 RANGE="支持的范围：Apple 芯片的 Mac，macOS 14 及以上；或 Windows 10/11（64 位）。"
 
-SOURCE="${CALIPER_SOURCE:-$DEFAULT_SOURCE}"
+SOURCE="${CALIPER_SOURCE:-${DEFAULT_SOURCE}}"
 DRY_RUN="${CALIPER_DRY_RUN:-}"
 
 say() { printf '%s\n' "$*"; }
 step() { printf '[%s/5] %s\n' "$1" "$2"; }
-is_dry() { [ "$DRY_RUN" = "1" ]; }
+is_dry() { [ "${DRY_RUN}" = "1" ]; }
 show_help() {
     say ""
     say "装不上的话可以这样试："
     say "  1. 检查网络：能不能打开 github.com 和 pypi.org；用代理的话确认代理开着。"
     say "  2. 改走国内镜像再装一次：把安装命令最后的 sh 换成 CALIPER_MIRROR=1 sh。"
-    say "  3. 看 README 的“装不上怎么办”一节（里面有下载压缩包本地安装的办法）：$HELP_URL"
+    say "  3. 看 README 的“装不上怎么办”一节（里面有下载压缩包本地安装的办法）：${HELP_URL}"
 }
 fail() { say "$2" >&2; [ "${3:-}" = "help" ] && show_help >&2; exit "$1"; }
 find_uv() {
     if command -v uv >/dev/null 2>&1; then command -v uv; return 0; fi
-    if [ -x "$HOME/.local/bin/uv" ]; then say "$HOME/.local/bin/uv"; return 0; fi
+    if [ -x "${HOME}/.local/bin/uv" ]; then say "${HOME}/.local/bin/uv"; return 0; fi
     return 1
 }
 has_real_git() {
@@ -54,44 +54,44 @@ has_real_git() {
 step 1 "检查这台电脑是否支持"
 OS_NAME="$(uname -s 2>/dev/null || echo unknown)"
 ARCH="$(uname -m 2>/dev/null || echo unknown)"
-if [ "$OS_NAME" != "Darwin" ]; then
-    fail 2 "这台电脑的系统是 $OS_NAME，卡尺不支持。$RANGE Windows 请用 install.ps1。"
+if [ "${OS_NAME}" != "Darwin" ]; then
+    fail 2 "这台电脑的系统是 ${OS_NAME}，卡尺不支持。${RANGE} Windows 请用 install.ps1。"
 fi
-if [ "$ARCH" != "arm64" ]; then
-    fail 2 "这台 Mac 的处理器是 $ARCH（Intel 芯片），卡尺只支持 Apple 芯片的 Mac：SCA 没有 Intel Mac 的安装包。$RANGE
+if [ "${ARCH}" != "arm64" ]; then
+    fail 2 "这台 Mac 的处理器是 ${ARCH}（Intel 芯片），卡尺只支持 Apple 芯片的 Mac：SCA 没有 Intel Mac 的安装包。${RANGE}
 如果你的 Mac 其实是 Apple 芯片，可能是终端开了 Rosetta：在“访达”里找到“终端”，显示简介，取消勾选“使用 Rosetta 打开”，再试一次。"
 fi
 MAC_VERSION="$(sw_vers -productVersion 2>/dev/null || echo 0)"
 MAC_MAJOR="${MAC_VERSION%%.*}"
-case "$MAC_MAJOR" in ''|*[!0-9]*) MAC_MAJOR=0 ;; esac
-if [ "$MAC_MAJOR" -lt 14 ]; then
-    fail 2 "这台 Mac 的系统是 macOS $MAC_VERSION，卡尺需要 macOS 14 及以上。$RANGE"
+case "${MAC_MAJOR}" in ''|*[!0-9]*) MAC_MAJOR=0 ;; esac
+if [ "${MAC_MAJOR}" -lt 14 ]; then
+    fail 2 "这台 Mac 的系统是 macOS ${MAC_VERSION}，卡尺需要 macOS 14 及以上。${RANGE}"
 fi
-say "  macOS $MAC_VERSION，Apple 芯片（$ARCH），可以安装。"
+say "  macOS ${MAC_VERSION}，Apple 芯片（${ARCH}），可以安装。"
 
 # ---------------------------------------------------------------- 2
 step 2 "准备 uv（用来准备独立的 Python 3.12 环境）"
 if UV="$(find_uv)"; then
-    say "  已经有 uv：$UV"
+    say "  已经有 uv：${UV}"
 elif is_dry; then
-    say "  （只打印，不执行）没有找到 uv，会运行 uv 的官方安装脚本：$UV_INSTALLER"
+    say "  （只打印，不执行）没有找到 uv，会运行 uv 的官方安装脚本：${UV_INSTALLER}"
     UV="uv"
 else
-    say "  没有找到 uv，运行 uv 的官方安装脚本：$UV_INSTALLER"
+    say "  没有找到 uv，运行 uv 的官方安装脚本：${UV_INSTALLER}"
     TMP_SCRIPT="$(mktemp)" || fail 1 "建不了临时文件。" help
-    if ! curl -LsSf --connect-timeout 20 -o "$TMP_SCRIPT" "$UV_INSTALLER"; then
-        rm -f "$TMP_SCRIPT"
+    if ! curl -LsSf --connect-timeout 20 -o "${TMP_SCRIPT}" "${UV_INSTALLER}"; then
+        rm -f "${TMP_SCRIPT}"
         fail 1 "uv 的安装脚本下载失败。" help
     fi
-    if ! sh "$TMP_SCRIPT"; then
-        rm -f "$TMP_SCRIPT"
+    if ! sh "${TMP_SCRIPT}"; then
+        rm -f "${TMP_SCRIPT}"
         fail 1 "uv 没装上，原因见上面的输出。" help
     fi
-    rm -f "$TMP_SCRIPT"
-    PATH="$HOME/.local/bin:$PATH"
+    rm -f "${TMP_SCRIPT}"
+    PATH="${HOME}/.local/bin:${PATH}"
     export PATH
     UV="$(find_uv)" || fail 1 "uv 的安装脚本运行完了，但还是找不到 uv。" help
-    say "  uv 装好了：$UV"
+    say "  uv 装好了：${UV}"
 fi
 
 # ---------------------------------------------------------------- 3
@@ -99,42 +99,42 @@ step 3 "安装卡尺（第一次要下载 Python 和 SCA，大约几百 MB，请
 UV_HTTP_CONNECT_TIMEOUT=20
 export UV_HTTP_CONNECT_TIMEOUT
 if [ "${CALIPER_MIRROR:-}" = "1" ]; then
-    say "  走国内镜像：PyPI 用 $PYPI_MIRROR，Python 用 $PYTHON_MIRROR"
-    UV_DEFAULT_INDEX="$PYPI_MIRROR"
-    UV_PYTHON_INSTALL_MIRROR="$PYTHON_MIRROR"
+    say "  走国内镜像：PyPI 用 ${PYPI_MIRROR}，Python 用 ${PYTHON_MIRROR}"
+    UV_DEFAULT_INDEX="${PYPI_MIRROR}"
+    UV_PYTHON_INSTALL_MIRROR="${PYTHON_MIRROR}"
     export UV_DEFAULT_INDEX UV_PYTHON_INSTALL_MIRROR
 fi
-if [ -d "$SOURCE" ]; then
-    SOURCE="$(cd "$SOURCE" && pwd)"
+if [ -d "${SOURCE}" ]; then
+    SOURCE="$(cd "${SOURCE}" && pwd)"
 else
-    case "$SOURCE" in
+    case "${SOURCE}" in
         git+*)
             if ! has_real_git; then
-                if [ "$SOURCE" = "$DEFAULT_SOURCE" ]; then
+                if [ "${SOURCE}" = "${DEFAULT_SOURCE}" ]; then
                     say "  这台电脑没有 git，改从 GitHub 下载同一个版本的压缩包来装。"
-                    SOURCE="$ARCHIVE_SOURCE"
+                    SOURCE="${ARCHIVE_SOURCE}"
                 else
-                    fail 1 "从 git 地址安装需要先装 git：$SOURCE" help
+                    fail 1 "从 git 地址安装需要先装 git：${SOURCE}" help
                 fi
             fi
             ;;
     esac
 fi
 if is_dry; then
-    say "  （只打印，不执行）uv tool install --python 3.12 --force \"$SOURCE\""
+    say "  （只打印，不执行）uv tool install --python 3.12 --force \"${SOURCE}\""
     BIN="<uv 工具目录>"
     TOOL_DIR="<uv 工具目录>"
 else
-    say "  运行：uv tool install --python 3.12 --force \"$SOURCE\""
-    "$UV" tool install --python 3.12 --force "$SOURCE" || fail 1 "安装没有成功，原因见上面 uv 的输出。" help
-    BIN="$("$UV" tool dir --bin)"
-    TOOL_DIR="$("$UV" tool dir)"
-    case ":$PATH:" in
-        *":$BIN:"*) ;;
+    say "  运行：uv tool install --python 3.12 --force \"${SOURCE}\""
+    "${UV}" tool install --python 3.12 --force "${SOURCE}" || fail 1 "安装没有成功，原因见上面 uv 的输出。" help
+    BIN="$("${UV}" tool dir --bin)"
+    TOOL_DIR="$("${UV}" tool dir)"
+    case ":${PATH}:" in
+        *":${BIN}:"*) ;;
         *)
-            say "  $BIN 还不在 PATH 里，运行 uv tool update-shell 把它加进终端的配置文件"
-            "$UV" tool update-shell || say "  没能自动加上；可以自己把 $BIN 加进 PATH。"
-            PATH="$BIN:$PATH"
+            say "  ${BIN} 还不在 PATH 里，运行 uv tool update-shell 把它加进终端的配置文件"
+            "${UV}" tool update-shell || say "  没能自动加上；可以自己把 ${BIN} 加进 PATH。"
+            PATH="${BIN}:${PATH}"
             export PATH
             ;;
     esac
@@ -142,16 +142,16 @@ fi
 
 # ---------------------------------------------------------------- 4
 step 4 "在“应用程序”里建 Caliper"
-APP="$HOME/Applications/Caliper.app"
+APP="${HOME}/Applications/Caliper.app"
 if [ "${CALIPER_NO_SHORTCUT:-}" = "1" ]; then
     say "  设了 CALIPER_NO_SHORTCUT=1，不建。"
 elif is_dry; then
-    say "  （只打印，不执行）建 $APP，双击时运行 $BIN/caliper-app"
+    say "  （只打印，不执行）建 ${APP}，双击时运行 ${BIN}/caliper-app"
 else
-    say "  建 $APP，双击时运行 $BIN/caliper-app"
-    rm -rf "$APP"
-    mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources" || fail 1 "建不了 $APP。"
-    cat > "$APP/Contents/Info.plist" <<PLIST
+    say "  建 ${APP}，双击时运行 ${BIN}/caliper-app"
+    rm -rf "${APP}"
+    mkdir -p "${APP}/Contents/MacOS" "${APP}/Contents/Resources" || fail 1 "建不了 ${APP}。"
+    cat > "${APP}/Contents/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <plist version="1.0">
 <dict>
@@ -167,24 +167,24 @@ else
 </dict>
 </plist>
 PLIST
-    cat > "$APP/Contents/MacOS/Caliper" <<LAUNCH
+    cat > "${APP}/Contents/MacOS/Caliper" <<LAUNCH
 #!/bin/sh
-exec "$BIN/caliper-app" "\$@"
+exec "${BIN}/caliper-app" "\$@"
 LAUNCH
-    chmod +x "$APP/Contents/MacOS/Caliper"
-    ICON="$("$TOOL_DIR/caliper-cad/bin/python" -I -c "import cad_agent, pathlib; print(pathlib.Path(cad_agent.__file__).parent / 'desk' / 'static' / 'icon.icns')" 2>/dev/null || true)"
-    if [ -n "$ICON" ] && [ -f "$ICON" ]; then
-        cp "$ICON" "$APP/Contents/Resources/icon.icns"
+    chmod +x "${APP}/Contents/MacOS/Caliper"
+    ICON="$("${TOOL_DIR}/caliper-cad/bin/python" -I -c "import cad_agent, pathlib; print(pathlib.Path(cad_agent.__file__).parent / 'desk' / 'static' / 'icon.icns')" 2>/dev/null || true)"
+    if [ -n "${ICON}" ] && [ -f "${ICON}" ]; then
+        cp "${ICON}" "${APP}/Contents/Resources/icon.icns"
     fi
-    touch "$APP"
+    touch "${APP}"
 fi
 
 # ---------------------------------------------------------------- 5
 step 5 "自检（caliper doctor）"
 if is_dry; then
-    say "  （只打印，不执行）$BIN/caliper doctor"
+    say "  （只打印，不执行）${BIN}/caliper doctor"
 else
-    "$BIN/caliper" doctor || fail 1 "自检里有不能用的项（标着 ✗ 的），按它下面的提示处理；处理不了可以看 README 的“装不上怎么办”一节。"
+    "${BIN}/caliper" doctor || fail 1 "自检里有不能用的项（标着 ✗ 的），按它下面的提示处理；处理不了可以看 README 的“装不上怎么办”一节。"
 fi
 say ""
 if is_dry; then

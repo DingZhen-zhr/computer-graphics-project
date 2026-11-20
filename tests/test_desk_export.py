@@ -187,3 +187,19 @@ def test_export_writes_lf_line_endings(exported):
     crlf = [p.relative_to(exported).as_posix() for p in _all_files(exported)
             if p.suffix in TEXT_SUFFIXES and b"\r\n" in p.read_bytes()]
     assert crlf == []
+
+
+def test_export_does_not_depend_on_file_times(tmp_path):
+    """持续集成第二次运行时 site/demo/state.json 和现导出的不一样：版本的 created 原来取的是目录的修改时间，
+    换一台电脑检出就变了。导出时改用会话日志里这个版本交付时记下的时间。"""
+    import os
+
+    copy = tmp_path / "src" / "phone_stand"
+    shutil.copytree(DEMO, copy)
+    for p in [copy, *copy.rglob("*")]:
+        os.utime(p, (1_000_000_000, 1_000_000_000))   # 2001 年
+    export_static(DEMO, tmp_path / "a", title=DEMO_TITLE)
+    export_static(copy, tmp_path / "b", title=DEMO_TITLE)
+    assert (tmp_path / "a" / "state.json").read_bytes() == (tmp_path / "b" / "state.json").read_bytes()
+    state = json.loads((tmp_path / "a" / "state.json").read_text(encoding="utf-8"))
+    assert [v["created"] for v in state["versions"]] == ["2026-11-09T17:36:15", "2026-11-09T17:36:24"]

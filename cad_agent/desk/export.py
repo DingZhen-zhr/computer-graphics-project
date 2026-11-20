@@ -101,6 +101,17 @@ def _normalize_line_endings(out_dir: Path) -> None:
                 f.write_bytes(raw.replace(CRLF, LF))
 
 
+def _created_from_log(session: Session) -> dict[str, str]:
+    """各版本是什么时候生成的：取会话日志里交付（或手动改参数）那一行记下的时间。
+    不用目录的修改时间：换一台电脑检出代码，修改时间就变了，导出来的 state.json 会不一样。"""
+    out: dict[str, str] = {}
+    for row in session.read_log():
+        version, ts = row.get("version"), row.get("ts")
+        if row.get("kind") in ("delivered", "manual") and isinstance(version, str) and isinstance(ts, str) and version not in out:
+            out[version] = ts[:19]
+    return out
+
+
 def _diffs(session: Session, names: list[str]) -> dict[str, list[str]]:
     base = session.part_dir() / "versions"
     out: dict[str, list[str]] = {}
@@ -116,6 +127,9 @@ def export_static(session_dir: Path, out_dir: Path, *, title: str) -> None:
     session = Session.open(session_dir)
     state = Workbench(None, session, demo=True).state()   # type: ignore[arg-type]  # 回放没有智能体
     names = [v["name"] for v in state["versions"]]
+    created = _created_from_log(session)
+    for v in state["versions"]:
+        v["created"] = created.get(v["name"])
     state = scrub(state)
     state["static_diffs"] = scrub(_diffs(session, names))
 

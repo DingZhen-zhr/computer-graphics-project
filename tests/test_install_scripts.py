@@ -266,3 +266,11 @@ def test_ps1_stops_when_caliper_is_running():
     assert 0 <= check < install
     block = text[check:install]
     assert "Get-Process" in block and "caliper-cad" in block and "关掉" in block and "-WithHelp" not in block
+
+
+def test_sh_variables_are_braced():
+    """Mac 自带的 /bin/sh（bash 3.2）会把紧跟在变量名后面的中文字节当成变量名的一部分（持续集成实测：
+    "$MAC_VERSION，" 报 "MAC_VERSION?: unbound variable"），所以 install.sh 里的变量一律写成 ${名字}。"""
+    bare = [line.strip() for line in _text(SH).splitlines()
+            if not line.lstrip().startswith("#") and re.search(r"\$[A-Za-z_][A-Za-z0-9_]*", line.replace("\\$", ""))]
+    assert bare == [], bare[:5]
