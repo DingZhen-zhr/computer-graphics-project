@@ -1,0 +1,264 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>多零件 展台小样</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,200..800&family=Noto+Sans+SC:wght@300;400;500;700&display=swap">
+<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"}}</script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;overflow:hidden}
+button,input{font:inherit;color:inherit;background:none;border:0}
+button{cursor:pointer}
+:root{--t:.32s cubic-bezier(.2,.8,.2,1)}
+body[data-th=studio]{--bg:radial-gradient(110% 85% at 50% 40%,#FFFFFF 0,#EEEDF1 55%,#D7D6DC 100%);--ink:#17151B;--mute:#77727F;--acc:#17151B;--accInk:#fff;--move:#2F5BFF;--glass:rgba(255,255,255,.68);--line:rgba(23,21,27,.12);--ok:#1F8A4C}
+body[data-th=obsidian]{--bg:radial-gradient(110% 85% at 50% 38%,#1C2230 0,#0A0D13 55%,#030405 100%);--ink:#EEF1F6;--mute:#8A93A6;--acc:#A9CBFF;--accInk:#08101E;--move:#7FB2FF;--glass:rgba(255,255,255,.06);--line:rgba(169,203,255,.18);--ok:#7FE0A8}
+body{background:var(--bg);color:var(--ink);font-family:"Noto Sans SC","Microsoft YaHei UI",sans-serif}
+.num{font-family:Archivo,sans-serif;font-variant-numeric:tabular-nums}
+#view{position:fixed;inset:0}
+#view canvas{display:block;cursor:grab}
+.glass{background:var(--glass);border:1px solid var(--line);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px)}
+.pill{border-radius:999px}
+:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
+#demo{position:fixed;z-index:60;top:10px;left:50%;transform:translateX(-50%);display:flex;gap:4px;align-items:center;background:rgba(0,0,0,.78);color:#ddd;padding:5px;border-radius:12px;font:12px "Microsoft YaHei UI"}
+#demo button{padding:5px 12px;border-radius:8px;color:#ccc}
+#demo button[aria-pressed=true]{background:#fff;color:#000}
+
+.menuBtn{position:fixed;top:22px;left:28px;display:flex;align-items:center;gap:10px;padding:8px 14px 8px 10px;font-size:14px}
+.menuBtn .bars{width:18px;height:12px;display:flex;flex-direction:column;justify-content:space-between}
+.menuBtn .bars i{display:block;height:1.5px;background:var(--ink)}
+.title{position:fixed;top:50px;left:0;right:0;text-align:center;pointer-events:none}
+.title h1{font-family:Archivo,"Noto Sans SC";font-weight:700;font-size:40px;letter-spacing:6px}
+body[data-th=obsidian] .title h1{font-weight:300;font-stretch:115%}
+.title p{margin-top:4px;color:var(--mute);font-size:13px;letter-spacing:1px}
+
+.parts{position:fixed;left:34px;top:50%;transform:translateY(-50%);display:flex;flex-direction:column;gap:4px;width:210px}
+.parts small{color:var(--mute);font-size:12px;padding:0 12px 4px}
+.parts button{display:grid;grid-template-columns:12px 1fr auto;gap:10px;align-items:center;padding:9px 12px;border-radius:12px;text-align:left;font-size:14px;color:var(--mute);transition:background var(--t),color var(--t)}
+.parts button:hover,.parts button.on{background:var(--glass);color:var(--ink)}
+.parts i{width:10px;height:10px;border-radius:3px}
+.parts em{font-style:normal;font-size:12px;color:var(--ok)}
+.parts .all{margin-top:6px;font-size:13px;display:block;padding:7px 12px}
+
+.score{position:fixed;right:44px;top:50%;transform:translateY(-62%);text-align:right}
+.score b{display:block;font-family:Archivo;font-weight:200;font-stretch:110%;font-size:80px;line-height:.9;letter-spacing:-2px}
+.score span{color:var(--mute);font-size:13px}
+.card{position:fixed;right:34px;top:calc(50% + 40px);width:250px;padding:16px 18px;border-radius:18px;font-size:13px;line-height:1.7;opacity:0;transform:translateY(8px);transition:opacity var(--t),transform var(--t);pointer-events:none}
+.card.on{opacity:1;transform:none;pointer-events:auto}
+.card h3{font-size:16px;margin-bottom:4px}
+.card .k{color:var(--mute)}
+
+.gizmo{position:fixed;right:30px;top:20px;width:104px;display:flex;flex-direction:column;align-items:center;gap:6px}
+.gizmo svg{width:96px;height:96px;border-radius:50%;cursor:pointer}
+.gizmo .views{display:flex;gap:2px;padding:3px;border-radius:10px}
+.gizmo .views button{font-size:12px;padding:4px 6px;border-radius:7px;color:var(--mute)}
+.gizmo .views button:hover{background:var(--glass);color:var(--ink)}
+
+#labels{position:fixed;inset:0;pointer-events:none}
+#labels svg{position:absolute;inset:0;width:100%;height:100%}
+#labels div{position:absolute;font-size:12.5px;padding:3px 10px;border-radius:999px;white-space:nowrap;transform:translate(-50%,-50%)}
+
+.motion{position:fixed;left:50%;bottom:104px;transform:translateX(-50%);width:600px;padding:12px 18px 10px;border-radius:20px}
+.motion .top{display:flex;align-items:center;gap:12px;font-size:13px;color:var(--mute)}
+.motion .top b{color:var(--ink);font-family:Archivo;font-size:22px;font-weight:500;min-width:58px;text-align:right}
+.motion .play{width:34px;height:34px;border-radius:50%;background:var(--acc);color:var(--accInk);display:flex;align-items:center;justify-content:center;font-size:13px}
+.motion input{flex:1;accent-color:var(--move)}
+.ticks{display:flex;justify-content:space-between;margin:2px 0 0 46px;padding-right:70px}
+.ticks i{width:2px;height:6px;border-radius:1px;background:var(--ok);opacity:.7}
+.motion .st{margin-top:6px;font-size:13px;display:flex;align-items:center;gap:8px}
+.motion .st::before{content:"";width:8px;height:8px;border-radius:50%;background:var(--ok)}
+
+.tools{position:fixed;left:34px;bottom:34px;display:flex;gap:8px;align-items:center}
+.tools button{padding:9px 14px;font-size:13px;color:var(--mute);transition:background var(--t),color var(--t)}
+.tools button[aria-pressed=true]{background:var(--acc);color:var(--accInk);border-color:var(--acc)}
+.tools .ex{display:flex;align-items:center;gap:8px;padding:6px 14px;font-size:13px;color:var(--mute)}
+.tools .ex input{width:110px;accent-color:var(--acc)}
+.in{position:fixed;left:50%;bottom:34px;transform:translateX(-50%);width:600px;display:flex;align-items:center;padding:8px 8px 8px 22px;color:var(--mute);font-size:15px}
+.in .send{margin-left:auto;width:36px;height:36px;border-radius:50%;background:var(--acc);color:var(--accInk);display:flex;align-items:center;justify-content:center}
+.tune{position:fixed;right:44px;bottom:34px;padding:10px 16px;font-size:14px}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body data-th="studio">
+<div id="demo"><button data-th="studio" aria-pressed="true">浅色</button><button data-th="obsidian" aria-pressed="false">深色</button></div>
+<div id="view"></div>
+<div id="labels"><svg></svg></div>
+
+<button class="menuBtn glass pill"><span class="bars"><i></i><i></i><i></i></span>菜单</button>
+<div class="title"><h1>工具盒</h1><p>第 1 版，4 个零件</p></div>
+
+<nav class="parts" aria-label="零件">
+ <small>零件，点一个单独看</small>
+ <button data-p="body"><i style="background:#3A3F47"></i>盒体<em>6/6</em></button>
+ <button data-p="lid"><i style="background:var(--move)"></i>盖子<em>6/6</em></button>
+ <button data-p="pin"><i style="background:#A9AEB6"></i>铰链轴<em>3/3</em></button>
+ <button data-p="handle"><i style="background:#1E1F22"></i>提手<em>3/3</em></button>
+ <button class="all" data-p="">看全部</button>
+</nav>
+
+<div class="score"><b class="num">18/18</b><span>项全部量过，都对</span></div>
+<div class="card glass" data-card></div>
+
+<div class="gizmo"><svg viewBox="0 0 104 104" data-giz aria-label="方向"></svg>
+ <div class="views glass"><button data-v="front">前</button><button data-v="top">上</button><button data-v="right">右</button><button data-v="iso">立体</button><button data-v="bottom">底</button></div></div>
+
+<div class="motion glass" aria-label="让它动起来">
+ <div class="top"><button class="play" data-play aria-label="播放">▶</button><span>盖子翻开</span><input type="range" min="0" max="110" step="0.5" value="0" data-ang aria-label="盖子翻开的角度"><b class="num" data-angv>0°</b></div>
+ <div class="ticks" data-ticks></div>
+ <div class="st">翻到哪个角度都没有碰到别的零件（量了 24 个位置）</div>
+</div>
+
+<div class="tools">
+ <span class="ex glass pill">炸开<input type="range" min="0" max="1" step="0.01" value="0" data-ex aria-label="炸开的程度"></span>
+ <button class="glass pill" data-tg="xray" aria-pressed="false">透视</button>
+ <button class="glass pill" data-tg="cut" aria-pressed="false">剖开</button>
+ <button class="glass pill" data-tg="lab" aria-pressed="true">名字</button>
+</div>
+<div class="in glass pill">接着说要改哪里<span class="send">↑</span></div>
+<button class="tune glass pill">调参数</button>
+
+<script type="module">
+import * as THREE from 'three';
+import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
+const $ = s => document.querySelector(s), $$ = s => [...document.querySelectorAll(s)];
+const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+const el = $('#view');
+const r = new THREE.WebGLRenderer({antialias:true, alpha:true});
+r.setPixelRatio(Math.min(devicePixelRatio,2)); r.shadowMap.enabled = true; r.shadowMap.type = THREE.PCFSoftShadowMap;
+r.toneMapping = THREE.ACESFilmicToneMapping; r.localClippingEnabled = true; el.appendChild(r.domElement);
+const sc = new THREE.Scene();
+const cam = new THREE.PerspectiveCamera(26, 1, 1, 5000); cam.position.set(520,360,660);
+const ctl = new OrbitControls(cam, r.domElement); ctl.enableDamping = true; ctl.target.set(0,70,20); ctl.minDistance = 200; ctl.maxDistance = 1100;
+const hemi = new THREE.HemisphereLight(); sc.add(hemi);
+const key = new THREE.DirectionalLight(); key.position.set(160,320,220); key.castShadow = true; key.shadow.mapSize.set(2048,2048);
+Object.assign(key.shadow.camera,{left:-260,right:260,top:260,bottom:-260}); key.shadow.radius = 8; sc.add(key);
+const rim = new THREE.DirectionalLight(); rim.position.set(-260,140,-240); sc.add(rim);
+const under = new THREE.DirectionalLight(0xffffff,.6); under.position.set(0,-200,60); sc.add(under);
+const shadowM = new THREE.ShadowMaterial({opacity:.18});
+const ground = new THREE.Mesh(new THREE.PlaneGeometry(1600,1600), shadowM); ground.rotation.x = -Math.PI/2; ground.receiveShadow = true; sc.add(ground);
+const grid = new THREE.GridHelper(800, 40); grid.material.transparent = true; grid.material.opacity = .07; grid.position.y = .1; sc.add(grid);
+const clip = new THREE.Plane(new THREE.Vector3(-1,0,0), 0);
+
+// ---- 零件（单位毫米，三维里 y 朝上；建模坐标的 z 朝上） ----
+function rr(w, d, rad){ const s = new THREE.Shape(), a = w/2, b = d/2;
+  s.moveTo(-a+rad,-b); s.lineTo(a-rad,-b); s.quadraticCurveTo(a,-b,a,-b+rad); s.lineTo(a,b-rad); s.quadraticCurveTo(a,b,a-rad,b);
+  s.lineTo(-a+rad,b); s.quadraticCurveTo(-a,b,-a,b-rad); s.lineTo(-a,-b+rad); s.quadraticCurveTo(-a,-b,-a+rad,-b); return s; }
+function slab(shape, h, bevel=1.2){ const g = new THREE.ExtrudeGeometry(shape, {depth:h, bevelEnabled:true, bevelThickness:bevel, bevelSize:bevel, bevelSegments:3, curveSegments:24}); g.rotateX(-Math.PI/2); return g; }
+const mats = {}, parts = {};
+function mat(name, o){ const m = new THREE.MeshStandardMaterial(o); m.userData.base = {opacity:1}; mats[name] = m; return m; }
+const MB = mat('body', {roughness:.55, metalness:.05});
+const ML = mat('lid', {roughness:.32, metalness:.55});
+const MP = mat('pin', {roughness:.25, metalness:.9, color:0xB8BDC4});
+const MH = mat('handle', {roughness:.8, metalness:0, color:0x1E1F22});
+const lineM = new THREE.LineBasicMaterial({transparent:true, opacity:.22});
+function add(group, geo, m, pos=[0,0,0]){ const mesh = new THREE.Mesh(geo, m); mesh.position.set(...pos); mesh.castShadow = mesh.receiveShadow = true; group.add(mesh);
+  const e = new THREE.LineSegments(new THREE.EdgesGeometry(geo, 28), lineM); e.position.copy(mesh.position); group.add(e); return mesh; }
+
+const HY = 66, HZ = -56;   // 铰链轴心
+// 盒体：圆角外形、2.5 mm 壁、底板，后边三段铰链耳
+const body = new THREE.Group(); sc.add(body); parts.body = {g:body, m:MB, anchor:new THREE.Vector3(80,30,40), name:'盒体', ex:new THREE.Vector3(0,0,0),
+  info:'外形 160 × 100 × 64，壁厚 2.5<br><span class="k">材料</span>　石墨灰 ABS，哑光'};
+const wall = rr(160,100,10); wall.holes.push(rr(155,95,7.5)); add(body, slab(wall, 58, .8), MB, [0,4,0]);
+add(body, slab(rr(160,100,10), 3.2, .8), MB, [0,.8,0]);
+for (const x of [-62, 0, 62]) { const k = new THREE.CylinderGeometry(5,5,26,32); k.rotateZ(Math.PI/2); add(body, k, MB, [x, HY, HZ]);
+  const web = new THREE.BoxGeometry(26, 9, 8); add(body, web, MB, [x, HY-5, HZ+4]); }
+// 盖子：绕铰链轴转，带两段铰链耳和前沿的小把手
+const lidPivot = new THREE.Group(); lidPivot.position.set(0, HY, HZ); sc.add(lidPivot);
+const lid = new THREE.Group(); lidPivot.add(lid); parts.lid = {g:lid, m:ML, anchor:new THREE.Vector3(-40,4,70), name:'盖子', ex:new THREE.Vector3(0,45,0),
+  info:'外形 162 × 102 × 5，能翻开 0 到 110 度<br><span class="k">材料</span>　铝，蓝色阳极氧化'};
+add(lid, slab(rr(162,102,11), 4.2, 1), ML, [0,-2.4,56]);
+add(lid, slab(rr(150,90,8), 2.2, .6), ML, [0,-4.2,56]);
+for (const x of [-31, 31]) { const k = new THREE.CylinderGeometry(5,5,30,32); k.rotateZ(Math.PI/2); add(lid, k, ML, [x,0,0]); }
+add(lid, new THREE.BoxGeometry(34,3,9), ML, [0,-1,108]);
+// 铰链轴：穿过五段铰链耳
+const pin = new THREE.Group(); lidPivot.add(pin); parts.pin = {g:pin, m:MP, anchor:new THREE.Vector3(84,0,0), name:'铰链轴', ex:new THREE.Vector3(150,0,0),
+  info:'直径 3，长 156<br><span class="k">材料</span>　不锈钢'};
+{ const g = new THREE.CylinderGeometry(1.6,1.6,156,24); g.rotateZ(Math.PI/2); add(pin, g, MP);
+  const cap = new THREE.CylinderGeometry(3.2,3.2,2,24); cap.rotateZ(Math.PI/2); add(pin, cap, MP, [78,0,0]); add(pin, cap.clone(), MP, [-78,0,0]); }
+// 提手：装在盖子上，跟着盖子转
+const handle = new THREE.Group(); lid.add(handle); parts.handle = {g:handle, m:MH, anchor:new THREE.Vector3(0,26,56), name:'提手', ex:new THREE.Vector3(0,40,0),
+  info:'跨距 70，粗 7<br><span class="k">材料</span>　黑色橡胶包覆'};
+{ const arc = new THREE.TorusGeometry(35, 3.5, 20, 64, Math.PI); add(handle, arc, MH, [0,2,56]);
+  for (const x of [-35, 35]) add(handle, new THREE.CylinderGeometry(6,7,4,32), MH, [x,3,56]); }
+
+// ---- 外观 ----
+const TH = {
+  studio:  {sky:0xffffff, gnd:0xC9C7D0, hemi:1.9, key:0xffffff, keyI:2.4, rim:0xffffff, rimI:1.0, body:0x3A3F47, lid:0x4767E8, edge:0x17151B, shadow:.18, grid:0x17151B, exp:1.05, axis:['#D93F3F','#2E9B5B','#3A62D6']},
+  obsidian:{sky:0x3A4766, gnd:0x020305, hemi:.9, key:0xDDE8FF, keyI:3.0, rim:0x5C8DFF, rimI:3.6, body:0x8D96A5, lid:0x7FB2FF, edge:0xA9CBFF, shadow:.55, grid:0xA9CBFF, exp:1.1, axis:['#FF6B6B','#5BE08F','#7AA7FF']}
+};
+let axisColors;
+function theme(n){ const t = TH[n]; document.body.dataset.th = n; hemi.color.set(t.sky); hemi.groundColor.set(t.gnd); hemi.intensity = t.hemi;
+  key.color.set(t.key); key.intensity = t.keyI; rim.color.set(t.rim); rim.intensity = t.rimI; MB.color.set(t.body); ML.color.set(t.lid);
+  lineM.color.set(t.edge); shadowM.opacity = t.shadow; grid.material.color.set(t.grid); r.toneMappingExposure = t.exp; axisColors = t.axis;
+  $$('#demo [data-th]').forEach(b => b.setAttribute('aria-pressed', b.dataset.th === n)); }
+theme('studio');
+$$('#demo [data-th]').forEach(b => b.addEventListener('click', () => theme(b.dataset.th)));
+
+// ---- 单独看一个零件 ----
+let focus = '', xray = false;
+function applyLook(){ for (const [k,p] of Object.entries(parts)) { const dim = focus && focus !== k;
+  const op = xray ? (focus === k ? .9 : .22) : (dim ? .12 : 1);
+  p.m.transparent = op < 1; p.m.opacity = op; p.m.depthWrite = op >= 1; p.m.needsUpdate = true; } }
+$$('.parts button').forEach(b => b.addEventListener('click', () => { focus = b.dataset.p;
+  $$('.parts button').forEach(x => x.classList.toggle('on', x === b && !!focus));
+  const c = $('[data-card]'); if (focus) { const p = parts[focus]; c.innerHTML = `<h3>${p.name}</h3>${p.info}`; c.classList.add('on'); } else c.classList.remove('on');
+  applyLook(); }));
+// ---- 工具 ----
+let showLabels = true;
+$$('[data-tg]').forEach(b => b.addEventListener('click', () => { const on = b.getAttribute('aria-pressed') !== 'true'; b.setAttribute('aria-pressed', on);
+  if (b.dataset.tg === 'xray') { xray = on; applyLook(); }
+  if (b.dataset.tg === 'cut') Object.values(mats).forEach(m => { m.clippingPlanes = on ? [clip] : []; m.clipShadows = true; m.needsUpdate = true; });
+  if (b.dataset.tg === 'lab') showLabels = on; }));
+let ex = 0; $('[data-ex]').addEventListener('input', e => { ex = +e.target.value; });
+// ---- 动起来 ----
+let ang = 0, playing = false, t0 = 0;
+const angIn = $('[data-ang]');
+angIn.addEventListener('input', () => { playing = false; $('[data-play]').textContent = '▶'; ang = +angIn.value; });
+$('[data-play]').addEventListener('click', () => { playing = !playing; $('[data-play]').textContent = playing ? '❚❚' : '▶'; t0 = performance.now() - (ang/110)*2200; });
+$('[data-ticks]').innerHTML = Array.from({length:24}, () => '<i></i>').join('');
+
+// ---- 视角和坐标轴 ----
+let fly = null;
+function flyTo(dir){ const d = cam.position.distanceTo(ctl.target); const to = ctl.target.clone().add(dir.clone().normalize().multiplyScalar(d)); if (Math.abs(dir.y) > .99) to.z += .01; fly = {from:cam.position.clone(), to, t0:performance.now()}; }
+const V = {front:new THREE.Vector3(0,0,1), top:new THREE.Vector3(0,1,0), right:new THREE.Vector3(1,0,0), bottom:new THREE.Vector3(0,-1,0), iso:new THREE.Vector3(.75,.6,1)};
+$$('[data-v]').forEach(b => b.addEventListener('click', () => flyTo(V[b.dataset.v])));
+const AX = [{k:'X', v:new THREE.Vector3(1,0,0)}, {k:'Y', v:new THREE.Vector3(0,0,-1)}, {k:'Z', v:new THREE.Vector3(0,1,0)}];
+const giz = $('[data-giz]');
+function drawGizmo(){ const q = cam.quaternion.clone().invert(); const it = [];
+  AX.forEach((a,i) => { const p = a.v.clone().applyQuaternion(q); it.push({k:a.k,i,x:52+p.x*34,y:52-p.y*34,z:p.z,pos:true,d:a.v}); it.push({k:'',i,x:52-p.x*34,y:52+p.y*34,z:-p.z,pos:false,d:a.v.clone().negate()}); });
+  it.sort((a,b) => a.z - b.z);
+  giz.innerHTML = it.map(o => { const c = axisColors[o.i]; return (o.pos ? `<line x1="52" y1="52" x2="${o.x}" y2="${o.y}" stroke="${c}" stroke-width="2.5"/>` : '') +
+    `<circle data-d="${o.d.x},${o.d.y},${o.d.z}" cx="${o.x}" cy="${o.y}" r="${o.pos?10:7}" fill="${o.pos?c:'none'}" stroke="${c}" stroke-width="2"/>` +
+    (o.pos ? `<text x="${o.x}" y="${o.y+4}" text-anchor="middle" font-size="11" font-weight="700" fill="#fff" style="pointer-events:none;font-family:Archivo">${o.k}</text>` : ''); }).join(''); }
+giz.addEventListener('click', e => { const d = e.target.dataset && e.target.dataset.d; if (d) flyTo(new THREE.Vector3(...d.split(',').map(Number))); });
+
+// ---- 名字和引线 ----
+const lab = $('#labels'), lsvg = lab.querySelector('svg');
+const tags = Object.entries(parts).map(([k,p]) => { const d = document.createElement('div'); d.className = 'glass'; d.textContent = p.name; lab.appendChild(d); return {k,p,d}; });
+function drawLabels(){ let lines = '';
+  for (const {k,p,d} of tags) { const w = p.g.localToWorld(p.anchor.clone()), s = w.project(cam);
+    const x = (s.x+1)/2*innerWidth, y = (1-s.y)/2*innerHeight, lx = x + (x < innerWidth/2 ? -90 : 90), ly = y - 46;
+    const vis = showLabels && s.z < 1 && (!focus || focus === k); d.style.opacity = vis ? 1 : 0; d.style.left = lx + 'px'; d.style.top = ly + 'px';
+    if (vis) lines += `<line x1="${x}" y1="${y}" x2="${lx}" y2="${ly}" stroke="currentColor" stroke-opacity=".35" stroke-width="1"/><circle cx="${x}" cy="${y}" r="2.5" fill="currentColor" fill-opacity=".6"/>`; }
+  lsvg.innerHTML = lines; }
+
+function size(){ r.setSize(innerWidth, innerHeight); cam.aspect = innerWidth/innerHeight; cam.updateProjectionMatrix(); }
+addEventListener('resize', size); size();
+const ease = x => x < .5 ? 4*x*x*x : 1 - Math.pow(-2*x+2, 3)/2;
+r.setAnimationLoop(now => {
+  if (playing && !reduce) { const ph = ((now - t0) % 4400) / 2200; ang = 110 * ease(ph <= 1 ? ph : 2 - ph); angIn.value = ang; }
+  $('[data-angv]').textContent = Math.round(ang) + '°';
+  lidPivot.rotation.x = -THREE.MathUtils.degToRad(ang);
+  // 炸开：沿装配方向分开
+  lidPivot.position.set(0, HY + parts.lid.ex.y*ex, HZ);
+  pin.position.set(parts.pin.ex.x*ex, 0, 0);
+  handle.position.set(0, parts.handle.ex.y*ex, 0);
+  if (fly) { const k = Math.min(1,(now-fly.t0)/450); cam.position.lerpVectors(fly.from, fly.to, 1-Math.pow(1-k,3)); if (k === 1) fly = null; }
+  const below = cam.position.y < 0; ground.visible = grid.visible = !below;
+  ctl.update(); r.render(sc, cam); drawGizmo(); drawLabels();
+});
+</script>
+</body>
+</html>

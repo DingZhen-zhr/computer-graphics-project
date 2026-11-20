@@ -1,0 +1,297 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>展台 第二稿</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,200..800&family=Noto+Sans+SC:wght@300;400;500;700&display=swap">
+<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"}}</script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;overflow:hidden}
+button,input{font:inherit;color:inherit;background:none;border:0}
+button{cursor:pointer}
+:root{--t:.32s cubic-bezier(.2,.8,.2,1)}
+body[data-th=studio]{--bg:radial-gradient(110% 85% at 50% 38%,#FFFFFF 0,#EEEDF1 55%,#D9D8DE 100%);--ink:#17151B;--mute:#77727F;--acc:#17151B;--accInk:#FFFFFF;--glass:rgba(255,255,255,.66);--line:rgba(23,21,27,.12);--panel:rgba(250,250,252,.94);--ok:#1F8A4C;--run:#17151B;--h1w:700;--h1s:100%}
+body[data-th=obsidian]{--bg:radial-gradient(110% 85% at 50% 36%,#1C2230 0,#0A0D13 55%,#030405 100%);--ink:#EEF1F6;--mute:#8A93A6;--acc:#A9CBFF;--accInk:#08101E;--glass:rgba(255,255,255,.06);--line:rgba(169,203,255,.18);--panel:rgba(10,13,19,.92);--ok:#7FE0A8;--run:#A9CBFF;--h1w:300;--h1s:115%}
+body{background:var(--bg);color:var(--ink);font-family:"Noto Sans SC","Microsoft YaHei UI",sans-serif}
+.num{font-family:Archivo,sans-serif;font-variant-numeric:tabular-nums}
+#view{position:fixed;inset:0}
+#view canvas{display:block;cursor:grab}
+#view canvas:active{cursor:grabbing}
+.glass{background:var(--glass);border:1px solid var(--line);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px)}
+.pill{border-radius:999px}
+:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
+.hide{opacity:0!important;pointer-events:none!important}
+.fade{transition:opacity var(--t),transform var(--t)}
+
+#demo{position:fixed;z-index:60;top:10px;left:50%;transform:translateX(-50%);display:flex;gap:4px;align-items:center;background:rgba(0,0,0,.78);color:#ddd;padding:5px;border-radius:12px;font:12px "Microsoft YaHei UI"}
+#demo span{padding:0 6px;color:#999}
+#demo button{padding:5px 10px;border-radius:8px;color:#ccc}
+#demo button[aria-pressed=true]{background:#fff;color:#000}
+
+.menuBtn{position:fixed;z-index:5;top:22px;left:28px;display:flex;align-items:center;gap:10px;padding:8px 14px 8px 10px;font-size:14px}
+.menuBtn .bars{width:18px;height:12px;display:flex;flex-direction:column;justify-content:space-between}
+.menuBtn .bars i{display:block;height:1.5px;background:var(--ink)}
+.title{position:fixed;top:62px;left:0;right:0;text-align:center;pointer-events:none}
+.title h1{font-family:Archivo,"Noto Sans SC",sans-serif;font-weight:var(--h1w);font-stretch:var(--h1s);font-size:52px;letter-spacing:6px}
+.title p{margin-top:6px;color:var(--mute);font-size:13px;letter-spacing:1px}
+
+.time{position:fixed;left:40px;top:50%;transform:translateY(-50%);display:flex;flex-direction:column;gap:6px}
+.time button{display:flex;align-items:center;gap:12px;padding:8px 12px;border-radius:10px;color:var(--mute);font-size:14px;text-align:left}
+.time button:hover,.time button.on{background:var(--glass);color:var(--ink)}
+.time i{width:9px;height:9px;border-radius:50%;background:var(--ok)}
+.time i.run{background:var(--run);animation:pulse 1s infinite}
+.time em{font-style:normal;margin-left:6px}
+@keyframes pulse{50%{opacity:.25}}
+.score{position:fixed;right:44px;top:50%;transform:translateY(-50%);text-align:right;padding:12px 16px;border-radius:16px}
+.score:hover{background:var(--glass)}
+.score b{display:block;font-family:Archivo;font-weight:200;font-stretch:110%;font-size:84px;line-height:.9;letter-spacing:-2px}
+.score span{color:var(--mute);font-size:13px}
+
+/* 坐标轴小图 */
+.gizmo{position:fixed;right:30px;top:20px;width:112px;display:flex;flex-direction:column;align-items:center;gap:6px;z-index:4}
+.gizmo svg{width:104px;height:104px;border-radius:50%;cursor:pointer}
+.gizmo svg:hover{background:var(--glass)}
+.gizmo .views{display:flex;gap:2px;padding:3px;border-radius:10px}
+.gizmo .views button{font-size:12px;padding:4px 7px;border-radius:7px;color:var(--mute)}
+.gizmo .views button:hover{background:var(--glass);color:var(--ink)}
+
+.cap{position:fixed;left:50%;bottom:150px;transform:translateX(-50%);width:760px;text-align:center;font-size:21px;line-height:1.6}
+body[data-th=obsidian] .cap{text-shadow:0 2px 20px rgba(0,0,0,.6)}
+.ask{position:fixed;left:50%;bottom:98px;transform:translateX(-50%);display:flex;gap:12px}
+.ask button{padding:9px 22px;font-size:15px}
+.ask button:first-child,.ask button:hover{background:var(--acc);color:var(--accInk);border-color:var(--acc)}
+.in{position:fixed;left:50%;bottom:34px;transform:translateX(-50%);width:600px;display:flex;align-items:center;padding:8px 8px 8px 22px;color:var(--mute);font-size:15px}
+.in .send{margin-left:auto;width:38px;height:38px;border-radius:50%;background:var(--acc);color:var(--accInk);display:flex;align-items:center;justify-content:center;font-size:18px}
+.hist{position:fixed;left:40px;bottom:36px;padding:9px 14px;font-size:14px;color:var(--mute)}
+.tune{position:fixed;right:44px;bottom:36px;display:flex;align-items:center;gap:8px;padding:10px 16px;font-size:14px}
+.tune svg{width:16px;height:16px}
+
+/* 需求单：澄清时就在舞台中间 */
+.brief{position:fixed;left:50%;top:50%;width:540px;transform:translate(-50%,-56%);border-radius:24px;padding:26px 28px;background:var(--panel);border:1px solid var(--line);backdrop-filter:blur(24px)}
+.brief.away{transform:translate(-50%,-140%) scale(.6);opacity:0;pointer-events:none}
+.brief h2{font-size:24px;font-weight:700}
+.brief .sub{color:var(--mute);font-size:13px;margin:4px 0 14px}
+.brief .r{display:grid;grid-template-columns:1fr auto 90px;gap:10px;align-items:center;padding:9px 2px;border-bottom:1px solid var(--line);font-size:14px}
+.brief .v{text-align:right;font-family:Archivo;font-size:17px}
+.tag{font-size:11px;padding:2px 8px;border-radius:999px;border:1px solid var(--line);color:var(--mute);justify-self:start}
+.tag.u{background:var(--acc);color:var(--accInk);border-color:var(--acc)}
+.wait{color:var(--mute);border-bottom:1.5px dashed var(--mute);animation:pulse 1.4s infinite;justify-self:end;font-size:13px}
+.brief h3{font-size:12px;color:var(--mute);font-weight:500;margin:14px 0 4px}
+.brief li{list-style:none;font-size:14px;line-height:1.7}
+.brief .act{display:flex;gap:10px;margin-top:18px}
+.brief .act button{padding:10px 20px;border-radius:999px;font-size:15px;border:1px solid var(--line)}
+.brief .act button:first-child{background:var(--acc);color:var(--accInk);border-color:var(--acc)}
+
+/* 调参数：从底部升起，舞台往上让 */
+.sheet{position:fixed;z-index:25;left:12px;right:12px;bottom:12px;height:270px;border-radius:22px;background:var(--panel);border:1px solid var(--line);backdrop-filter:blur(24px);padding:18px 24px;transform:translateY(110%);transition:transform var(--t);display:flex;flex-direction:column}
+.sheet.on{transform:none}
+.sheet header{display:flex;align-items:center;gap:14px;margin-bottom:10px}
+.sheet header h2{font-size:17px;font-weight:700}
+.sheet header span{color:var(--mute);font-size:13px}
+.sheet header .x{margin-left:auto;width:32px;height:32px;border-radius:50%;font-size:20px;color:var(--mute)}
+.groups{display:flex;gap:28px;flex:1}
+.group{flex:1}
+.group h3{font-size:12px;color:var(--mute);font-weight:500;margin-bottom:6px}
+.p{display:grid;grid-template-columns:64px 1fr 74px 34px;gap:10px;align-items:center;padding:7px 0;border-left:3px solid transparent;padding-left:8px;margin-left:-11px}
+.p.chg{border-left-color:var(--acc)}
+.p label{font-size:14px}
+.p input[type=number]{width:74px;text-align:right;font-family:Archivo;font-size:17px;padding:4px 6px;border-radius:8px;border:1px solid var(--line);background:var(--glass)}
+.p small{color:var(--mute);font-size:12px}
+input[type=range]{width:100%;accent-color:var(--acc)}
+.sheet footer{display:flex;align-items:center;gap:12px;border-top:1px solid var(--line);padding-top:12px}
+.sheet footer .st{color:var(--mute);font-size:13px}
+.sheet footer button{padding:9px 18px;border-radius:999px;font-size:14px;border:1px solid var(--line)}
+.sheet footer .go{margin-left:auto;background:var(--acc);color:var(--accInk);border-color:var(--acc)}
+.sheet footer .go[disabled]{opacity:.35;cursor:default}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body data-th="studio" data-ph="done">
+<div id="demo" aria-label="演示用的开关（不是界面的一部分）">
+ <span>颜色</span><button data-th="studio" aria-pressed="true">浅色</button><button data-th="obsidian" aria-pressed="false">深色</button>
+ <span>看看不同时候的样子</span><button data-ph="clarify" aria-pressed="false">刚开始聊</button><button data-ph="confirm" aria-pressed="false">等你确认</button><button data-ph="build" aria-pressed="false">正在做</button><button data-ph="done" aria-pressed="true">做好了</button>
+</div>
+
+<div id="view"></div>
+
+<button class="menuBtn glass pill"><span class="bars"><i></i><i></i><i></i></span>菜单</button>
+<div class="title fade"><h1 data-t>安装板</h1><p data-st>第 2 版　100 × 60 × 5 毫米</p></div>
+
+<div class="gizmo fade" data-show="build done">
+ <svg viewBox="0 0 104 104" aria-label="方向：点一个轴，转到从那边看" data-giz></svg>
+ <div class="views glass"><button data-v="front">前</button><button data-v="top">上</button><button data-v="right">右</button><button data-v="iso">立体</button><button data-v="bottom">底</button></div>
+</div>
+
+<div class="time fade" data-show="build done">
+ <button><i></i>底板<em class="num">6/6</em></button>
+ <button class="on"><i data-s2></i>四个角孔<em class="num" data-s2n>9/9</em></button>
+</div>
+<button class="score fade" data-show="build done"><b class="num" data-score>9/9</b><span data-scorel>项全部量过，都对</span></button>
+
+<section class="brief fade" data-brief aria-label="需求单">
+ <h2>安装板</h2><div class="sub" data-bsub>边聊边记。缺的会问你，齐了再请你确认。</div>
+ <div class="r"><span>板长</span><span class="tag u">你给的</span><span class="v">100 mm</span></div>
+ <div class="r"><span>板宽</span><span class="tag u">你给的</span><span class="v">60 mm</span></div>
+ <div class="r"><span>板厚</span><span class="tag">建议</span><span class="v" data-q1>5 mm</span></div>
+ <div class="r"><span>孔径</span><span class="tag u" data-q2t>你给的</span><span class="v" data-q2>6 mm</span></div>
+ <div class="r"><span>孔离边</span><span class="tag">建议</span><span class="v">10 mm</span></div>
+ <h3>组成部分</h3><ul><li>板</li><li>四个角孔</li></ul>
+ <h3>怎么拼在一起</h3><ul><li>四个孔在板的四个角上，孔心离相邻两条边各 10 毫米，打穿板厚</li></ul>
+ <div class="act" data-act><button>没问题，开始做</button><button>我还要改</button></div>
+</section>
+
+<div class="cap fade" data-cap>做好了，每一步都量过。孔离边 10 毫米，要不要再往里一点？</div>
+<div class="ask fade" data-ask><button class="glass pill">往里 2 毫米</button><button class="glass pill">就这样</button></div>
+<div class="in glass pill">接着说要改哪里<span class="send">↑</span></div>
+<button class="hist glass pill">对话记录</button>
+<button class="tune glass pill fade" data-show="done" data-open-tune><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 4h7M13 4h1M2 12h2M8 12h6"/><circle cx="11" cy="4" r="2"/><circle cx="6" cy="12" r="2"/></svg>调参数</button>
+
+<section class="sheet" data-sheet aria-label="调参数">
+ <header><h2>调参数</h2><span>改好后点"应用"，会从头重做一遍、再量一遍。不花钱</span><button class="x" data-close-tune aria-label="收起">×</button></header>
+ <div class="groups">
+  <div class="group"><h3>外形</h3>
+   <div class="p" data-k="L"><label>板长</label><input type="range" min="60" max="160" step="1" value="100"><input type="number" value="100"><small>mm</small></div>
+   <div class="p" data-k="W"><label>板宽</label><input type="range" min="40" max="100" step="1" value="60"><input type="number" value="60"><small>mm</small></div>
+   <div class="p" data-k="T"><label>板厚</label><input type="range" min="2" max="12" step="0.5" value="5"><input type="number" value="5"><small>mm</small></div>
+  </div>
+  <div class="group"><h3>孔</h3>
+   <div class="p" data-k="H"><label>孔径</label><input type="range" min="3" max="12" step="0.5" value="6"><input type="number" value="6"><small>mm</small></div>
+   <div class="p" data-k="I"><label>孔离边</label><input type="range" min="6" max="20" step="0.5" value="10"><input type="number" value="10"><small>mm</small></div>
+  </div>
+ </div>
+ <footer><span class="st" data-tst>还没有改动</span><button data-reset>还原</button><button class="go" data-apply disabled>应用</button></footer>
+</section>
+
+<script type="module">
+import * as THREE from 'three';
+import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
+const $ = s => document.querySelector(s), $$ = s => [...document.querySelectorAll(s)];
+const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const TH = {
+  studio:  {sky:0xffffff, gnd:0xC9C7D0, hemi:2.0, key:0xffffff, keyI:2.4, rim:0xffffff, rimI:1.0, color:0x8E949D, rough:.3, metal:.55, edge:0x17151B, edgeA:.3, shadow:.18, grid:0x17151B, gridA:.08, axis:['#D93F3F','#2E9B5B','#3A62D6'], exp:1.05},
+  obsidian:{sky:0x3A4766, gnd:0x020305, hemi:.9, key:0xDDE8FF, keyI:3.0, rim:0x5C8DFF, rimI:4.0, color:0xC4CCD8, rough:.22, metal:.6, edge:0xA9CBFF, edgeA:.25, shadow:.55, grid:0xA9CBFF, gridA:.10, axis:['#FF6B6B','#5BE08F','#7AA7FF'], exp:1.1}
+};
+// 尺寸，单位毫米；SCA 的坐标是 z 朝上，这里把它转成 three.js 的 y 朝上来画
+const P = {L:100, W:60, T:5, H:6, I:10};
+function part(p, holes){
+  const s = new THREE.Shape(), a = p.L/2, b = p.W/2;
+  s.moveTo(-a,-b); s.lineTo(a,-b); s.lineTo(a,b); s.lineTo(-a,b); s.lineTo(-a,-b);
+  if (holes) for (const [x,y] of [[1,1],[-1,1],[1,-1],[-1,-1]]) { const h = new THREE.Path(); h.absarc(x*(a-p.I), y*(b-p.I), p.H/2, 0, Math.PI*2, true); s.holes.push(h); }
+  const g = new THREE.ExtrudeGeometry(s, {depth:p.T, bevelEnabled:true, bevelThickness:.4, bevelSize:.4, bevelSegments:2, curveSegments:48});
+  g.rotateX(-Math.PI/2); return g;
+}
+const el = $('#view');
+const r = new THREE.WebGLRenderer({antialias:true, alpha:true});
+r.setPixelRatio(Math.min(devicePixelRatio,2)); r.shadowMap.enabled = true; r.shadowMap.type = THREE.PCFSoftShadowMap; r.toneMapping = THREE.ACESFilmicToneMapping;
+el.appendChild(r.domElement);
+const sc = new THREE.Scene();
+const cam = new THREE.PerspectiveCamera(24, 1, 1, 4000); cam.position.set(230,150,290);
+const ctl = new OrbitControls(cam, r.domElement); ctl.enableDamping = true; ctl.enablePan = true; ctl.screenSpacePanning = true;
+ctl.autoRotate = false; ctl.target.set(0,3,0); ctl.minDistance = 120; ctl.maxDistance = 700;   // 不限制上下角度：可以转到底下看
+const hemi = new THREE.HemisphereLight(); sc.add(hemi);
+const key = new THREE.DirectionalLight(); key.position.set(90,170,110); key.castShadow = true; key.shadow.mapSize.set(2048,2048);
+Object.assign(key.shadow.camera,{left:-140,right:140,top:140,bottom:-140}); key.shadow.radius = 6; sc.add(key);
+const rim = new THREE.DirectionalLight(); rim.position.set(-140,70,-120); sc.add(rim);
+const under = new THREE.DirectionalLight(0xffffff,.8); under.position.set(0,-150,40); sc.add(under);   // 从底下看时也有光
+const mat = new THREE.MeshStandardMaterial({side:THREE.DoubleSide}); const lm = new THREE.LineBasicMaterial({transparent:true});
+const shadowM = new THREE.ShadowMaterial({opacity:.2}); const ground = new THREE.Mesh(new THREE.PlaneGeometry(800,800), shadowM);
+ground.rotation.x = -Math.PI/2; ground.position.y = -.5; ground.receiveShadow = true; sc.add(ground);
+const grid = new THREE.GridHelper(400, 40); grid.position.y = -.45; grid.material.transparent = true; sc.add(grid);
+let mesh, edges, holes = true;
+function build(){ if (mesh){ sc.remove(mesh); sc.remove(edges); mesh.geometry.dispose(); edges.geometry.dispose(); }
+  const g = part(P, holes); mesh = new THREE.Mesh(g, mat); mesh.castShadow = true; sc.add(mesh);
+  edges = new THREE.LineSegments(new THREE.EdgesGeometry(g, 25), lm); sc.add(edges); }
+build();
+let axisColors;
+function theme(n){ const t = TH[n]; document.body.dataset.th = n;
+  hemi.color.set(t.sky); hemi.groundColor.set(t.gnd); hemi.intensity = t.hemi; key.color.set(t.key); key.intensity = t.keyI;
+  rim.color.set(t.rim); rim.intensity = t.rimI; mat.color.set(t.color); mat.roughness = t.rough; mat.metalness = t.metal;
+  lm.color.set(t.edge); lm.opacity = t.edgeA; shadowM.opacity = t.shadow; grid.material.color.set(t.grid); grid.material.opacity = t.gridA;
+  r.toneMappingExposure = t.exp; axisColors = t.axis;
+  $$('#demo [data-th]').forEach(b => b.setAttribute('aria-pressed', b.dataset.th === n)); }
+theme('studio');
+
+// 底部面板打开时，把画面往上挪，零件不被挡住
+let shift = 0, shiftTo = 0;
+function size(){ const w = innerWidth, h = innerHeight; r.setSize(w,h); cam.aspect = w/h; cam.updateProjectionMatrix(); }
+addEventListener('resize', size); size();
+
+// 视角：点坐标轴或下面的按钮，平滑转过去
+let fly = null;
+function flyTo(dir){ const d = cam.position.distanceTo(ctl.target); const to = ctl.target.clone().add(dir.clone().normalize().multiplyScalar(d));
+  if (Math.abs(dir.y) > .99) to.z += .01;   // 正上、正下看时避开万向锁
+  fly = {from:cam.position.clone(), to, t0:performance.now()}; }
+const V = {front:new THREE.Vector3(0,0,1), top:new THREE.Vector3(0,1,0), right:new THREE.Vector3(1,0,0), bottom:new THREE.Vector3(0,-1,0), iso:new THREE.Vector3(1,.75,1.25)};
+$$('[data-v]').forEach(b => b.addEventListener('click', () => flyTo(V[b.dataset.v])));
+// 坐标轴小图：X 红、Y 绿、Z 蓝（Z 朝上，和建模用的坐标一致）
+const AX = [{k:'X', v:new THREE.Vector3(1,0,0)}, {k:'Y', v:new THREE.Vector3(0,0,-1)}, {k:'Z', v:new THREE.Vector3(0,1,0)}];
+const giz = $('[data-giz]');
+function drawGizmo(){
+  const q = cam.quaternion.clone().invert(); const items = [];
+  AX.forEach((a,i) => { const p = a.v.clone().applyQuaternion(q);
+    items.push({k:a.k, i, x:52+p.x*36, y:52-p.y*36, z:p.z, pos:true, dir:a.v});
+    items.push({k:'', i, x:52-p.x*36, y:52+p.y*36, z:-p.z, pos:false, dir:a.v.clone().negate()}); });
+  items.sort((a,b) => a.z - b.z);
+  giz.innerHTML = items.map(o => { const c = axisColors[o.i];
+    return (o.pos ? `<line x1="52" y1="52" x2="${o.x}" y2="${o.y}" stroke="${c}" stroke-width="2.5"/>` : '') +
+      `<circle data-d="${o.dir.x},${o.dir.y},${o.dir.z}" cx="${o.x}" cy="${o.y}" r="${o.pos?10:7}" fill="${o.pos?c:'none'}" stroke="${c}" stroke-width="2" style="cursor:pointer"/>` +
+      (o.pos ? `<text x="${o.x}" y="${o.y+4}" text-anchor="middle" font-size="11" font-weight="700" fill="#fff" style="pointer-events:none;font-family:Archivo">${o.k}</text>` : ''); }).join('');
+}
+giz.addEventListener('click', e => { const d = e.target.dataset && e.target.dataset.d; if (d) flyTo(new THREE.Vector3(...d.split(',').map(Number))); });
+
+r.setAnimationLoop(now => {
+  if (fly) { const k = Math.min(1, (now - fly.t0)/450), e = 1 - Math.pow(1-k, 3); cam.position.lerpVectors(fly.from, fly.to, e); if (k === 1) fly = null; }
+  shift += (shiftTo - shift) * .15;
+  cam.setViewOffset(innerWidth, innerHeight, 0, shift, innerWidth, innerHeight);
+  const below = cam.position.y < 0; ground.visible = !below; grid.visible = !below;   // 转到底下时，地面和网格自动隐藏
+  ctl.update(); r.render(sc, cam); drawGizmo();
+});
+
+// 走到哪一步：舞台中间放的是"现在正在做的东西"
+const PH = {
+  clarify:{t:'新零件', st:'还在问你几个问题', cap:'还差两件事：孔要穿多大的螺丝？板厚有要求吗？', ask:['M6 螺丝','板厚你定'], bsub:'我边聊边记，还没问到的先空着。', act:false, wait:true},
+  confirm:{t:'安装板', st:'都记下了，你看一下', cap:'都记下了，你看一下。没问题的话我就开始做。', ask:null, bsub:'没问题就开始做；想改哪里，直接跟我说。', act:true, wait:false},
+  build:  {t:'安装板', st:'正在做，第 2 步，共 2 步', cap:'板子做好了，尺寸都对。现在开始打四个角上的孔……', ask:null, model:'s1'},
+  done:   {t:'安装板', st:'第 2 版　100 × 60 × 5 毫米', cap:'做好了，每一步都量过。孔离边 10 毫米，要不要再往里一点？', ask:['往里 2 毫米','就这样'], model:'full'}
+};
+function phase(n){ const p = PH[n]; document.body.dataset.ph = n;
+  $('[data-t]').textContent = p.t; $('[data-st]').textContent = p.st; $('[data-cap]').textContent = p.cap;
+  const ask = $('[data-ask]'); ask.classList.toggle('hide', !p.ask); if (p.ask) ask.querySelectorAll('button').forEach((b,i) => b.textContent = p.ask[i]);
+  const br = $('[data-brief]'); br.classList.toggle('away', !!p.model); $('[data-bsub]').textContent = p.bsub || '';
+  $('[data-act]').style.display = p.act ? 'flex' : 'none';
+  $('[data-q1]').innerHTML = p.wait ? '<span class="wait">等你回答</span>' : '5 mm';
+  $('[data-q2]').innerHTML = p.wait ? '<span class="wait">等你回答</span>' : '6 mm';
+  mesh.visible = edges.visible = !!p.model; holes = p.model === 'full'; build(); mesh.visible = edges.visible = !!p.model;
+  $$('[data-show]').forEach(x => x.classList.toggle('hide', !x.dataset.show.split(' ').includes(n)));
+  $('[data-s2]').className = n === 'build' ? 'run' : ''; $('[data-s2n]').textContent = n === 'build' ? '进行中' : '9/9';
+  $('[data-score]').textContent = n === 'build' ? '6/6' : '9/9'; $('[data-scorel]').textContent = n === 'build' ? '项已经量过' : '项全部量过，都对';
+  closeTune();
+  $$('#demo [data-ph]').forEach(b => b.setAttribute('aria-pressed', b.dataset.ph === n)); }
+
+// 调参数
+const sheet = $('[data-sheet]'), orig = {...P};
+function openTune(){ sheet.classList.add('on'); shiftTo = 130; }
+function closeTune(){ sheet.classList.remove('on'); shiftTo = 0; }
+$('[data-open-tune]').addEventListener('click', openTune); $('[data-close-tune]').addEventListener('click', closeTune);
+let timer;
+function changed(){ const ks = Object.keys(P).filter(k => P[k] !== orig[k]);
+  $$('.p').forEach(row => row.classList.toggle('chg', ks.includes(row.dataset.k)));
+  $('[data-apply]').disabled = !ks.length;
+  $('[data-tst]').textContent = ks.length ? `改了 ${ks.length} 处，点"应用"才会真正重做` : '还没有改动'; }
+$$('.p').forEach(row => { const [rg, nb] = row.querySelectorAll('input'), k = row.dataset.k;
+  const set = v => { P[k] = +v; rg.value = v; nb.value = v; changed(); clearTimeout(timer); timer = setTimeout(build, 160); };
+  rg.addEventListener('input', () => set(rg.value)); nb.addEventListener('change', () => set(nb.value)); });
+$('[data-reset]').addEventListener('click', () => { Object.assign(P, orig); $$('.p').forEach(row => { const [rg, nb] = row.querySelectorAll('input'); rg.value = nb.value = P[row.dataset.k]; }); changed(); build(); });
+$('[data-apply]').addEventListener('click', () => { const msgs = ['重做板子，量尺寸……','重新打孔，量尺寸……','都对，存成了第 3 版'];
+  let i = 0; $('[data-apply]').disabled = true; const tick = () => { $('[data-tst]').textContent = msgs[i]; if (++i < msgs.length) setTimeout(tick, 700);
+    else { Object.assign(orig, P); $$('.p').forEach(r => r.classList.remove('chg')); $('[data-st]').textContent = `第 3 版　${P.L} × ${P.W} × ${P.T} 毫米`; } }; tick(); });
+
+$$('#demo [data-th]').forEach(b => b.addEventListener('click', () => theme(b.dataset.th)));
+$$('#demo [data-ph]').forEach(b => b.addEventListener('click', () => phase(b.dataset.ph)));
+addEventListener('keydown', e => { if (e.key === 'Escape') closeTune(); });
+phase('done');
+</script>
+</body>
+</html>
