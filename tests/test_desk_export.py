@@ -135,10 +135,11 @@ def test_homepage_content():
     assert f"irm {INSTALL_PS1} | iex" in html
     assert f"curl -fsSL {INSTALL_SH} | sh" in html
     assert REQUIREMENTS in html
-    assert "说出你要的零件，它来建模，每一步都实测。" in html and "卡尺 Caliper" in html
+    # 3.0 计划 5 Task 5：名字和"它怎么工作"的几步换成 3.0 的（只改字面值）
+    assert "说出你要做的东西，它来建模，每一步都实测。" in html and "Datum 基准" in html and "卡尺" not in html
     assert 'href="demo/"' in html
     assert f"https://github.com/{REPO}" in html
-    for step in ("澄清", "确认", "规划", "逐阶段建模与实测", "终检与交付"):
+    for step in ("问清楚", "确认", "一步步做、每步实测", "装起来、动起来检查", "交付"):
         assert step in html, step
     # 没有外部脚本、样式、字体
     assert not re.search(r"<script[^>]+src=[\"']https?://", html)

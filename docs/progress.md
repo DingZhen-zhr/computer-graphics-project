@@ -1326,3 +1326,7 @@
 
 ## 3.0 计划 5 Task 3：演示脚本和实验报告初稿
 - `docs/demo-script.md`（四个镜头、单零件版、录制前的检查清单）、`docs/report-draft.md`（五节；真实评测的数字还没有，写的是"还没有测"）。测试 `tests/test_report_docs.py` 4 个：标题齐全、报告里的"x/y"都能在 results-v3.md 里找到、成员分工没有人名、没有 key。
+
+## 3.0 计划 5 Task 5：主页、在线示例、README、Mac 清单
+- `site/index.html` 换成展台风格、名字 Datum 基准、五步"它怎么工作"；`test_homepage_content` 只改了字面值（计划清单内）。README 的"怎么用"换成展台界面，加了"多个零件和会动的东西"一节和署名；Mac 清单加了第 17 项（多零件）；`test_readme.py` 加 1 个测试。快速全量 1150 个通过。
+- 在线示例还是单零件的手机支架回放（还没有真实的多零件会话），README 截图还是第二版的，见 D40。

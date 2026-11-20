@@ -94,3 +94,13 @@ def test_mac_checklist_has_all_items():
     assert all("看到了什么" in item or "看到了什么" in text for item in items)
     tail = text.strip().splitlines()[-4:]
     assert any("签名" in line for line in tail) and any("日期" in line for line in tail)
+
+
+def test_readme_v3_name_and_multipart():
+    """3.0 计划 5 Task 5：README 用 Datum 的名字；"卡尺"只出现在讲从第二版升级的句子里；有多零件一节、teardown 致谢。"""
+    text = README.read_text(encoding="utf-8")
+    assert text.startswith("# Datum 基准")
+    for line in text.splitlines():
+        if "卡尺" in line:
+            assert "第二版" in line, line
+    assert "### 多个零件和会动的东西" in text and "装配和运动检查" in text and "teardown" in text
