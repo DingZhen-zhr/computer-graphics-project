@@ -176,3 +176,16 @@
 - 实际情况：旧测试 `test_install_scripts.py::test_default_source_is_the_release_tag` 断言默认来源是 `@v{__version__}`。Task 1 把版本号改成 3.0.0 以后，这条测试马上变红。它不在"要改的旧测试"清单里，而且断言本身是对的，只能改实现。
 - 怎么改：Task 1 里只改两个脚本的三处：默认来源 `@v3.0.0`、压缩包地址 `datum-cad @ …/v3.0.0.zip`（v3 的压缩包里包名是 `datum-cad`，名字对不上 uv 会报错）、开头注释里的标签。其余（环境变量、快捷方式、进程名、发现旧版）仍在 Task 5 做。
 - 影响：Task 1 到 Task 4 的提交里，安装脚本装的是 `datum-cad`，但快捷方式、自检那几步还在找 `caliper` 的文件，真的运行会在第 4 步出问题。这几个提交只在本地，不推送；Task 5 一起改齐。Task 5 的新测试 `test_default_source_is_v3_tag` 写好时就会通过，这是预料之中的，不说明测试没用。
+
+## D24（3.0 计划 1 Task 3）每个服务只从旧服务名回退一次；删 key 后不再复制回来（规划会话修订）
+
+- 原计划：Task 3 的 Interfaces 写的是：取 key 的顺序是"环境变量 → 新服务名 `datum` → 旧服务名 `caliper`"，从旧的取到就复制一份到新的；`set_key`、`delete_key` 只动新服务名；旧服务名里的 key 不删。
+- 发现的问题（实现 Task 3 时发现，报告给了规划会话）：设置页有"删除 key"。升级用户的旧服务名里有 key 时，在 Datum 里删 key 只删掉了新服务名里的那份；设置页紧接着查 key 的来源，又从旧服务名里找到、复制回来。用户看到的是 key 删不掉。
+- 怎么改（规划会话给的修订，不是用户本人的回复；规划会话说会告诉用户）：
+  1. 数据目录里记一个小文件 `key_migration.json`，内容是 `{预设 id: true}`。`get_key`、`key_source` 只有在这个服务还没记过时，才去旧服务名找；找到并复制到新服务名后记上。复制失败不记，下次还会再试。
+  2. `delete_key` 删掉新服务名里的 key；旧服务名里还有这个服务的 key 时，把它记成"回退过"，删掉后不会再复制回来。旧服务名里的 key 照旧不删。
+  3. 文件读不出来、内容不对时当作没记过，不抛异常、不挡住取 key（日志里记一条）；写文件失败只在日志里记一条。
+  4. 函数签名都不变。
+  - 我加的一条：只有旧服务名里确实有这个服务的 key 时，`delete_key` 才写这个文件。这样旧测试里没有设 `DATUM_HOME` 的删 key 调用不会在真实的数据目录里写东西（那会建出 `Datum` 目录，挡住数据目录的迁移）；没有旧 key 时本来也不存在"复制回来"的问题。
+- 测试：规划会话要求的 `test_deleted_key_does_not_come_back`、`test_fallback_only_once_per_provider`、`test_marker_file_corrupt_is_ignored`、`test_copy_failure_does_not_mark`，另加 `test_delete_before_any_fallback_also_blocks_it`、`test_marker_write_failure_only_logs`、`test_no_marker_written_without_old_key`。
+- 影响：只影响 Task 3 和设置页删 key 的行为。`datum uninstall --delete-data` 会连这个文件一起删掉；之后重新安装，旧服务名里的 key 会再被复制一次，这和"旧的不删"的规矩一致。
