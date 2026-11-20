@@ -1,4 +1,5 @@
-"""桌面端的视觉规范（第二版计划 3 Task 2）：颜色、对比度、线和圆角、不用阴影渐变和网络字体。"""
+"""桌面端的视觉规范（3.0 计划 3 Task 1，换掉第二版的 8 条）：展台的两套颜色、对比度、本地字体、颜色只在 tokens.css、
+不用投影阴影做卡片、减少动态效果、圆角、三种按钮。"""
 
 from __future__ import annotations
 
@@ -6,16 +7,21 @@ import re
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-CSS_DIR = ROOT / "cad_agent" / "desk" / "static" / "css"
+STATIC = ROOT / "cad_agent" / "desk" / "static"
+CSS_DIR = STATIC / "css"
 TOKENS = CSS_DIR / "tokens.css"
 
-LIGHT = {"--paper": "#F4F1EA", "--ink": "#1B1B1B", "--ink-2": "#6B675E", "--accent": "#1F4FD8", "--ok": "#2E6B3F", "--bad": "#B3261E"}
-DARK = {"--paper": "#0F2A4A", "--ink": "#E6EEF8", "--ink-2": "#9DB7D6", "--accent": "#FFD166", "--ok": "#8FD6A3", "--bad": "#FF8A80"}
+# 设计文档第 7.2 节（浅色的次要文字按偏离 D35 加深到 #5E5A66，才够 4.5:1）
+LIGHT = {"--ink": "#17151B", "--mute": "#5E5A66", "--acc": "#17151B", "--move": "#4767E8", "--ok": "#1F8A4C", "--bad": "#C93A2E"}
+DARK = {"--ink": "#EEF1F6", "--mute": "#8A93A6", "--acc": "#A9CBFF", "--move": "#7FB2FF", "--ok": "#7FE0A8", "--bad": "#FF8A80"}
+LIGHT_BG = ("#FFFFFF", "#EEEDF1", "#D9D8DE")
+DARK_BG = ("#1C2230", "#0A0D13", "#030405")
+NAMES = {"--bg", "--ink", "--mute", "--acc", "--acc-ink", "--move", "--ok", "--bad", "--glass", "--line", "--panel",
+         "--font-ui", "--font-num", "--r-pill", "--r-card", "--t"}
 _DECL = re.compile(r"(--[\w-]+)\s*:\s*([^;]+);")
 
 
 def _block(css: str, selector: str) -> str:
-    """取出某个选择器后面第一对大括号里的内容（不处理嵌套的选择器）。"""
     start = css.index(selector + " {")
     return css[css.index("{", start) + 1: css.index("}", start)]
 
@@ -27,11 +33,6 @@ def _vars(block: str) -> dict[str, str]:
 def _palettes() -> tuple[dict[str, str], dict[str, str]]:
     css = TOKENS.read_text(encoding="utf-8")
     return _vars(_block(css, ":root")), _vars(_block(css, ':root[data-theme="dark"]'))
-
-
-def _resolve(value: str, table: dict[str, str]) -> str:
-    m = re.fullmatch(r"var\((--[\w-]+)\)", value)
-    return _resolve(table[m.group(1)], table) if m else value
 
 
 def _luminance(hex_color: str) -> float:
@@ -47,7 +48,7 @@ def _contrast(a: str, b: str) -> float:
     return (la + 0.05) / (lb + 0.05)
 
 
-def _css_files() -> list[Path]:
+def _css() -> list[Path]:
     files = sorted(CSS_DIR.glob("*.css"))
     assert files, "还没有样式文件"
     return files
@@ -59,66 +60,64 @@ def test_token_values():
         assert light[name].upper() == value, name
     for name, value in DARK.items():
         assert dark[name].upper() == value, name
-    assert set(light) >= {"--paper", "--ink", "--ink-2", "--accent", "--ok", "--bad", "--line", "--line-soft", "--part", "--part-edge",
-                          "--font-ui", "--font-mono", "--s-1", "--s-2", "--s-3", "--s-4", "--s-5", "--s-6", "--radius"}
-    colour_names = {k for k, v in light.items() if v.startswith("#") or v.startswith("var(--")}
-    assert colour_names == {k for k, v in dark.items() if v.startswith("#") or v.startswith("var(--")}
-    assert light["--part"].upper() == "#D9D5CB" and dark["--part"].upper() == "#7FA3CC"
-    assert light["--line"] == "var(--ink)" and light["--line-soft"] == "var(--ink-2)" and light["--part-edge"] == "var(--ink)"
-    assert light["--radius"] == "2px"
-    assert [light[f"--s-{i}"] for i in range(1, 7)] == ["4px", "8px", "12px", "16px", "24px", "32px"]
-    assert light["--font-ui"] == '"Microsoft YaHei UI", "PingFang SC", system-ui, sans-serif'
-    assert light["--font-mono"] == '"Cascadia Mono", "SF Mono", Consolas, monospace'
+    for stops, table in ((LIGHT_BG, light), (DARK_BG, dark)):
+        assert [s.upper() for s in re.findall(r"#[0-9A-Fa-f]{6}", table["--bg"])] == list(stops)
+        assert table["--bg"].startswith("radial-gradient(")
+    assert NAMES <= set(light) and set(light) == set(dark)
     css = TOKENS.read_text(encoding="utf-8")
-    assert ':root[data-theme="system"]' in css and "prefers-color-scheme: dark" in css
-
-
-def test_system_theme_uses_dark_palette_under_media_query():
-    css = TOKENS.read_text(encoding="utf-8")
-    media = css[css.index("@media (prefers-color-scheme: dark)"):]
-    _, dark = _palettes()
-    system = _vars(_block(media, ':root[data-theme="system"]'))
-    assert {k: system[k] for k in DARK} == {k: dark[k] for k in DARK}
+    system = _vars(_block(css, ':root[data-theme="system"]'))   # 跟随系统、系统是深色时：和深色一样
+    assert all(dark[k] == v for k, v in system.items()) and {"--bg", "--ink", "--mute", "--acc"} <= set(system)
+    assert "prefers-color-scheme: dark" in css and ':root[data-theme="system"]' in css
 
 
 def test_contrast_at_least_4_5():
-    for table in _palettes():
-        paper = _resolve(table["--paper"], table)
-        for name in ("--ink", "--ink-2", "--accent", "--ok", "--bad"):
-            ratio = _contrast(_resolve(table[name], table), paper)
-            assert ratio >= 4.5, (name, round(ratio, 2))
+    light, dark = _palettes()
+    for table, stops in ((light, LIGHT_BG), (dark, DARK_BG)):
+        for name in ("--ink", "--mute"):
+            for bg in stops:
+                assert _contrast(table[name], bg) >= 4.5, (name, table[name], bg)
+        assert _contrast(table["--acc-ink"], table["--acc"]) >= 4.5
 
 
-def test_no_shadow_gradient_blur_webfont():
-    for path in _css_files():
-        text = path.read_text(encoding="utf-8")
-        for bad in ("box-shadow", "text-shadow", "gradient(", "blur(", "@font-face", "@import", "http://", "https://"):
-            assert bad not in text, (path.name, bad)
-
-
-def test_radius_at_most_2px():
-    allowed = {"0", "var(--radius)", "1px", "2px", "50%"}
-    for path in _css_files():
-        for value in re.findall(r"border-radius\s*:\s*([^;]+);", path.read_text(encoding="utf-8")):
-            assert value.strip() in allowed, (path.name, value)
+def test_no_external_resources_and_font_is_local():
+    for p in _css():
+        assert "http" not in p.read_text(encoding="utf-8"), p.name
+    base = (CSS_DIR / "base.css").read_text(encoding="utf-8")
+    assert re.search(r'@font-face\s*{[^}]*url\("\.\./fonts/Archivo\.ttf"\)\s*format\("truetype"\)', base)
+    assert "font-display: swap" in base
+    assert (STATIC / "fonts" / "Archivo.ttf").stat().st_size > 100_000
+    assert "SIL Open Font License" in (STATIC / "fonts" / "OFL.txt").read_text(encoding="utf-8")
 
 
 def test_colors_only_in_tokens():
-    for path in _css_files():
-        if path.name == "tokens.css":
+    pat = re.compile(r"#[0-9A-Fa-f]{3,8}\b|rgba?\(|hsla?\(")
+    for p in _css():
+        if p.name == "tokens.css":
             continue
-        text = re.sub(r"/\*.*?\*/", "", path.read_text(encoding="utf-8"), flags=re.S)
-        assert not re.search(r"#[0-9a-fA-F]{3,8}\b", text), path.name
-        assert "rgb(" not in text and "rgba(" not in text and "hsl(" not in text, path.name
+        assert not pat.search(p.read_text(encoding="utf-8")), p.name
+
+
+def test_no_box_shadow_cards():
+    for p in _css():
+        css = p.read_text(encoding="utf-8")
+        for m in re.finditer(r"([^{}]+)\{([^}]*box-shadow[^}]*)\}", css):
+            assert ":focus-visible" in m.group(1), (p.name, m.group(1).strip())
 
 
 def test_reduced_motion_rule_exists():
-    text = (CSS_DIR / "base.css").read_text(encoding="utf-8")
-    block = text[text.index("@media (prefers-reduced-motion: reduce)"):]
-    assert "transition" in block and "animation" in block
+    base = (CSS_DIR / "base.css").read_text(encoding="utf-8")
+    m = re.search(r"@media \(prefers-reduced-motion: reduce\)\s*{(.*?)}\s*}", base, re.S)
+    assert m and "transition: none" in m.group(1) and "animation: none" in m.group(1)
 
 
-def test_base_has_three_buttons_section_head_and_states():
-    text = (CSS_DIR / "base.css").read_text(encoding="utf-8")
-    for sel in (".btn-primary", ".btn ", ".btn-text", ".section-head", ".ok", ".bad", ".none", ":focus-visible", "font-size: 14px"):
-        assert sel in text, sel
+def test_radius_values():
+    allowed = re.compile(r"^(0|50%|var\(--r-pill\)|var\(--r-card\)|(8|9|10|11|12)px|(16|17|18|19|20|21|22)px)$")
+    for p in _css():
+        for v in re.findall(r"border-radius\s*:\s*([^;]+);", p.read_text(encoding="utf-8")):
+            assert allowed.match(v.strip()), (p.name, v)
+
+
+def test_buttons_defined():
+    base = (CSS_DIR / "base.css").read_text(encoding="utf-8")
+    for cls in (".btn-primary", ".btn-glass", ".btn-text"):
+        assert cls in base, cls

@@ -1,59 +1,91 @@
-/* Datum 的视觉规范（设计文档 5.3）：浅色是米白图纸加墨线，深色是深蓝蓝图加白线。
-   全部颜色只在这个文件里出现；其他样式和脚本一律用这里的变量。 */
-
+/* 颜色和尺寸的唯一来源（设计文档第 7.2 节）：浅色"影棚"、深色"黑曜"。别的样式和脚本只用这里的变量。
+   三维画面里的颜色（坐标轴、轮廓线、网格、灯光）也从这里读。 */
 :root {
-  --paper: #F4F1EA;
-  --paper-2: #EAE5D9;
-  --ink: #1B1B1B;
-  --ink-2: #6B675E;
-  --accent: #1F4FD8;
-  --ok: #2E6B3F;
-  --bad: #B3261E;
-  --line: var(--ink);
-  --line-soft: var(--ink-2);
-  --part: #D9D5CB;
-  --part-edge: var(--ink);
-
-  --font-ui: "Microsoft YaHei UI", "PingFang SC", system-ui, sans-serif;
-  --font-mono: "Cascadia Mono", "SF Mono", Consolas, monospace;
-  --s-1: 4px;
-  --s-2: 8px;
-  --s-3: 12px;
-  --s-4: 16px;
-  --s-5: 24px;
-  --s-6: 32px;
-  --radius: 2px;
   color-scheme: light;
+  --bg: radial-gradient(110% 85% at 50% 38%, #FFFFFF 0, #EEEDF1 55%, #D9D8DE 100%);
+  --ink: #17151B;
+  --mute: #5E5A66;
+  --acc: #17151B;
+  --acc-ink: #FFFFFF;
+  --move: #4767E8;
+  --ok: #1F8A4C;
+  --bad: #C93A2E;
+  --glass: rgba(255, 255, 255, 0.66);
+  --line: rgba(23, 21, 27, 0.12);
+  --panel: rgba(250, 250, 252, 0.94);
+  --scrim: rgba(23, 21, 27, 0.18);
+  --axis-x: #D93F3F;
+  --axis-y: #2E9B5B;
+  --axis-z: #3A62D6;
+  --edge: #17151B;
+  --sky: #FFFFFF;
+  --ground: #C9C7D0;
+  --rim: #FFFFFF;
+  --part: #8E949D;
+  --font-ui: "Microsoft YaHei UI", "PingFang SC", system-ui, sans-serif;
+  --font-num: "Archivo", "Microsoft YaHei UI", "PingFang SC", system-ui, sans-serif;
+  --r-pill: 999px;
+  --r-card: 20px;
+  --t: 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
+  --h1-weight: 700;
+  --h1-stretch: 100%;
 }
 
 :root[data-theme="dark"] {
-  --paper: #0F2A4A;
-  --paper-2: #16365C;
-  --ink: #E6EEF8;
-  --ink-2: #9DB7D6;
-  --accent: #FFD166;
-  --ok: #8FD6A3;
-  --bad: #FF8A80;
-  --line: var(--ink);
-  --line-soft: var(--ink-2);
-  --part: #7FA3CC;
-  --part-edge: var(--ink);
   color-scheme: dark;
+  --bg: radial-gradient(110% 85% at 50% 36%, #1C2230 0, #0A0D13 55%, #030405 100%);
+  --ink: #EEF1F6;
+  --mute: #8A93A6;
+  --acc: #A9CBFF;
+  --acc-ink: #08101E;
+  --move: #7FB2FF;
+  --ok: #7FE0A8;
+  --bad: #FF8A80;
+  --glass: rgba(255, 255, 255, 0.06);
+  --line: rgba(169, 203, 255, 0.18);
+  --panel: rgba(10, 13, 19, 0.92);
+  --scrim: rgba(0, 0, 0, 0.45);
+  --axis-x: #FF6B6B;
+  --axis-y: #5BE08F;
+  --axis-z: #7AA7FF;
+  --edge: #A9CBFF;
+  --sky: #3A4766;
+  --ground: #020305;
+  --rim: #5C8DFF;
+  --part: #C4CCD8;
+  --font-ui: "Microsoft YaHei UI", "PingFang SC", system-ui, sans-serif;
+  --font-num: "Archivo", "Microsoft YaHei UI", "PingFang SC", system-ui, sans-serif;
+  --r-pill: 999px;
+  --r-card: 20px;
+  --t: 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
+  --h1-weight: 300;
+  --h1-stretch: 115%;
 }
 
 @media (prefers-color-scheme: dark) {
   :root[data-theme="system"] {
-    --paper: #0F2A4A;
-    --paper-2: #16365C;
-    --ink: #E6EEF8;
-    --ink-2: #9DB7D6;
-    --accent: #FFD166;
-    --ok: #8FD6A3;
-    --bad: #FF8A80;
-    --line: var(--ink);
-    --line-soft: var(--ink-2);
-    --part: #7FA3CC;
-    --part-edge: var(--ink);
     color-scheme: dark;
+    --bg: radial-gradient(110% 85% at 50% 36%, #1C2230 0, #0A0D13 55%, #030405 100%);
+    --ink: #EEF1F6;
+    --mute: #8A93A6;
+    --acc: #A9CBFF;
+    --acc-ink: #08101E;
+    --move: #7FB2FF;
+    --ok: #7FE0A8;
+    --bad: #FF8A80;
+    --glass: rgba(255, 255, 255, 0.06);
+    --line: rgba(169, 203, 255, 0.18);
+    --panel: rgba(10, 13, 19, 0.92);
+    --scrim: rgba(0, 0, 0, 0.45);
+    --axis-x: #FF6B6B;
+    --axis-y: #5BE08F;
+    --axis-z: #7AA7FF;
+    --edge: #A9CBFF;
+    --sky: #3A4766;
+    --ground: #020305;
+    --rim: #5C8DFF;
+    --part: #C4CCD8;
+    --h1-weight: 300;
+    --h1-stretch: 115%;
   }
 }
