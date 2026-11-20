@@ -1,88 +1,71 @@
-/* 基础：重置、字、三种按钮、输入框、焦点、小节标题（尺寸线）、状态文字。颜色只用 tokens.css 的变量。 */
+/* 基础：字体、正文、三种按钮、输入框、焦点、玻璃质感、减少动态效果。 */
+@font-face {
+  font-family: "Archivo";
+  src: url("../fonts/Archivo.ttf") format("truetype");
+  font-weight: 100 900;
+  font-stretch: 62% 125%;
+  font-display: swap;
+}
 
-*, *::before, *::after { box-sizing: border-box; }
-html, body { margin: 0; height: 100%; }
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; overflow: hidden; }
 body {
-  background: var(--paper);
+  background: var(--bg);
   color: var(--ink);
   font-family: var(--font-ui);
-  font-size: 14px;
-  line-height: 1.6;
-  -webkit-font-smoothing: antialiased;
+  font-size: 15px;
+  line-height: 1.5;
 }
-h1, h2, h3, h4, p, ul, ol, dl, dd, figure { margin: 0; }
-ul, ol { padding: 0; list-style: none; }
-img { display: block; max-width: 100%; }
-a { color: var(--accent); text-decoration: underline; text-underline-offset: 2px; }
-::selection { background: var(--accent); color: var(--paper); }
+button, input, select, textarea { font: inherit; color: inherit; background: none; border: 0; }
+button { cursor: pointer; }
+button:disabled { cursor: default; opacity: 0.4; }
+a { color: inherit; }
+.num { font-family: var(--font-num); font-variant-numeric: tabular-nums; }
+.mute { color: var(--mute); }
+.small { font-size: 13px; }
+.hide { opacity: 0 !important; pointer-events: none !important; }
+.gone { display: none !important; }
+.fade { transition: opacity var(--t), transform var(--t); }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 
-/* 数字、参数名、工具调用、代码：等宽 */
-.mono, code, kbd, pre, .num { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
-.num { text-align: right; white-space: nowrap; }
-pre { margin: 0; white-space: pre-wrap; word-break: break-word; font-size: 12px; }
-.muted { color: var(--ink-2); }
-.small { font-size: 12px; }
-.hidden { display: none !important; }
-.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
-
-/* 按钮：主要（强调色描边加强调色文字）、普通（主线色描边）、文字按钮（无边框） */
-button { font: inherit; color: inherit; }
-.btn {
-  display: inline-flex; align-items: center; justify-content: center; gap: var(--s-1);
-  height: 28px; padding: 0 var(--s-3);
-  border: 1px solid var(--line); border-radius: var(--radius);
-  background: transparent; color: var(--ink);
-  font-size: 13px; line-height: 1; white-space: nowrap; cursor: pointer;
-  transition: background-color .12s linear;
+.glass {
+  background: var(--glass);
+  border: 1px solid var(--line);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
 }
-.btn:hover:not(:disabled) { background: var(--paper-2); }
-.btn-primary { border-color: var(--accent); color: var(--accent); }
-.btn-text { border-color: transparent; padding: 0 var(--s-2); }
-.btn-text:hover:not(:disabled) { border-color: transparent; text-decoration: underline; text-underline-offset: 3px; background: transparent; }
-.btn:disabled { color: var(--ink-2); border-color: var(--line-soft); cursor: default; opacity: .7; }
-.btn-text:disabled { border-color: transparent; }
-.btn.small { height: 24px; font-size: 12px; padding: 0 var(--s-2); }
+.pill { border-radius: var(--r-pill); }
 
-/* 输入框 */
-input, textarea, select {
-  font: inherit; color: var(--ink); background: transparent;
-  border: 1px solid var(--line-soft); border-radius: var(--radius);
-  padding: var(--s-1) var(--s-2);
+/* 按钮：主要（强调色实心，一个画面最多一个）、玻璃、文字 */
+.btn-primary, .btn-glass, .btn-text {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  padding: 9px 20px; border-radius: var(--r-pill); font-size: 15px; white-space: nowrap;
+  transition: background var(--t), color var(--t), border-color var(--t);
 }
-input:hover, textarea:hover, select:hover { border-color: var(--line); }
-input:disabled, textarea:disabled, select:disabled { color: var(--ink-2); border-style: dashed; }
-select option { background: var(--paper); color: var(--ink); }
-input[type="range"] { accent-color: var(--accent); padding: 0; border: 0; }
-input[type="checkbox"], input[type="radio"] { accent-color: var(--accent); }
+.btn-primary { background: var(--acc); color: var(--acc-ink); border: 1px solid var(--acc); }
+.btn-glass { background: var(--glass); border: 1px solid var(--line); backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px); }
+.btn-glass:hover:not(:disabled), .btn-glass[aria-pressed="true"] { border-color: var(--acc); }
+.btn-glass[aria-pressed="true"] { background: var(--acc); color: var(--acc-ink); }
+.btn-text { padding: 6px 10px; color: var(--mute); }
+.btn-text:hover:not(:disabled) { color: var(--ink); }
+.btn-small { padding: 6px 14px; font-size: 13px; }
 
-/* 焦点：强调色 2px 描边 */
+input[type="text"], input[type="number"], input[type="password"], textarea, select {
+  border: 1px solid var(--line); border-radius: 10px; background: var(--glass); padding: 7px 10px;
+}
+input[type="range"] { width: 100%; accent-color: var(--acc); }
+textarea { resize: none; }
+
 :focus { outline: none; }
-:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+:focus-visible { outline: 2px solid var(--acc); outline-offset: 2px; }
 
-/* 小节标题：等宽小号编号 + 标题；下面一条两端带短竖线的尺寸线 */
-.section-head {
-  position: relative; display: flex; align-items: baseline; gap: var(--s-2);
-  padding: 0 var(--s-1) var(--s-1); margin-bottom: var(--s-3);
-  border-bottom: 1px solid var(--line);
-}
-.section-head::before, .section-head::after {
-  content: ""; position: absolute; bottom: -4px; width: 1px; height: 7px; background: var(--line);
-}
-.section-head::before { left: 0; }
-.section-head::after { right: 0; }
-.section-no { font-family: var(--font-mono); font-size: 11px; color: var(--ink-2); letter-spacing: .04em; }
-.section-title { font-size: 13px; font-weight: 600; letter-spacing: .06em; }
-.section-meta { margin-left: auto; font-size: 12px; color: var(--ink-2); font-family: var(--font-mono); }
+.status-ok { color: var(--ok); }
+.status-bad { color: var(--bad); }
+.status-none { color: var(--mute); }
 
-/* 状态：文字加符号，颜色只是辅助 */
-.ok { color: var(--ok); }
-.bad { color: var(--bad); }
-.none { color: var(--ink-2); }
+@keyframes pulse { 50% { opacity: 0.25; } }
+@keyframes spin { to { transform: rotate(360deg); } }
 
-/* 滚动条细一点，颜色跟着主题 */
-* { scrollbar-width: thin; scrollbar-color: var(--line-soft) transparent; }
-
-/* 系统设置了"减少动态效果"：关掉过渡和动画 */
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { transition: none !important; animation: none !important; }
 }

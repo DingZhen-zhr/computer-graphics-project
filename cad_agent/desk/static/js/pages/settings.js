@@ -1,7 +1,7 @@
 // 设置页：占满工作区，左边小节目录。每一项改了就存（设置文件里没有密钥；密钥走钥匙串）。
-import { del, get, post } from "./api.js";
-import { button, clear, confirmDialog, h, sectionHead, status } from "./dom.js";
-import { saveTheme } from "./theme.js";
+import { del, get, post } from "../api.js";
+import { button, clear, confirmDialog, h, sectionHead, status } from "../dom.js";
+import { saveTheme } from "../theme.js";
 
 const GATES = [
   ["staged", "分阶段", "把零件拆成几个阶段，一个阶段验证通过了再做下一个。关掉后退回到一次做完的老流程。"],
@@ -146,7 +146,7 @@ export function renderSettings(el, actions) {
 
   function look(s) {
     return block("look", "06", "外观", h("div", { class: "radio-row", role: "radiogroup", "aria-label": "外观" },
-      [["light", "浅色（图纸）"], ["dark", "深色（蓝图）"], ["system", "跟随系统"]].map(([v, label]) => h("label", { class: "radio" },
+      [["light", "浅色（影棚）"], ["dark", "深色（黑曜）"], ["system", "跟随系统"]].map(([v, label]) => h("label", { class: "radio" },
         h("input", { type: "radio", name: "theme", value: v, checked: s.theme === v, onchange: async () => { await saveTheme(v); boot = (await get("/api/boot")).body; actions.setBoot(boot); draw(); } }),
         label))));
   }

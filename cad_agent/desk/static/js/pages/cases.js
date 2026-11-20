@@ -1,6 +1,6 @@
 // 案例库：两组——自带、我保存的。每个案例一行：标题、标签、一句话需求、阶段标题；我保存的可以删除。
-import { del, get } from "./api.js";
-import { button, clear, confirmDialog, h, sectionHead, status } from "./dom.js";
+import { del, get } from "../api.js";
+import { button, clear, confirmDialog, h, sectionHead, status } from "../dom.js";
 
 const MINE_EMPTY = '还没有保存过案例。交付一个满意的零件后，在"版本"里点"存为案例"，以后做相似的零件时会拿它当参考。';
 

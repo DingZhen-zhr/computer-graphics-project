@@ -1,78 +1,55 @@
 // 启动和路由：取启动信息、主题、会话列表；打开一个会话 = 取完整状态 + 从它的 last_seq 订阅事件。
-// 事件流断了：顶栏下面显示"连接断开，正在重试"；接上以后先取一次完整状态，再接着收事件（store 按 seq 去重）。
+// 事件流断了：顶上显示"连接断开，正在重试"；接上以后先取一次完整状态，再接着收事件（store 按 seq 去重）。
 import { configure, del, fileUrl as versionFileUrl, get, isStatic, post, subscribe } from "./api.js";
-import { renderBench, showTab } from "./bench.js";
-import { renderChecks } from "./bench-checks.js";
-import { renderModel, viewVersion } from "./bench-model.js";
-import { renderParams } from "./bench-params.js";
-import { renderVersions } from "./bench-versions.js";
-import { renderTitleblock } from "./titleblock.js";
-import { renderCases } from "./cases.js";
-import { renderChat } from "./chat.js";
-import { renderOnboarding } from "./onboarding.js";
-import { renderSettings } from "./settings.js";
-import { $, clear, h, button, toast, icon } from "./dom.js";
+import { renderBrief } from "./brief-card.js";
+import { closeCompare, isComparing, mountCompare, openCompare } from "./compare.js";
+import { $, clear, h, toast } from "./dom.js";
+import { closeAll, isOpen, onEscape, openDrawer, setupDrawers } from "./drawers.js";
+import { renderHistory } from "./history.js";
+import { renderInspector, showInspectorTab } from "./inspector.js";
+import { renderMenu } from "./menu.js";
+import { hideCompare, mountModelView, setShift, showCompare, showStage, updateModel } from "./model-view.js";
+import { renderCases } from "./pages/cases.js";
+import { renderOnboarding } from "./pages/onboarding.js";
+import { renderSettings } from "./pages/settings.js";
+import { focusPrompt, mountStage, renderStage } from "./stage.js";
 import { applyEvent, dispatch, emptyState, getState, onChange, setState } from "./store.js";
-import { renderSidebar } from "./sidebar.js";
 import { THEME_LABELS, applyTheme, currentTheme, nextTheme, saveTheme } from "./theme.js";
+import { closeTune, mountTune, openTune, updateTune } from "./tune.js";
 
 const LAST_KEY = "datum.lastSession";
-export const app = { boot: null, sessions: [], currentId: null, renaming: null, unsubscribe: null, retrying: false };
-const views = [];
-const pages = {};
+const app = { boot: null, sessions: [], currentId: null, unsubscribe: null, retrying: false };
+const sid = () => encodeURIComponent(app.currentId);
+const fileUrl = (version, name) => versionFileUrl(app.currentId, version, name);
 
-// 别的模块（对话栏、工作台、各个整页）在这里登记自己
-export function registerView(render) {
-  views.push(render);
-}
-export function registerPage(name, render) {
-  pages[name] = render;
-}
-
-function remember(id) {
-  try {
-    localStorage.setItem(LAST_KEY, id);
-  } catch { /* 存不了就算了：下次打开第一个会话 */ }
-}
-function remembered() {
-  try {
-    return localStorage.getItem(LAST_KEY);
-  } catch {
-    return null;
-  }
-}
+function remember(id) { try { localStorage.setItem(LAST_KEY, id); } catch { /* 存不了就算了 */ } }
+function remembered() { try { return localStorage.getItem(LAST_KEY); } catch { return null; } }
 
 // ---- 会话 ----
-export async function refreshSessions() {
+async function refreshSessions() {
   const { status, body } = await get("/api/sessions");
   if (status === 200) app.sessions = body;
-  renderSide();
-}
-
-function renderSide() {
-  renderSidebar($("sidebar"), app.sessions, { currentId: app.currentId, renaming: app.renaming }, sideActions);
+  renderDrawers(getState());
 }
 
 async function loadState(id = app.currentId) {
   const { status, body } = await get(`/api/sessions/${encodeURIComponent(id)}/state`);
   if (id !== app.currentId) return null;   // 回来得太晚：用户已经切到别的会话了
-  if (status !== 200) {
-    toast(body.error);
-    return null;
-  }
+  if (status !== 200) { toast(body.error); return null; }
   setState(applyEvent(emptyState(), { type: "state", state: body, seq: body.last_seq }));
   return body;
 }
 
-export async function openSession(id) {
+async function openSession(id) {
   closePage();
+  closeAll();
+  closeTune();
+  closeCompare();
   app.currentId = id;
   remember(id);
-  renderSide();
   await resubscribe(id);
 }
 
-// 先停掉事件流，取一次完整状态，再从它的 last_seq 接着订阅：这样中间的事件既不会丢，也不会被完整状态盖掉
 async function resubscribe(id) {
   if (app.unsubscribe) app.unsubscribe();
   app.unsubscribe = null;
@@ -88,18 +65,11 @@ function onEvent(ev) {
 }
 
 function onStatus(s) {
-  if (s === "retrying") {
-    app.retrying = true;
-    $("conn").classList.remove("hidden");
-  } else if (s === "open" && app.retrying) {
-    app.retrying = false;
-    $("conn").classList.add("hidden");
-    resubscribe(app.currentId);
-    refreshSessions();
-  }
+  if (s === "retrying") { app.retrying = true; $("conn").classList.remove("gone"); }
+  else if (s === "open" && app.retrying) { app.retrying = false; $("conn").classList.add("gone"); resubscribe(app.currentId); refreshSessions(); }
 }
 
-export async function createSession(firstMessage = null) {
+async function createSession(firstMessage = null) {
   const { status, body } = await post("/api/sessions", {});
   if (status !== 200) return toast(body.error);
   await refreshSessions();
@@ -107,172 +77,142 @@ export async function createSession(firstMessage = null) {
   if (firstMessage) await sendMessage(firstMessage);
 }
 
-export async function sendMessage(text) {
-  const { status, body } = await post(`/api/sessions/${encodeURIComponent(app.currentId)}/message`, { text });
+async function sendMessage(text) {
+  if (!app.currentId || (getState().session && getState().session.demo)) return false;
+  const { status, body } = await post(`/api/sessions/${sid()}/message`, { text });
   if (status !== 200) toast(body.error);
   return status === 200;
 }
 
-export async function stopTurn() {
-  await post(`/api/sessions/${encodeURIComponent(app.currentId)}/stop`, {});
-}
-
-export function fileUrl(version, name) {
-  return versionFileUrl(app.currentId, version, name);
-}
-
-export async function reveal(version) {
-  const { status, body } = await post(`/api/sessions/${encodeURIComponent(app.currentId)}/reveal`, { version });
-  if (status !== 200) toast(body.error);
-}
-
-const chatActions = { send: (t) => sendMessage(t), stop: () => stopTurn(), reveal: (v) => reveal(v), fileUrl: (v, n) => fileUrl(v, n) };
-registerView((state) => renderChat($("chat"), state, chatActions));
-
-const sid = () => encodeURIComponent(app.currentId);
-const benchActions = {
-  fileUrl: (v, n) => fileUrl(v, n),
-  focusInput: () => document.querySelector(".composer-input")?.focus(),
+// ---- 各个部件要用的动作 ----
+const actions = {
   send: (t) => sendMessage(t),
-  toast,
-  reveal: (v) => reveal(v),
-  showModel: (v) => { showTab("model"); viewVersion(v); },
-  modelName: () => modelName(),
+  stop: () => post(`/api/sessions/${sid()}/stop`, {}),
+  showStage: (id) => showStage(id),
+  focusPrompt: () => focusPrompt(),
+  close: () => closeAll(),
+  fileUrl,
+  readOnly: isStatic(),
+  reveal: async (v) => { const { status, body } = await post(`/api/sessions/${sid()}/reveal`, { version: v }); if (status !== 200) toast(body.error); },
+  saveCase: async (title, tags) => {
+    const { status, body } = await post(`/api/sessions/${sid()}/case`, { title, tags });
+    toast(status === 200 ? "已存为案例，可以在案例库里看到。" : body.error);
+  },
+  compare: (name) => {
+    const vs = (getState().versions || []).map((v) => v.name);
+    const i = vs.indexOf(name);
+    const [a, b] = i > 0 ? [vs[i - 1], name] : [name, vs[vs.length - 1]];
+    if (a === b) return;
+    closeAll();
+    openCompare(a, b);
+  },
   applyParams: async (values) => {
     const { status, body } = await post(`/api/sessions/${sid()}/params`, { values });
     if (status === 409) return { ok: false, busy: true, text: body.error };
     return status === 200 ? body : { ok: false, text: body.error, failed_checks: [] };
   },
-  diff: async (a, b) => {
-    const { status, body } = await get(`/api/sessions/${sid()}/diff?a=${a}&b=${b}`);
-    return status === 200 ? body.lines : { error: body.error };
-  },
-  saveCase: async (title, tags) => {
-    const { status, body } = await post(`/api/sessions/${sid()}/case`, { title, tags });
-    toast(status === 200 ? "已存为案例，可以在案例库里看到。" : body.error);
-  },
 };
-registerView((state) => renderBench($("bench"), state, {
-  model: (panel, s) => renderModel(panel, s, benchActions),
-  checks: (panel, s) => renderChecks(panel, s, benchActions),
-  params: (panel, s) => renderParams(panel, s, benchActions),
-  versions: (panel, s) => renderVersions(panel, s, benchActions),
-  titleblock: (slot, s) => renderTitleblock(slot, s, benchActions),
-}));
 
+const menuActions = {
+  open: (id) => openSession(id),
+  create: () => { closeAll(); createSession(); },
+  rename: async (id, title) => { const { status, body } = await post(`/api/sessions/${encodeURIComponent(id)}/rename`, { title }); if (status !== 200) toast(body.error); await refreshSessions(); if (id === app.currentId) resubscribe(id); },
+  remove: async (id) => {
+    const { status, body } = await del(`/api/sessions/${encodeURIComponent(id)}`);
+    if (status !== 200) return toast(body.error);
+    await refreshSessions();
+    if (id === app.currentId) { const next = app.sessions.find((s) => !s.demo); if (next) openSession(next.id); else createSession(); }
+  },
+  cases: () => { closeAll(); openPage("cases"); },
+  settings: () => { closeAll(); openPage("settings"); },
+  theme: () => saveTheme(nextTheme(currentTheme())).then(() => renderDrawers(getState())),
+  themeLabel: () => `外观：${THEME_LABELS[currentTheme()]}`,
+  close: () => closeAll(),
+  readOnly: isStatic(),
+};
+
+function renderDrawers(state) {
+  renderMenu($("menu"), app.sessions, app.currentId, menuActions);
+  renderHistory($("history"), state, actions);
+  renderInspector($("inspector"), state, actions);
+}
+
+// ---- 整页（设置、案例库、引导） ----
 const pageActions = {
   boot: () => app.boot,
-  setBoot: (b) => { app.boot = b; renderTop(getState()); },
+  setBoot: (b) => { app.boot = b; },
   toast,
   close: () => backToSession(),
   openDemo: () => { const d = app.sessions.find((x) => x.demo); if (d) openSession(d.id); else backToSession(); },
   start: () => createSession(),
 };
-registerPage("onboarding", (el) => renderOnboarding(el, pageActions));
-registerPage("settings", (el) => renderSettings(el, pageActions));
-registerPage("cases", (el) => renderCases(el, pageActions));
+const pages = { onboarding: renderOnboarding, settings: renderSettings, cases: renderCases };
+
+function openPage(name) {
+  const el = $("page");
+  el.classList.remove("gone");
+  const panel = h("div", { class: "page-panel" });
+  clear(el, panel);
+  pages[name](panel, pageActions);
+}
+
+function closePage() { $("page").classList.add("gone"); clear($("page")); }
 
 function backToSession() {
-  if (app.currentId) {
-    closePage();
-    renderSide();
-    return;
-  }
+  closePage();
+  if (app.currentId) return;
   const mine = app.sessions.find((x) => !x.demo);
-  if (mine) openSession(mine.id);
-  else createSession();
-}
-
-function modelName() {
-  const b = app.boot;
-  if (!b) return "";
-  const p = (b.providers || []).find((x) => x.id === b.settings.provider);
-  return b.settings.model || (p && p.models[0]) || "";
-}
-
-const sideActions = {
-  open: (id) => openSession(id),
-  create: () => createSession(),
-  startRename: (id) => { app.renaming = id; renderSide(); },
-  stopRename: () => { app.renaming = null; setTimeout(renderSide, 0); },
-  rename: async (id, title) => {
-    const { status, body } = await post(`/api/sessions/${encodeURIComponent(id)}/rename`, { title });
-    if (status !== 200) toast(body.error);
-    await refreshSessions();
-    if (id === app.currentId) resubscribe(id);
-  },
-  remove: async (id) => {
-    const { status, body } = await del(`/api/sessions/${encodeURIComponent(id)}`);
-    if (status !== 200) return toast(body.error);
-    await refreshSessions();
-    if (id === app.currentId) {
-      const next = app.sessions.find((s) => !s.demo);
-      if (next) openSession(next.id);
-      else createSession();
-    }
-  },
-  cases: () => openPage("cases"),
-};
-
-// ---- 整页（设置、案例库、引导） ----
-export function openPage(name, arg) {
-  const render = pages[name];
-  if (!render) return toast("这一页还没有做好。");
-  document.body.classList.add("on-page");
-  const el = $("page");
-  el.classList.remove("hidden");
-  clear(el);
-  render(el, arg);
-}
-
-export function closePage() {
-  document.body.classList.remove("on-page");
-  $("page").classList.add("hidden");
-  clear($("page"));
-}
-
-// ---- 顶栏和主题 ----
-function renderTop(state) {
-  $("top-title").textContent = state.session ? state.session.title : "";
-  const t = currentTheme();
-  const btn = $("theme-btn");
-  btn.textContent = `外观：${THEME_LABELS[t]}`;
-  btn.setAttribute("aria-label", `外观：${THEME_LABELS[t]}，点一下切换`);
+  if (mine) openSession(mine.id); else createSession();
 }
 
 // ---- 启动 ----
 function fatal(text) {
-  clear($("app"), h("div", { class: "fatal" }, h("p", {}, text), h("p", { class: "muted" }, "关掉这个窗口，重新打开 Datum 再试。")));
+  clear($("page"), h("div", { class: "fatal" }, h("p", {}, text), h("p", { class: "mute" }, "关掉这个窗口，重新打开 Datum 再试。")));
+  $("page").classList.remove("gone");
+}
+
+function wire() {
+  $("menu-btn").addEventListener("click", (e) => { renderDrawers(getState()); openDrawer("menu", e.currentTarget); });
+  $("history-btn").addEventListener("click", (e) => { renderDrawers(getState()); openDrawer("history", e.currentTarget); });
+  $("score").addEventListener("click", (e) => { showInspectorTab("checks"); renderInspector($("inspector"), getState(), actions); openDrawer("inspector", e.currentTarget); });
+  $("versions-btn").addEventListener("click", (e) => { showInspectorTab("versions"); renderInspector($("inspector"), getState(), actions); openDrawer("inspector", e.currentTarget); });
+  $("tune-open").addEventListener("click", () => openTune());
+  onEscape(() => { closeTune(); if (isComparing()) closeCompare(); });
+  setupDrawers();
 }
 
 async function start() {
   configure({ token: new URLSearchParams(window.location.search).get("t") || "", tokenHeader: document.documentElement.dataset.tokenHeader || "" });
-  $("brand-mark").append(icon("brand"));
-  $("theme-btn").addEventListener("click", () => saveTheme(nextTheme(currentTheme())).then(() => renderTop(getState())));
-  $("settings-btn").addEventListener("click", () => openPage("settings"));
+  mountStage(actions);
+  mountTune({ ...actions, onOpen: (on) => setShift(on ? 130 : 0) });
+  mountCompare({ fetchCompare: async (a, b) => {
+    const { status, body } = await get(`/api/sessions/${sid()}/compare?a=${a}&b=${b}`);
+    return status === 200 ? body : { error: body.error };
+  }, toast, show: (d, m) => showCompare(d, m), hide: () => hideCompare() });
+  mountModelView(fileUrl);
+  wire();
   if (isStatic()) {
-    // 在线示例：只有一个只读的示例会话；没有设置和引导，右上角换成回主页安装的链接
     document.body.classList.add("static-mode");
-    $("settings-btn").replaceWith(h("a", { class: "btn btn-text", href: "../" }, "安装 Datum"));
+    $("tune-open").replaceWith(h("a", { class: "corner tune-open glass pill", href: "../" }, "安装 Datum"));
   }
   onChange((state) => {
-    renderTop(state);
-    for (const render of views) render(state);
+    const v = renderStage(state);
+    renderBrief(state, v.center, actions);
+    updateModel(state, v.center);
+    updateTune(state);
+    if (isOpen("history") || isOpen("inspector") || isOpen("menu")) renderDrawers(state);
   });
   const { status, body } = await get("/api/boot");
   if (status !== 200) return fatal(body.error);
   app.boot = body;
   applyTheme(body.settings.theme);
-  renderTop(getState());
   await refreshSessions();
   if (isStatic()) return app.sessions.length ? openSession(app.sessions[0].id) : fatal(body.error || "在线示例的数据没有加载出来。");
   const mine = app.sessions.filter((s) => !s.demo);
-  if (!mine.length && !body.ready && pages.onboarding) return openPage("onboarding");
-  const last = remembered();
-  const pick = app.sessions.find((s) => s.id === last) || mine[0];
+  if (!mine.length && !body.ready) return openPage("onboarding");
+  const pick = app.sessions.find((s) => s.id === remembered()) || mine[0];
   if (pick) return openSession(pick.id);
   return createSession();
 }
 
-export { button };
 start();

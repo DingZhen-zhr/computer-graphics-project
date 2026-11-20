@@ -6,40 +6,49 @@
   <title>在线示例 · Datum 基准</title>
   <link rel="stylesheet" href="./static/css/tokens.css">
   <link rel="stylesheet" href="./static/css/base.css">
-  <link rel="stylesheet" href="./static/css/layout.css">
-  <link rel="stylesheet" href="./static/css/chat.css">
-  <link rel="stylesheet" href="./static/css/bench.css">
+  <link rel="stylesheet" href="./static/css/stage.css">
+  <link rel="stylesheet" href="./static/css/overlays.css">
   <link rel="stylesheet" href="./static/css/pages.css">
   <script type="importmap">{"imports": {"three": "./static/vendor/three/three.module.js"}}</script>
 </head>
 <body>
-  <header class="topbar">
-    <div class="brand"><span class="brand-mark" id="brand-mark"></span><span class="brand-name">Datum</span><span class="brand-en">基准</span></div>
-    <div class="top-title" id="top-title"></div>
-    <div class="top-actions">
-      <button class="btn btn-text" type="button" id="theme-btn"></button>
-      <button class="btn btn-text" type="button" id="settings-btn">设置</button>
-    </div>
-  </header>
-  <div class="conn hidden" id="conn" role="status" aria-live="polite">连接断开，正在重试</div>
+  <div id="view" aria-label="零件的三维画面"></div>
+  <div id="labels" class="gone" aria-hidden="true"></div>
+  <svg id="svg-ns" class="gone" aria-hidden="true"></svg>
 
-  <main class="app" id="app">
-    <aside class="sidebar" id="sidebar" aria-label="会话"></aside>
-    <section class="chat" id="chat" aria-label="对话"></section>
-    <section class="bench" id="bench" aria-label="工作台"></section>
-  </main>
-  <section class="page hidden" id="page"></section>
+  <button class="menu-btn glass pill" type="button" id="menu-btn" aria-label="菜单"><span class="bars" aria-hidden="true"><i></i><i></i><i></i></span>菜单</button>
+  <div class="title fade"><h1 id="title-h1">新零件</h1><p id="title-sub"></p></div>
 
+  <nav class="steps gone" id="steps" aria-label="步骤"></nav>
+  <nav class="parts" id="parts" aria-label="零件"></nav>
+  <button class="score gone" type="button" id="score" aria-label="查看检查"><b class="num" id="score-n"></b><span id="score-l"></span></button>
+  <div class="part-card glass gone" id="part-card" role="status"></div>
+  <div class="gizmo fade hide" id="gizmo"></div>
+
+  <section class="brief-card away" id="brief" aria-label="需求单" aria-hidden="true"></section>
+  <div class="caption fade" id="caption" role="status" aria-live="polite"></div>
+  <div class="choices" id="choices"></div>
+  <div class="motion glass gone" id="motion" aria-label="让它动起来"></div>
+  <div class="asm-tools gone" id="asm-tools"></div>
+  <div class="prompt glass pill" id="prompt"></div>
+  <button class="corner history glass pill" type="button" id="history-btn">对话记录</button>
+  <button class="corner versions glass pill" type="button" id="versions-btn">版本</button>
+  <button class="corner tune-open glass pill gone" type="button" id="tune-open"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M2 4h7M13 4h1M2 12h2M8 12h6"/><circle cx="11" cy="4" r="2"/><circle cx="6" cy="12" r="2"/></svg>调参数</button>
+
+  <div class="compare-bar glass pill gone" id="compare-bar" role="toolbar" aria-label="对比"></div>
+  <div class="compare-changes glass gone" id="compare-changes" role="status"></div>
+  <div class="compare-split gone" id="compare-split"></div>
+
+  <div class="scrim" id="scrim"></div>
+  <aside class="drawer left" id="menu" aria-label="菜单"></aside>
+  <aside class="drawer left" id="history" aria-label="对话记录"></aside>
+  <aside class="drawer right" id="inspector" aria-label="检查和版本"></aside>
+  <section class="tune-sheet" id="tune" aria-label="调参数" aria-hidden="true"></section>
+
+  <div class="conn glass pill gone" id="conn" role="status" aria-live="polite">连接断开，正在重试</div>
+  <section class="page gone" id="page"></section>
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
   <dialog class="dialog" id="dialog" aria-label="确认"></dialog>
-
-  <template id="icons">
-    <svg data-icon="plus" width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M8 3v10M3 8h10" stroke="currentColor" stroke-width="1.3"/></svg>
-    <svg data-icon="pencil" width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M3 13l1-3.5 7-7 2.5 2.5-7 7L3 13z" stroke="currentColor" stroke-width="1.2"/></svg>
-    <svg data-icon="cross" width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" stroke-width="1.3"/></svg>
-    <svg data-icon="stop" width="12" height="12" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M4 4h8v8H4z" fill="currentColor"/></svg>
-    <svg data-icon="brand" width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M2.5 5.5h19M5 5.5v13M5 18.5l2.5-5V5.5M14 5.5v6h4v-6M9 5.5V9M11 5.5V8" stroke="currentColor" stroke-width="1.3"/></svg>
-  </template>
   <script type="module" src="./static/js/main.js"></script>
 </body>
 </html>

@@ -2,6 +2,13 @@
 
 export const $ = (id) => document.getElementById(id);
 
+// SVG 元素要用 SVG 的命名空间：从页面里那个空的 <svg id="svg-ns"> 上取（免得在脚本里写网址）
+export function svgEl(tag, attrs = {}) {
+  const el = document.createElementNS($("svg-ns").namespaceURI, tag);
+  for (const [k, v] of Object.entries(attrs)) el.setAttribute(k, String(v));
+  return el;
+}
+
 export function h(tag, attrs = {}, ...children) {
   const el = document.createElement(tag);
   for (const [key, value] of Object.entries(attrs || {})) {
@@ -30,9 +37,9 @@ export function clear(el, ...children) {
   return el;
 }
 
-// 按钮：kind 是 "primary" | "normal" | "text"（界面清单第 3 条）
+// 按钮：kind 是 "primary"（强调色实心）| "normal"（玻璃）| "text"（界面清单第 3 条）
 export function button(label, onclick, { kind = "normal", small = false, ...attrs } = {}) {
-  const cls = ["btn", kind === "primary" ? "btn-primary" : kind === "text" ? "btn-text" : "", small ? "small" : ""].filter(Boolean).join(" ");
+  const cls = [kind === "primary" ? "btn-primary" : kind === "text" ? "btn-text" : "btn-glass", small ? "btn-small" : ""].filter(Boolean).join(" ");
   return h("button", { type: "button", class: cls, onclick, ...attrs }, label);
 }
 
@@ -80,13 +87,13 @@ export function confirmDialog(message, okLabel = "确定") {
       h("p", {}, message),
       h("div", { class: "dialog-actions" },
         button("取消", () => done(false)),
-        h("button", { type: "submit", class: "btn btn-primary" }, okLabel))));
+        h("button", { type: "submit", class: "btn-primary" }, okLabel))));
     dlg.oncancel = (e) => {
       e.preventDefault();
       done(false);
     };
     dlg.showModal();
-    dlg.querySelector(".btn").focus();   // 默认焦点在"取消"上，免得回车误删
+    dlg.querySelector(".btn-glass").focus();   // 默认焦点在"取消"上，免得回车误删
   });
 }
 
@@ -102,7 +109,7 @@ export function formDialog(title, fields, okLabel = "保存") {
     clear(dlg, h("form", { class: "dialog-body", onsubmit: (e) => { e.preventDefault(); done(true); } },
       h("h3", {}, title),
       fields.map((f, i) => h("label", { class: "field", for: `dlg-${f.name}` }, h("span", {}, f.label), inputs[i])),
-      h("div", { class: "dialog-actions" }, button("取消", () => done(false)), h("button", { type: "submit", class: "btn btn-primary" }, okLabel))));
+      h("div", { class: "dialog-actions" }, button("取消", () => done(false)), h("button", { type: "submit", class: "btn-primary" }, okLabel))));
     dlg.oncancel = (e) => {
       e.preventDefault();
       done(false);

@@ -1,4 +1,4 @@
-// 外观：浅色（图纸）、深色（蓝图）、跟随系统。写到根元素的 data-theme 上；切换后立刻存进设置。
+// 外观：浅色（影棚）、深色（黑曜）、跟随系统。写到根元素的 data-theme 上；切换后立刻存进设置。
 import { post } from "./api.js";
 
 export const THEMES = ["system", "light", "dark"];

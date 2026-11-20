@@ -52,18 +52,19 @@ def test_no_external_resources():
         assert "innerHTML" not in text and "insertAdjacentHTML" not in text and "document.write" not in text, path.name
 
 
-def test_index_has_three_columns_and_import_map():
+def test_index_has_stage_and_import_map():
+    """3.0 计划 3（要改的旧测试）：页面是一个舞台——三维画布占满，四周是标题、字幕、选项、输入框、各个按钮和抽屉。"""
     html = (STATIC / "index.html").read_text(encoding="utf-8")
     assert '<html lang="zh-CN"' in html and '<meta charset="utf-8">' in html
     m = re.search(r'<script type="importmap">(.*?)</script>', html, re.S)
     assert m and __import__("json").loads(m.group(1)) == {"imports": {"three": "/static/vendor/three/three.module.js"}}
-    for region in ('class="sidebar"', 'class="chat"', 'class="bench"'):
+    for region in ('id="view"', 'id="title-h1"', 'id="caption"', 'id="choices"', 'id="prompt"', 'id="menu-btn"', 'id="history-btn"',
+                   'id="tune-open"', 'id="score"', 'id="gizmo"', 'id="parts"', 'id="motion"', 'id="brief"', 'id="menu"', 'id="history"',
+                   'id="inspector"', 'id="tune"'):
         assert html.count(region) == 1, region
-    for css in ("tokens.css", "base.css", "layout.css"):
+    for css in ("tokens.css", "base.css", "stage.css", "overlays.css", "pages.css"):
         assert f'href="/static/css/{css}"' in html
     assert '<script type="module" src="/static/js/main.js"></script>' in html
-    layout = (STATIC / "css" / "layout.css").read_text(encoding="utf-8")
-    assert "240px" in layout and "minmax(420px" in layout and "minmax(440px" in layout
 
 
 def test_every_file_under_300_lines():
@@ -81,7 +82,14 @@ def test_no_color_literals_in_js():
 
 
 def test_page_texts_are_verbatim():
-    """计划"界面文字"一节里这一任务用到的原文（逐字）。"""
+    """3.0 计划 3（要改的旧测试）：对照计划 3 末尾"界面文字"一节逐字比对。"正在预览"不在里面：预览没有做（偏离 D32）。"""
     text = "\n".join(p.read_text(encoding="utf-8") for p in _own_files(".js", ".html"))
+    plan = (ROOT / "docs" / "superpowers" / "plans" / "2026-11-20-datum-3-stage-ui.md").read_text(encoding="utf-8")
+    blocks = re.findall(r"```text\n(.*?)\n```", plan.split("## 界面文字", 1)[1], flags=re.S)
+    lines = [ln for b in blocks for ln in b.splitlines() if ln.strip() and ln != "正在预览"]
+    assert len(lines) > 40
+    for line in lines:   # <…> 是运行时填入的内容：拆成前后几段分别找
+        for piece in (x for x in re.split(r"<[^>]+>", line) if x.strip()):
+            assert piece in text, (line, piece)
     for line in ("连接断开，正在重试", '删除"${', '"？它的全部版本和文件都会一起删掉，不能恢复。'):
         assert line in text, line

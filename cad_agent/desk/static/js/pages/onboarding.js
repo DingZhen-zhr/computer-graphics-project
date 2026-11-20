@@ -1,6 +1,6 @@
 // 首次引导：选模型服务 → 填密钥并测试连接 → 完成。顶上一条尺寸线标出走到第几步；任何一步都能点"先看看示例"跳过。
-import { get, post } from "./api.js";
-import { button, clear, h, status } from "./dom.js";
+import { get, post } from "../api.js";
+import { button, clear, h, status } from "../dom.js";
 
 const KEY_NOTE = "密钥只保存在这台电脑的系统钥匙串里（Windows 的凭据管理器、Mac 的钥匙串），不会写进任何文件，也不会发到模型服务以外的地方。";
 const ENV_NOTE = (name) => `已经从环境变量 ${name} 读到密钥，不用再填。`;
@@ -95,7 +95,7 @@ export function renderOnboarding(el, actions) {
     } else {
       body = [
         h("h1", { class: "page-title" }, "可以开始了"),
-        h("p", { class: "muted" }, "说说你想做什么零件，Datum 会先问清楚尺寸，再一个阶段一个阶段地建模，每一步都由程序实测。"),
+        h("p", { class: "muted" }, "说说你想做什么零件，Datum 会先问清楚尺寸，再一步一步地做出来，每一步都量过。几个零件装在一起、能动的东西也能做。"),
         h("div", { class: "page-actions" }, button("开始第一个零件", () => actions.start(), { kind: "primary" }), skip),
       ];
     }

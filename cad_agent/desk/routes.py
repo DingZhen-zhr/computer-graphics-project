@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import Any, Callable
 
 from cad_agent.cli import _load_brief, diff_briefs
+from cad_agent.desk.compare_api import compare_versions
 from cad_agent.desk.hub import Hub
 from cad_agent.desk.workbench import Busy
 
@@ -124,6 +125,9 @@ def _dispatch(hub: Hub, method: str, segs: list[str], query: dict, body: Any, re
         a, b = (query.get(k, [""])[0] for k in ("a", "b"))
         va, vb = _version_dir(hub, sid, a), _version_dir(hub, sid, b)
         return {"lines": diff_briefs(_load_brief(va), _load_brief(vb))}
+    if route == ("GET", "compare"):   # 修改前后的对比（3.0 计划 3 Task 8）
+        a, b = (query.get(k, [""])[0] for k in ("a", "b"))
+        return compare_versions(_version_dir(hub, sid, a), _version_dir(hub, sid, b))
     if route == ("POST", "reveal"):
         reveal(_version_dir(hub, sid, _need_dict(body).get("version")))
         return {"ok": True}
