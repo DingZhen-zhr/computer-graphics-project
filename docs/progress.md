@@ -1319,3 +1319,7 @@
 
 ## 3.0 计划 5 Task 2：提示词与工具定义文档
 - `scripts/export_prompts.py` 从代码生成 `docs/prompts-and-tools.md`（6 段系统提示词、17 个工具、程序生成的消息和 hint、模拟用户的提示词）。测试 `tests/test_prompts_doc.py` 3 个：重新生成一遍和仓库里的逐字相同、17 个工具都在、没有 key 和本机路径。先做了 Task 2 再做 Task 1（Task 1 的提交材料要用这份文档）。
+
+## 3.0 计划 5 Task 1：一键整理提交材料
+- `cad_agent/submission.py` 和子命令 `datum submission`：六个文件夹加清单.md；整理前搜一遍要复制的文字文件里有没有 key（环境变量里名字带 KEY、TOKEN 的值和钥匙串里的 key），搜到就停、说明文件和行号；目标已存在就另建带序号的；没交付过的会话只带运行日志并在清单里写明。偏离 D39（不做桌面端菜单）。
+- 测试 `tests/test_submission.py` 7 个。第一次运行时扫描器把测试文件里写死的假 key 抓出来了（扫描是对的），改成运行时拼出来。

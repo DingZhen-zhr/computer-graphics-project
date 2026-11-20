@@ -281,3 +281,7 @@
 ## D38（3.0 计划 4 Task 3）改 `test_full_system_prompt_v2`（计划漏列，用户同意）
 - 实际：系统提示词多了 `system_voice.md` 一段，`tests/test_staged_extras.py::test_full_system_prompt_v2` 写死了各段文件的列表。
 - 改法（用户同意）：期望的列表在 `system_multipart.md` 后面加 `system_voice.md`，其余不变。计划清单里的 `test_system_prompt_order` 同样加上这一段。
+
+## D39（3.0 计划 5 Task 1）提交材料只做命令行，桌面端菜单不做
+- 原计划：命令 `datum submission` 加桌面端菜单"整理提交材料"（勾选会话的对话框和接口）。
+- 改法：用户要求快做完，只做命令行（`datum submission <目录> [--session ...]`），桌面端菜单和接口不做；`test_desk_endpoint` 没写。作业提交时由组员在终端里运行一次就够了。

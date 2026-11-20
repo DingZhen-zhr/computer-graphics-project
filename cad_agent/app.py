@@ -26,7 +26,7 @@ import time
 import webbrowser
 from pathlib import Path
 
-from cad_agent import __version__, brand, cli, doctor, maintenance, migrate, paths
+from cad_agent import __version__, brand, cli, doctor, maintenance, migrate, paths, submission
 from cad_agent.agent.loop import Agent
 from cad_agent.brief import Brief
 from cad_agent.cases import load_cases
@@ -192,7 +192,8 @@ def _run_cli(config_file: str | None) -> int:
     return cli.main([], config=config)
 
 
-SUBCOMMANDS = {"doctor": doctor.doctor_main, "update": maintenance.update_main, "uninstall": maintenance.uninstall_main}
+SUBCOMMANDS = {"doctor": doctor.doctor_main, "update": maintenance.update_main, "uninstall": maintenance.uninstall_main,
+               "submission": submission.submission_main}
 
 
 def _start(settings: Settings, script: Path | None) -> tuple[Hub, object, str]:
@@ -230,7 +231,7 @@ def main(argv: list[str] | None = None) -> int:
         return SUBCOMMANDS[argv[0]](argv[1:])
     cmd = brand.COMMAND
     parser = argparse.ArgumentParser(prog=cmd, description=f"{brand.DISPLAY}：用平常话做 CAD 零件，每一步都由程序实测。"
-                                     f"另有子命令：{cmd} doctor（自检）、{cmd} update（更新）、{cmd} uninstall（卸载）。",
+                                     f"另有子命令：{cmd} doctor（自检）、{cmd} update（更新）、{cmd} uninstall（卸载）、{cmd} submission（整理作业提交材料）。",
                                      epilog="--demo-script <剧本文件>：开发用，模型换成假模型剧本，不需要密钥。")
     parser.add_argument("--version", action="version", version=f"{brand.DISPLAY} {__version__}", help="显示版本号")
     parser.add_argument("--browser", action="store_true", help="不开桌面窗口，改用默认浏览器打开")
