@@ -20,6 +20,8 @@ import yaml
 from benchmarks.report import (LENGTH_TYPES, SKIPPED_TEXT, SUMMARY_HEADER, TABLE_HEADER, is_skipped,  # noqa: F401 - 测试从这里导入
                                max_dimension_deviation, render_results_md, render_summary_md)
 from benchmarks.sim_user import SimUser
+from benchmarks.assembly_accept import AcceptSpecError, validate_entries
+from benchmarks.assembly_accept import evaluate as assembly_evaluate
 from cad_agent.checks.spec import MANDATORY_IDS, CheckSpecError, parse_checks
 from cad_agent.cli import build_agent
 from cad_agent.config import ConfigError, load_config
@@ -28,13 +30,16 @@ from cad_agent.notebook import RenderedNotebook
 from cad_agent.sandbox import execute
 
 TASKS_DIR = Path(__file__).parent / "tasks"
+MULTI_TYPES = ("joint", "at_pose")
 ALL_TASKS = ["phone_stand", "flange", "l_bracket"]
 HOLDOUT_TASKS: list[str] = ["enclosure", "stepped_shaft"]  # 留出任务：只用来测，不许为它们调提示词
 MEDIUM_TASKS = ["bearing_block", "battery_box", "spur_gear"]   # 第二版：中等
 HARD_TASKS = ["heatsink", "tee_fitting", "bracket_arm"]        # 第二版：困难
+MULTI_TASKS = ["toolbox", "drawer_cabinet", "gear_pair"]         # 3.0：多零件、会动
 TASK_SETS: dict[str, list[str]] = {
     "dev": ALL_TASKS, "holdout": HOLDOUT_TASKS, "all": ALL_TASKS + HOLDOUT_TASKS,
     "medium": MEDIUM_TASKS, "hard": HARD_TASKS, "v2": ALL_TASKS + HOLDOUT_TASKS + MEDIUM_TASKS + HARD_TASKS,
+    "multi": MULTI_TASKS, "v3": ALL_TASKS + HOLDOUT_TASKS + MEDIUM_TASKS + HARD_TASKS + MULTI_TASKS,
 }
 DEFAULT_MAX_USER_TURNS = 12
 
@@ -68,8 +73,12 @@ def load_task(name_or_path: str | Path) -> dict:
         raise ValueError(f"任务 {task['id']} 的 acceptance 必须恰好有这几组（按顺序）：{'、'.join(expected_stages)}，现在是 {list(task['acceptance'])}")
     for stage, raw in task["acceptance"].items():
         try:
-            parse_checks(raw, set())
-        except CheckSpecError as e:
+            parse_checks([c for c in raw if c.get("type") not in MULTI_TYPES], set())
+            validate_entries(raw)
+            for c in raw:
+                if c.get("type") == "at_pose":
+                    parse_checks(c["checks"], set())
+        except (CheckSpecError, AcceptSpecError) as e:
             raise ValueError(f"任务 {task['id']} 的 {stage} 验收检查写得不对：{e}") from e
     return task
 
@@ -98,7 +107,9 @@ def _converse(agent, sim_user: SimUser, first_message: str, max_turns: int, tota
 
 
 def _evaluate(stage: str, turn, checks_raw: list[dict], run_job: Callable, timeout_s: float) -> dict:
-    """对交付版本的 model.py 单独跑一遍验收检查（参数集合为空，期望值都是数字）。"""
+    """对交付版本的 model.py 单独跑一遍验收检查（参数集合为空，期望值都是数字）。多零件的版本交给 assembly_accept。"""
+    if (turn.version_dir / "assembly.json").is_file():
+        return _evaluate_multi(stage, turn, checks_raw)
     text = (turn.version_dir / "model.py").read_text(encoding="utf-8")
     result = run_job(RenderedNotebook(text=text, cell_lines={}), checks_raw, set(), timeout_s=timeout_s)
     by_id = {c.id: c for c in result.checks}
@@ -115,6 +126,18 @@ def _evaluate(stage: str, turn, checks_raw: list[dict], run_job: Callable, timeo
     mandatory_ok = all(by_id[i].passed for i in MANDATORY_IDS if i in by_id)
     return {"stage": stage, "delivered": True, "version": turn.version_dir.name, "acceptance": entries,
             "mandatory_ok": mandatory_ok, "error": result.error}
+
+
+def _evaluate_multi(stage: str, turn, checks_raw: list[dict]) -> dict:
+    res = assembly_evaluate(turn.version_dir, checks_raw)
+    entries = [{"id": e["id"], "type": e["type"], "expected": e.get("expected"), "measured": e.get("measured"),
+                "deviation": e["measured"] - e["expected"] if e.get("measured") is not None and e.get("expected") is not None else None,
+                "passed": bool(e["passed"]), "detail": e.get("detail", "")} for e in res["entries"]]
+    if res["error"] is not None:   # 验收本身没跑成：每一条都算不通过
+        entries = [{"id": c["id"], "type": c["type"], "expected": None, "measured": None, "deviation": None, "passed": False,
+                    "detail": res["error"]["message"]} for c in checks_raw]
+    return {"stage": stage, "delivered": True, "version": turn.version_dir.name, "acceptance": entries,
+            "mandatory_ok": res["mandatory_ok"], "error": res["error"]}
 
 
 def run_task(task: dict, make_agent: Callable[[Path], object], sim_user: SimUser, out_dir: Path, *,

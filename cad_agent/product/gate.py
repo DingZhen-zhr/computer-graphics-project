@@ -54,9 +54,35 @@ def users_of(ws: "Workspace", name: str) -> list[str]:
     return out
 
 
+def range_only(ws: "Workspace") -> set[str]:
+    """只出现在关节范围里的参数（如盖子最多翻多少度）。改它不改变任何几何，运动取样直接覆盖了整个范围，
+    所以不做扰动，算作"管住了"（偏离 D33）。"""
+    in_range: set[str] = set()
+    elsewhere: set[str] = set()
+    asm = ws.assembly
+    if asm is None:
+        return set()
+    for j in asm.joints:
+        in_range |= expr_names(j.lo) | expr_names(j.hi)
+    for m in asm.mates:
+        elsewhere |= expr_names(m.gap) | expr_names(m.angle)
+    for c in asm.couplings:
+        elsewhere |= expr_names(c.ratio)
+    for pid, st in ws.parts.items():
+        for con in st.connectors:
+            elsewhere |= expr_names(con.offset)
+            elsewhere |= {n for path, _, v in con.where if path != "geom.type" for n in expr_names(v)}
+        for f in st.features.items:
+            try:
+                elsewhere |= _analyse(f).reads
+            except NotebookError:
+                continue
+    return in_range - elsewhere
+
+
 def product_coverage_gaps(ws: "Workspace") -> list[str]:
-    """哪些用户参数没有被任何零件的检查、也没有被装配检查用到。"""
-    refs: set[str] = set()
+    """哪些用户参数没有被任何零件的检查、也没有被装配检查用到（只在关节范围里的参数不算缺）。"""
+    refs: set[str] = set(range_only(ws))
     for pid in ws.parts:
         names = set(part_param_names(ws, pid))
         refs |= {r for c in parse_checks(final_checks(_part_ws(ws, pid)), names) if c.holds == "from_here" for r in c.refs}
@@ -118,12 +144,15 @@ def run_product_gate(box: "ToolBox", workers: int = 4) -> GateResult:
     missing = product_coverage_gaps(ws)
     if missing or not box.gates.mutation_check:
         return GateResult(passed=not missing, missing_coverage=missing)
-    users = [p.name for p in ws.brief.params if p.source == "user"]
+    ranges = range_only(ws)
+    users = [p.name for p in ws.brief.params if p.source == "user" and p.name not in ranges]
     chosen, skipped = users[:LIMIT], users[LIMIT:]
+    fixed = [MutationResult(n, "constrained", (), ("motion_range",)) for n in sorted(ranges)
+             if any(p.name == n and p.source == "user" for p in ws.brief.params)]
     if not chosen:
-        return GateResult(passed=True, missing_coverage=[], skipped=skipped)
+        return GateResult(passed=True, missing_coverage=[], mutation=fixed, skipped=skipped)
     with ThreadPoolExecutor(max_workers=max(1, min(workers, len(chosen)))) as pool:
-        results = list(pool.map(lambda n: _mutate(box, n), chosen))
+        results = list(pool.map(lambda n: _mutate(box, n), chosen)) + fixed
     gate = GateResult(passed=True, missing_coverage=[], mutation=results, skipped=skipped)
     gate.passed = not gate.unconstrained
     return gate

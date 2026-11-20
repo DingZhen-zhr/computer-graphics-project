@@ -1,0 +1,66 @@
+# 多零件任务 1：带铰链盖的工具盒。考查：薄壁盒、铰链耳和轴、绕轴翻开的盖子不碰盒体、盖上的提手、四种材料。
+# 坐标约定（装好后是盒体的坐标）：盒底贴 z=0，xy 以原点为中心，长 160 沿 x，铰链在 +y 一侧。
+id: toolbox
+initial: "做一个带铰链盖的工具盒"
+max_user_turns: 14
+
+hidden_spec: |
+  - 盒体外形 160×100×60 mm（长×宽×高），四面侧壁厚 3 mm，底厚 3 mm，上面敞口。
+  - 盖子 160×100×6 mm，盖上时正好压在盒体上沿。
+  - 铰链在后边（+y 那一侧）：轴线沿长度方向（x），在盒体后壁外侧 5 mm、离桌面高 63 mm。盒体后面三段铰链耳，盖子两段，轴直径 3 mm。
+  - 盖子能向上翻开 0 到 110 度，翻开时不能碰到盒体。
+  - 盖子顶面正中一个提手，跨距 70 mm。
+  - 盒体用 ABS 塑料，盖子阳极氧化铝，轴不锈钢，提手橡胶。
+
+modifications:
+  - "盖子最多翻到 95 度就够了，盒子加高到 70"
+
+# 手算（装好后的坐标）：
+#   盒体 x ±80、y ±50、z 0~60；内腔 x ±77、y ±47、z 3 以上。铰链轴 y = 50 + 5 = 55，z = 63（盒高 60 + 盖厚 6 / 2）。
+#   铰链耳外半径 4（y 51~59、z 59~67），盖子装好后 z 60~66，提手底在 z 66，提手高 17（握把是半径 4 的圆柱，中心比底高 13）。
+#   所以 x 向 160；y 向 -50 到 59 = 109；z 向到 66 + 17 = 83。
+#   in-knuckle：x = -50 在盒体的铰链耳（-60~-40）里，离轴 3（耳外半径 4，轴孔半径 1.7）。
+#   盖子翻开 90 度：盖板中点（离轴 -55, 0）转到轴的正上方 55，即 (y 55, z 118)；原来盖子的位置空了。
+#   改后：盒高 70，轴 z = 73，盖子 70~76，提手到 93，其余 z 坐标加 10；翻开范围到 95。
+#   没改的旧模型对改后验收，恰好卡在 size-z、in-lid、in-grip、out-under-grip、in-pin、in-knuckle、hinge、open-90 上。
+acceptance:
+  after_initial:
+    - {id: size-x, type: bbox, axis: x, expected: 160, tol: 0.5}
+    - {id: size-y, type: bbox, axis: y, expected: 109, tol: 1.5}
+    - {id: size-z, type: bbox, axis: z, expected: 83, tol: 1.5}
+    - {id: in-floor, type: point_inside, point: [0, 0, 1.5]}
+    - {id: in-wall, type: point_inside, point: [0, -48.5, 30]}
+    - {id: out-cavity, type: point_outside, point: [0, 0, 30]}
+    - {id: in-lid, type: point_inside, point: [0, 0, 63]}
+    - {id: in-grip, type: point_inside, point: [0, 0, 79]}
+    - {id: out-under-grip, type: point_outside, point: [0, 0, 73]}
+    - {id: in-pin, type: point_inside, point: [0, 55, 63]}
+    - {id: in-knuckle, type: point_inside, point: [-50, 58, 63]}
+    - {id: hinge, type: joint, kind: revolute, axis: [1, 0, 0], through: [0, 55, 63], pos_tol: 0.5, lo: 0, hi: 110}
+    - id: open-90
+      type: at_pose
+      joint: hinge
+      value: 90
+      checks:
+        - {id: lid-up, type: point_inside, point: [-60, 55, 118]}
+        - {id: lid-gone, type: point_outside, point: [-60, 0, 63]}
+  after_mod_1:
+    - {id: size-x, type: bbox, axis: x, expected: 160, tol: 0.5}
+    - {id: size-y, type: bbox, axis: y, expected: 109, tol: 1.5}
+    - {id: size-z, type: bbox, axis: z, expected: 93, tol: 1.5}
+    - {id: in-floor, type: point_inside, point: [0, 0, 1.5]}
+    - {id: in-wall, type: point_inside, point: [0, -48.5, 35]}
+    - {id: out-cavity, type: point_outside, point: [0, 0, 35]}
+    - {id: in-lid, type: point_inside, point: [0, 0, 73]}
+    - {id: in-grip, type: point_inside, point: [0, 0, 89]}
+    - {id: out-under-grip, type: point_outside, point: [0, 0, 82]}
+    - {id: in-pin, type: point_inside, point: [0, 55, 73]}
+    - {id: in-knuckle, type: point_inside, point: [-50, 58, 73]}
+    - {id: hinge, type: joint, kind: revolute, axis: [1, 0, 0], through: [0, 55, 73], pos_tol: 0.5, lo: 0, hi: 95}
+    - id: open-90
+      type: at_pose
+      joint: hinge
+      value: 90
+      checks:
+        - {id: lid-up, type: point_inside, point: [-60, 55, 128]}
+        - {id: lid-gone, type: point_outside, point: [-60, 0, 73]}

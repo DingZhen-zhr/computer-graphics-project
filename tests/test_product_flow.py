@@ -111,7 +111,7 @@ def test_two_part_flow_delivers(tmp_path):
     v = session.dir / "versions" / "v1"
     for name in ("brief.json", "assembly.json", "assembly.py", "product.step", "view.png", "motion.json", "checks.json", "gate.json",
                  "changes.md", "parts/body/model.py", "parts/body/model.step", "parts/body/model.stl", "parts/body/checks.json",
-                 "parts/lid/model.py", "parts/lid/model.stl", "parts/lid/checks.json"):
+                 "parts/lid/model.py", "parts/lid/model.stl", "parts/lid/checks.json", "parts/lid/connectors.json"):
         assert (v / name).is_file(), name
     motion = json.loads((v / "motion.json").read_text(encoding="utf-8"))
     assert set(motion) == {"parts", "rest", "explode", "joints"}
@@ -200,3 +200,22 @@ def test_single_part_flow_unchanged(tmp_path):
     assert ws.parts == {} and ws.active is None
     assert (session.dir / "versions" / "v1" / "model.step").is_file()
     assert not (session.dir / "assembly.json").exists()
+
+
+def test_range_only_param_is_not_mutated(tmp_path):
+    """偏离 D33：只在关节范围里的参数（盖子最多翻多少度）不扰动，算作管住了；也不算缺检查。"""
+    from cad_agent.product.gate import product_coverage_gaps, range_only, run_product_gate
+
+    agent, ws, llm, box, session = make_agent(tmp_path, BODY + LID + [CONNECT])
+    assert agent.handle_user("开始").kind == "delivered"
+    ws.brief.apply_patch({"set_params": [_p("lid_max", 110)]})
+    box.call("set_assembly", {"ground": "body", "mates": [{"id": "lid_on", "fixed": "body.hinge", "moving": "lid.hinge", "align": "same"}],
+                              "joints": [{"id": "open", "mate": "lid_on", "type": "revolute", "range": [0, "lid_max"], "label": "盖子翻开"}]})
+    assert range_only(ws) == {"lid_max"} and "lid_max" not in product_coverage_gaps(ws)
+    box.gates = Gates(mutation_check=True, visual_review=False, cases=False)
+    asm = FakeAssembly()
+    box.run_assembly = asm
+    gate = run_product_gate(box, workers=1)
+    m = next(x for x in gate.mutation if x.param == "lid_max")
+    assert m.verdict == "constrained" and m.caught_by == ("motion_range",) and m.tried == ()
+    assert all("lid_max" not in c["values"] for c in asm.calls)

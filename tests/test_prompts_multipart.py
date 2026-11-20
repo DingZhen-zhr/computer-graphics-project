@@ -92,6 +92,9 @@ def test_assembly_examples_are_valid():
         cons = {p: parse_connectors(p, [{"name": r.split(".")[1], "kind": "faces", "where": WHERE}
                                         for r in sorted(set(refs)) if r.startswith(p + ".")], set()) for p in parts}
         names = set()
+        for m in ex["mates"]:
+            for key in ("gap", "angle"):
+                names |= expr_names(m.get(key, 0))
         for j in ex.get("joints", []):
             for v in j["range"]:
                 names |= expr_names(v)

@@ -1,0 +1,69 @@
+# 多零件任务 2：带抽屉的小柜子。考查：一面开口的柜体、比柜内小一圈的抽屉、盖住柜口的前面板、沿 -y 滑出不碰柜体。
+# 坐标约定（装好后是柜体的坐标）：柜底贴 z=0，xy 以原点为中心，宽 200 沿 x，开口在 -y 一侧。
+id: drawer_cabinet
+initial: "做一个带抽屉的小柜子"
+max_user_turns: 14
+
+hidden_spec: |
+  - 柜体外形 200×150×120 mm（宽×深×高），壁厚 4 mm，正面（朝 -y 的那面）开口。
+  - 抽屉外形比柜内空间左右各小 1 mm、上下各小 1 mm，深度 140 mm，壁厚 3 mm，上面敞口。
+  - 抽屉前面板 200×4×120 mm，推进去时正好盖住柜子正面。
+  - 前面板正中一个拉手，宽 60 mm。
+  - 抽屉沿 -y 能拉出 0 到 100 mm，拉出时不碰柜体。
+  - 柜体木头，抽屉 ABS 塑料，拉手黄铜。
+
+modifications:
+  - "抽屉能拉出 120 毫米"
+
+# 手算（装好后的坐标）：
+#   柜体 x ±100、y ±75、z 0~120；柜内 x ±96、z 4~116、y 到 71。
+#   抽屉盒 x ±95（=96-1）、z 5~115（=4+1 到 116-1）、y -75~65（深 140），壁 3（侧壁 x 92~95，底 z 5~8）；
+#   前面板 y -79~-75、x ±100、z 0~120；拉手在面板前面正中（z 60），向 -y 伸出 17，握把中心在 y = -79 - 13 = -92。
+#   所以 x 向 200；y 向 -96 到 75 = 171；z 向 120。out-gap 在抽屉侧壁和柜子侧壁之间（x -95.5）。
+#   拉出 100：抽屉底 y -175~-35，原来 y=40 的抽屉底那里空了。改后拉出 120。
+#   没改的旧模型对改后验收，恰好卡在 pull 上（范围只到 100）；几何没变，at_pose 照样过。
+acceptance:
+  after_initial:
+    - {id: size-x, type: bbox, axis: x, expected: 200, tol: 0.5}
+    - {id: size-y, type: bbox, axis: y, expected: 171, tol: 1.5}
+    - {id: size-z, type: bbox, axis: z, expected: 120, tol: 0.5}
+    - {id: in-back, type: point_inside, point: [0, 73, 60]}
+    - {id: in-side, type: point_inside, point: [-98, 0, 60]}
+    - {id: in-drawer-side, type: point_inside, point: [-93.5, 0, 60]}
+    - {id: out-gap, type: point_outside, point: [-95.5, 0, 60]}
+    - {id: out-cavity, type: point_outside, point: [0, 0, 60]}
+    - {id: in-drawer-floor, type: point_inside, point: [0, 0, 6.5]}
+    - {id: in-panel, type: point_inside, point: [-97, -77, 60]}
+    - {id: in-grip, type: point_inside, point: [0, -92, 60]}
+    - {id: out-under-grip, type: point_outside, point: [0, -86, 60]}
+    - {id: pull, type: joint, kind: prismatic, axis: [0, -1, 0], lo: 0, hi: 100}
+    - id: pulled
+      type: at_pose
+      joint: pull
+      value: 100
+      checks:
+        - {id: floor-out, type: point_inside, point: [0, -100, 6.5]}
+        - {id: floor-gone, type: point_outside, point: [0, 40, 6.5]}
+        - {id: panel-out, type: point_inside, point: [-97, -177, 60]}
+  after_mod_1:
+    - {id: size-x, type: bbox, axis: x, expected: 200, tol: 0.5}
+    - {id: size-y, type: bbox, axis: y, expected: 171, tol: 1.5}
+    - {id: size-z, type: bbox, axis: z, expected: 120, tol: 0.5}
+    - {id: in-back, type: point_inside, point: [0, 73, 60]}
+    - {id: in-side, type: point_inside, point: [-98, 0, 60]}
+    - {id: in-drawer-side, type: point_inside, point: [-93.5, 0, 60]}
+    - {id: out-gap, type: point_outside, point: [-95.5, 0, 60]}
+    - {id: out-cavity, type: point_outside, point: [0, 0, 60]}
+    - {id: in-drawer-floor, type: point_inside, point: [0, 0, 6.5]}
+    - {id: in-panel, type: point_inside, point: [-97, -77, 60]}
+    - {id: in-grip, type: point_inside, point: [0, -92, 60]}
+    - {id: out-under-grip, type: point_outside, point: [0, -86, 60]}
+    - {id: pull, type: joint, kind: prismatic, axis: [0, -1, 0], lo: 0, hi: 120}
+    - id: pulled
+      type: at_pose
+      joint: pull
+      value: 120
+      checks:
+        - {id: floor-out, type: point_inside, point: [0, -120, 6.5]}
+        - {id: floor-gone, type: point_outside, point: [0, 40, 6.5]}
+        - {id: panel-out, type: point_inside, point: [-97, -197, 60]}

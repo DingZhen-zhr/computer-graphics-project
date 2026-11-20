@@ -1,0 +1,63 @@
+# 多零件任务 3：一对装在支架上能啮合转动的齿轮。考查：标准件齿轮、按模数和齿数算中心距、轴孔间隙、
+# 齿轮联动（反向、半速）、转一整圈不卡。
+# 坐标约定（装好后是底板的坐标）：底板贴 z=0，xy 以原点为中心，长 140 沿 x，两根轴在 x 轴上、关于原点对称。
+id: gear_pair
+initial: "做一对装在支架上能啮合转动的齿轮"
+max_user_turns: 14
+
+hidden_spec: |
+  - 底板 140×80×8 mm。两根轴直径 8 mm、高 30 mm，竖直立在底板上，两轴中心距 60 mm，关于底板中心对称、都在长度方向的中线上。
+  - 小齿轮模数 2、20 齿、齿宽 10 mm；大齿轮模数 2、40 齿、齿宽 10 mm。都套在轴上，小齿轮在 -x 那根轴上，下表面离底板上表面 5 mm。
+  - 轴和齿轮孔之间单边间隙 0.2 mm。
+  - 小齿轮转动时带动大齿轮反向转，转速是一半；小齿轮转一整圈不卡。
+  - 底板铝，轴不锈钢，齿轮黄铜。
+
+modifications:
+  - "大齿轮改成 50 齿，中心距跟着变"
+
+# 手算（装好后的坐标）：
+#   中心距 = 模数 ×（20 + 40）/ 2 = 60，轴在 x = ±30；改后 2 ×（20 + 50）/ 2 = 70，轴在 x = ±35。
+#   齿轮 z 13~23（底板 8 + 5，齿宽 10），检查点都取 z = 18；轴顶 z = 8 + 30 = 38，所以 z 向 38。
+#   齿顶半径：小齿轮 2 × 22 / 2 = 22，大齿轮 42（改后 52）。标准件 +x 方向正对一个齿（笔记第 21 节）。
+#   啮合：小齿轮 +x 是齿、对着大齿轮；大齿轮要转半个齿（4.5 度，改后 3.6 度），让齿槽对着小齿轮。
+#   于是装好时小齿轮 -x 方向（180 度）是齿，离轴 21.5 的点在材料里；大齿轮 +x 方向是齿槽，离轴 41.5 的点在外面。
+#   小齿轮转 9 度（半个齿）：它的 -x 方向变成齿槽；大齿轮反转 4.5 度，+x 方向变成齿。
+#   out-gap 在轴（半径 4）和齿轮孔（半径 4.2）之间。
+#   没改的旧模型对改后验收，恰好卡在 in-shaft、out-gap、in-pinion-tooth、pinion、gear、half-tooth 上。
+acceptance:
+  after_initial:
+    - {id: size-z, type: bbox, axis: z, expected: 38, tol: 0.5}
+    - {id: in-plate, type: point_inside, point: [0, 0, 4]}
+    - {id: in-shaft, type: point_inside, point: [-30, 0, 30]}
+    - {id: in-pinion, type: point_inside, point: [-22, 0, 18]}
+    - {id: out-gap, type: point_outside, point: [-25.9, 0, 18]}
+    - {id: in-gear, type: point_inside, point: [42, 0, 18]}
+    - {id: in-pinion-tooth, type: point_inside, point: [-51.5, 0, 18]}
+    - {id: out-gear-gap, type: point_outside, point: [71.5, 0, 18]}
+    - {id: pinion, type: joint, kind: revolute, axis: [0, 0, 1], through: [-30, 0, 0], pos_tol: 0.5, lo: 0, hi: 360}
+    - {id: gear, type: joint, kind: revolute, axis: [0, 0, 1], through: [30, 0, 0], pos_tol: 0.5, lo: -180, hi: 0}
+    - id: half-tooth
+      type: at_pose
+      joint: pinion
+      value: 9
+      checks:
+        - {id: pinion-gap, type: point_outside, point: [-51.5, 0, 18]}
+        - {id: gear-tooth, type: point_inside, point: [71.5, 0, 18]}
+  after_mod_1:
+    - {id: size-z, type: bbox, axis: z, expected: 38, tol: 0.5}
+    - {id: in-plate, type: point_inside, point: [0, 0, 4]}
+    - {id: in-shaft, type: point_inside, point: [-35, 0, 30]}
+    - {id: in-pinion, type: point_inside, point: [-27, 0, 18]}
+    - {id: out-gap, type: point_outside, point: [-30.9, 0, 18]}
+    - {id: in-gear, type: point_inside, point: [47, 0, 18]}
+    - {id: in-pinion-tooth, type: point_inside, point: [-56.5, 0, 18]}
+    - {id: out-gear-gap, type: point_outside, point: [86.5, 0, 18]}
+    - {id: pinion, type: joint, kind: revolute, axis: [0, 0, 1], through: [-35, 0, 0], pos_tol: 0.5, lo: 0, hi: 360}
+    - {id: gear, type: joint, kind: revolute, axis: [0, 0, 1], through: [35, 0, 0], pos_tol: 0.5, lo: -180, hi: 0}
+    - id: half-tooth
+      type: at_pose
+      joint: pinion
+      value: 9
+      checks:
+        - {id: pinion-gap, type: point_outside, point: [-56.5, 0, 18]}
+        - {id: gear-tooth, type: point_inside, point: [86.5, 0, 18]}

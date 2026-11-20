@@ -71,6 +71,7 @@ def write_product_version(session: "Session", ws: "Workspace", run: Any, files_d
         (d / "model.py").write_text(render_part_notebook(ws, p.id).text, encoding="utf-8")
         for name in ("model.step", "model.stl"):
             shutil.copyfile(files_dir / "parts" / p.id / name, d / name)
+        _write(d / "connectors.json", [c.to_dict() for c in ws.parts[p.id].connectors])   # 验收要用（不读 motion.json）
         own = [{**r, "part": p.id} for r in ws.parts[p.id].results]
         _write(d / "checks.json", own)
         checks += own

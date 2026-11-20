@@ -1280,3 +1280,9 @@
 - `cad_agent/desk/product_view.py`：`build_state` 多了 `product`（单零件是 null）、`params_view`，检查每条多 `part`（单零件 main、装配 assembly）和 `selected`（按 D32 一律是 null）。新事件 `part_done`、`assembly` 有平常话的说明；装配日志多记一条 `reason`（第一条没过的原因）。文件白名单加了 `product.step`、`assembly.py`、`motion.json`、`parts/<编号>/…` 四种；没有预览文件（D32）。
 - 状态多了字段，按测试提示重新生成了 `site/demo/state.json`。
 - 测试 `tests/test_desk_state_v3.py` 12 个，快速全量通过。
+
+## 3.0 计划 2 Task 14：三个多零件评测任务和验收
+- 任务文件 `toolbox.yaml`、`drawer_cabinet.yaml`、`gear_pair.yaml`（验收数字手算，过程写在注释里）；`benchmarks/assembly_accept.py` 独立验收（多零件的 joint、at_pose 条目）；`run.py` 加 `MULTI_TASKS`、`multi`、`v3` 两个任务集，多零件版本交给独立验收。
+- 标准答案在 `tests/references_v3.py`，速查表"装配的写法"的 4 个例子都出自这里（抽屉和齿轮两条按标准答案改了写法）。
+- 跑出来的问题：验收一开始没按连接点的 flip 定方向，盖子往下转了（已改）；抽屉的标准答案把抽屉的坐标写成依赖柜子深度，终检正确地报"cab_d 没管住"，改成抽屉自己的坐标。另外产品终检加了偏离 D33（只在关节范围里的参数不扰动）。
+- 测试：`tests/test_assembly_tasks.py` 8 个（快速），`tests/test_benchmark_references_v3.py` 3 个（`sca`，共约 8 分钟）全过：三个产品的零件终检、装配必做检查、产品终检、初始和修改后的验收都过，反例恰好卡在修改相关的条目上。
