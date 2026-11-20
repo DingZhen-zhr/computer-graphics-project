@@ -1,6 +1,6 @@
 """一行安装脚本 install.ps1 / install.sh 和图标（第二版计划 4 Task 3）。
 
-脚本都只在演示模式（CALIPER_DRY_RUN=1）下运行，或者在第一步就因为平台不支持而退出；
+脚本都只在演示模式（DATUM_DRY_RUN=1）下运行，或者在第一步就因为平台不支持而退出；
 PATH 最前面放一个假的 uv，它一旦被调用就留下记号，用来确认没有真的调用 uv。
 """
 
@@ -18,6 +18,9 @@ from PIL import Image
 
 from cad_agent import __version__
 from cad_agent.maintenance import REPO
+
+# 安装脚本发现旧版时打印的那句话（计划 1 Task 5 原文）
+OLD_VERSION_HINT = '检测到旧版"卡尺"（caliper-cad）。它可以和 Datum 同时存在；不需要的话运行：uv tool uninstall caliper-cad'
 
 ROOT = Path(__file__).resolve().parent.parent
 PS1 = ROOT / "install.ps1"
@@ -39,7 +42,7 @@ def _text(p: Path) -> str:
 
 
 def _env(tmp_path: Path, **extra: str) -> dict[str, str]:
-    env = {k: v for k, v in os.environ.items() if not k.startswith("CALIPER_")}
+    env = {k: v for k, v in os.environ.items() if not k.startswith("DATUM_")}
     env.update({"PYTHONUTF8": "1", "HOME": str(tmp_path / "home"), "USERPROFILE": str(tmp_path / "home"), **extra})
     (tmp_path / "home").mkdir(exist_ok=True)
     return env
@@ -110,7 +113,7 @@ def test_ps1_is_utf8_without_bom_and_sh_has_lf_endings():
 @windows_only
 def test_ps1_dry_run_prints_five_steps(tmp_path):
     bin_dir, marker = _fake_bin(tmp_path)
-    env = _env(tmp_path, CALIPER_DRY_RUN="1", PATH=f"{bin_dir}{os.pathsep}{os.environ['PATH']}")
+    env = _env(tmp_path, DATUM_DRY_RUN="1", PATH=f"{bin_dir}{os.pathsep}{os.environ['PATH']}")
     command = f"Get-Content -Raw -Encoding UTF8 -LiteralPath '{PS1}' | Invoke-Expression; exit $LASTEXITCODE"
     r = subprocess.run([POWERSHELL, "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", command],
                        capture_output=True, text=True, encoding=PS_ENCODING, errors="replace", env=env, timeout=120)
@@ -126,7 +129,7 @@ def test_ps1_dry_run_prints_five_steps(tmp_path):
 def test_ps1_dry_run_through_iex_keeps_the_shell(tmp_path):
     """用户的用法是 irm … | iex：脚本是在用户自己的 PowerShell 里执行的，出错或结束时不能把这个窗口关掉。"""
     bin_dir, marker = _fake_bin(tmp_path)
-    env = _env(tmp_path, CALIPER_DRY_RUN="1", PATH=f"{bin_dir}{os.pathsep}{os.environ['PATH']}")
+    env = _env(tmp_path, DATUM_DRY_RUN="1", PATH=f"{bin_dir}{os.pathsep}{os.environ['PATH']}")
     command = f"Get-Content -Raw -Encoding UTF8 '{PS1}' | Invoke-Expression; 'still-here'"
     r = subprocess.run([POWERSHELL, "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", command],
                        capture_output=True, text=True, encoding=PS_ENCODING, errors="replace", env=env, timeout=120)
@@ -141,7 +144,7 @@ def test_sh_dry_run_prints_five_steps(tmp_path):
     bin_dir, marker = _fake_bin(tmp_path)
     _fake_uname(bin_dir, "arm64", "Darwin")
     _fake(bin_dir, "sw_vers", "14.5")
-    env = _env(tmp_path, CALIPER_DRY_RUN="1", PATH=f"{bin_dir}{os.pathsep}{os.environ['PATH']}")
+    env = _env(tmp_path, DATUM_DRY_RUN="1", PATH=f"{bin_dir}{os.pathsep}{os.environ['PATH']}")
     r = subprocess.run([SH_EXE, str(SH)], capture_output=True, text=True, encoding="utf-8", errors="replace", env=env, timeout=120)
     out = r.stdout + r.stderr
     assert r.returncode == 0, out
@@ -199,7 +202,7 @@ def test_only_one_external_script_is_executed():
 def test_install_script_mentions_mirror_and_offline_path():
     ps1, sh = _text(PS1), _text(SH)
     for text in (ps1, sh):
-        assert "CALIPER_MIRROR" in text and "装不上怎么办" in text
+        assert "DATUM_MIRROR" in text and "装不上怎么办" in text
         assert "UV_HTTP_CONNECT_TIMEOUT" in text   # uv 自己下载时也有连接超时
     # 每一个下载命令都带超时
     downloads = [line for line in ps1.splitlines() if re.search(r"\b(Invoke-RestMethod|Invoke-WebRequest|irm|iwr)\b", line)
@@ -219,7 +222,7 @@ def test_scripts_have_no_admin_or_system_changes():
 def test_env_options_are_documented_in_both_scripts():
     for p in (PS1, SH):
         text = _text(p)
-        for name in ("CALIPER_SOURCE", "CALIPER_MIRROR", "CALIPER_NO_SHORTCUT", "CALIPER_DRY_RUN"):
+        for name in ("DATUM_SOURCE", "DATUM_MIRROR", "DATUM_NO_SHORTCUT", "DATUM_DRY_RUN"):
             assert name in text, (p.name, name)
 
 
@@ -272,7 +275,7 @@ def test_ps1_stops_when_caliper_is_running():
     install = text.find("$installArgs = @('tool', 'install'")
     assert 0 <= check < install
     block = text[check:install]
-    assert "Get-Process" in block and "caliper-cad" in block and "关掉" in block and "-WithHelp" not in block
+    assert "Get-Process" in block and "datum-cad" in block and "关掉" in block and "-WithHelp" not in block
 
 
 def test_sh_variables_are_braced():
@@ -288,19 +291,22 @@ def _code(text: str) -> str:
 
 
 def _reinstall_problems(ps1: str, sh: str) -> list[str]:
-    """再装一次会不会动到用户的数据：脚本不能碰数据目录、设置文件和钥匙串；删的只能是临时文件和旧的 Caliper.app。"""
+    """再装一次会不会动到用户的数据：脚本不能碰数据目录、设置文件和钥匙串；删的只能是临时文件、要重建的 Datum.app
+    和旧版的快捷方式（偏离 D25，用户同意）。"uv tool uninstall" 只能出现在提示旧版的那句话里，不能真的执行。"""
     problems = []
     for name, text in (("install.ps1", _code(ps1)), ("install.sh", _code(sh))):
-        for word in ("LOCALAPPDATA", "Application Support", "/.caliper", "settings.toml", "keyring", "uv tool uninstall"):
+        text = text.replace(OLD_VERSION_HINT, "")
+        for word in ("LOCALAPPDATA", "Application Support", "/.caliper", "settings.toml", "keyring", "tool uninstall"):
             if word in text:
                 problems.append(f"{name} 提到了 {word}")
-    if re.search(r"Remove-Item|\bdel\b|\brmdir\b", _code(ps1)):
+    removals = [line for line in _code(ps1).splitlines() if re.search(r"Remove-Item|\bdel\b|\brmdir\b", line)]
+    if any(not re.fullmatch(r"\s*Remove-Item -LiteralPath \$OldShortcut -Force", line) for line in removals):
         problems.append("install.ps1 删了东西")
     deleted = set(re.findall(r"\brm\s+-[a-z]+\s+(\S+)", _code(sh)))
-    if deleted - {'"${TMP_SCRIPT}"', '"${APP}"'}:
+    if deleted - {'"${TMP_SCRIPT}"', '"${APP}"', '"${OLD_APP}"'}:
         problems.append(f"install.sh 删了 {sorted(deleted)}")
-    if 'APP="${HOME}/Applications/Caliper.app"' not in sh:
-        problems.append("install.sh 里的 APP 不是 ~/Applications/Caliper.app")
+    if 'APP="${HOME}/Applications/Datum.app"' not in sh:
+        problems.append("install.sh 里的 APP 不是 ~/Applications/Datum.app")
     return problems
 
 
@@ -316,6 +322,9 @@ def test_reinstall_keeps_data():
     # 检查本身管用：在脚本里加一行删数据目录、或删设置文件，都要被查出来
     assert _reinstall_problems(ps1 + "\nRemove-Item -Recurse (Join-Path $env:LOCALAPPDATA 'Caliper')\n", sh)
     assert _reinstall_problems(ps1, sh + '\nrm -f "${HOME}/Library/Application Support/Caliper/settings.toml"\n')
+    # D25：真的执行卸载旧版要被查出来
+    assert _reinstall_problems(ps1 + "\n& $uv tool uninstall caliper-cad\n", sh)
+    assert _reinstall_problems(ps1, sh + '\n"${UV}" tool uninstall caliper-cad\n')
 
 
 # 快捷方式函数在 install.ps1 里夹在这两行注释之间，测试把它单独取出来运行

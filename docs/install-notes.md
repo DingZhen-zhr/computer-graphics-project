@@ -76,3 +76,12 @@ Get-Content -Raw -Encoding UTF8 install.ps1 | iex
 - 改用 IShellLinkW（`Add-Type` 编译的一小段 C#）后，泰文的名字、目标、工作目录、说明、图标全部正确，用 Shell.Application 读回来核对过。
 - 2026-11-20 用改过的脚本在本机重装了一次（`CALIPER_SOURCE=.`）：两个快捷方式都建好了，读回来的目标是 `C:\Users\18258\.local\bin\caliper-app.exe`，图标是包里的 `icon.ico`，自检全部正常。
 - 读快捷方式也别用 `WScript.Shell`（同样的问题）；用 `(New-Object -ComObject Shell.Application).NameSpace(目录).ParseName(文件名).GetLink`。
+
+## 9. 从卡尺升级（3.0 计划 1）
+
+- 安装脚本装的是 `datum-cad`，命令是 `datum`、`datum-app`。旧的 `caliper-cad` 是另一个 uv 工具，两者可以同时在。
+- 第 3 步先运行 `uv tool list`，里面有 `caliper-cad` 时打印"检测到旧版……不需要的话运行：uv tool uninstall caliper-cad"，**不自动卸载**。演示模式下这一步只打印，不调用 uv。
+- 第 4 步删掉旧快捷方式：Windows 是开始菜单和桌面上的 `卡尺 Caliper.lnk`，Mac 是 `~/Applications/Caliper.app`。删之前打印一行，演示模式下只打印。然后照常建 `Datum 基准.lnk` / `~/Applications/Datum.app`。
+- 数据和 key 不归安装脚本管：第一次启动（或安装脚本最后的 `datum doctor`）时，程序把 `%LOCALAPPDATA%\Caliper`（Mac `~/Library/Application Support/Caliper`）复制成 `Datum`。钥匙串里新服务名 `datum` 没有 key 时，去旧服务名 `caliper` 找，找到就复制一份；每个服务只回退一次（记在数据目录的 `key_migration.json`）。旧目录、旧 key 都不删。
+- 选项环境变量改名：`DATUM_SOURCE`、`DATUM_MIRROR`、`DATUM_NO_SHORTCUT`、`DATUM_DRY_RUN`。旧的 `CALIPER_*` 不再认。
+- 没有实测：真的在装着第二版的电脑上从 GitHub 装 v3.0.0（要等打了 `v3.0.0` 标签，计划 5 做）。这次只在本机跑了两个脚本的演示模式。

@@ -189,3 +189,14 @@
   - 我加的一条：只有旧服务名里确实有这个服务的 key 时，`delete_key` 才写这个文件。这样旧测试里没有设 `DATUM_HOME` 的删 key 调用不会在真实的数据目录里写东西（那会建出 `Datum` 目录，挡住数据目录的迁移）；没有旧 key 时本来也不存在"复制回来"的问题。
 - 测试：规划会话要求的 `test_deleted_key_does_not_come_back`、`test_fallback_only_once_per_provider`、`test_marker_file_corrupt_is_ignored`、`test_copy_failure_does_not_mark`，另加 `test_delete_before_any_fallback_also_blocks_it`、`test_marker_write_failure_only_logs`、`test_no_marker_written_without_old_key`。
 - 影响：只影响 Task 3 和设置页删 key 的行为。`datum uninstall --delete-data` 会连这个文件一起删掉；之后重新安装，旧服务名里的 key 会再被复制一次，这和"旧的不删"的规矩一致。
+
+## D25（3.0 计划 1 Task 5）改 `test_reinstall_keeps_data` 的辅助函数（计划漏列，用户同意）
+
+- 原计划："要改的旧测试"清单里，`tests/test_install_scripts.py` 只写了环境变量名和 `test_ps1_stops_when_caliper_is_running` 的进程名。
+- 实际情况：同一个文件里的 `test_reinstall_keeps_data`（辅助函数 `_reinstall_problems`）要求：`install.sh` 里有 `APP="${HOME}/Applications/Caliper.app"`；`install.ps1` 的代码里不能出现 `Remove-Item`/`del`/`rmdir`；两个脚本的代码行里不能出现 `uv tool uninstall`。而 Task 5 要求 Mac 应用改名 `Datum.app`、删掉旧快捷方式、打印含 `uv tool uninstall caliper-cad` 的提示。不改这条测试就做不了，计划漏列了它。
+- 怎么改（规划会话提议，用户本人在本会话里回答"Yes, change it"同意）：
+  1. `Caliper.app` → `Datum.app`；
+  2. 只额外放行删旧快捷方式这一个目标：`install.ps1` 只允许 `Remove-Item -LiteralPath $OldShortcut -Force` 这一行，`install.sh` 的允许删除集合加 `"${OLD_APP}"`，其余删除照旧不允许；
+  3. 先把提示旧版的那句原文（`OLD_VERSION_HINT`）去掉再查，`uv tool uninstall` 不能作为命令执行。查的词从 `uv tool uninstall` 改成 `tool uninstall`，`"${UV}" tool uninstall` 这种写法也能查出来，比原来更严。
+  原有两条反向检查不动；新加两条：在脚本里真的执行卸载旧版（PowerShell 和 sh 各一条），要被查出来。
+- 影响：只影响这一条测试和 Task 5 的两个安装脚本。

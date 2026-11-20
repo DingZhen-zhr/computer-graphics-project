@@ -75,7 +75,7 @@ def test_workflow_runs_tests_install_doctor_smoke():
     # 两个平台各自用自己的安装脚本，来源都指向检出的目录
     whole = CI.read_text(encoding="utf-8")
     assert "install.ps1" in whole and "install.sh" in whole
-    assert "CALIPER_SOURCE" in whole and "github.workspace" in whole
+    assert "DATUM_SOURCE" in whole and "github.workspace" in whole
     assert "PYTHONUTF8" in whole
 
 

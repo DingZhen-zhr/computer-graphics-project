@@ -1,5 +1,5 @@
 # 持续集成（第二版计划 4 Task 4）：在 Windows 和 Apple 芯片的 Mac 上各跑一遍
-#   全部测试 → 用检出的源码跑安装脚本 → caliper doctor --offline → caliper --smoke → 再装一次（覆盖安装也要成功）
+#   全部测试 → 用检出的源码跑安装脚本 → datum doctor --offline → datum --smoke → 再装一次（覆盖安装也要成功）
 # 不需要任何密钥，不调用任何模型接口。
 name: 持续集成
 
@@ -55,7 +55,7 @@ jobs:
         if: runner.os == 'Windows'
         shell: pwsh
         env:
-          CALIPER_SOURCE: ${{ github.workspace }}
+          DATUM_SOURCE: ${{ github.workspace }}
         # 按 UTF-8 读进来再执行，和用户的 irm | iex 一样（偏离 D17：5.1 的 -File 会按系统编码读）
         run: powershell -NoProfile -ExecutionPolicy Bypass -Command 'Get-Content -Raw -Encoding UTF8 install.ps1 | Invoke-Expression; exit $LASTEXITCODE'
 
@@ -63,24 +63,24 @@ jobs:
         if: runner.os == 'macOS'
         shell: bash
         env:
-          CALIPER_SOURCE: ${{ github.workspace }}
+          DATUM_SOURCE: ${{ github.workspace }}
         run: sh install.sh
 
       - name: 把 uv 的工具目录加进后面几步的 PATH
         shell: bash
         run: uv tool dir --bin >> "$GITHUB_PATH"
 
-      - name: caliper doctor --offline（返回码必须是 0）
-        run: caliper doctor --offline
+      - name: datum doctor --offline（返回码必须是 0）
+        run: datum doctor --offline
 
-      - name: caliper --smoke（不开窗口，起服务，请求首页和 /api/boot）
-        run: caliper --smoke
+      - name: datum --smoke（不开窗口，起服务，请求首页和 /api/boot）
+        run: datum --smoke
 
       - name: 再跑一次安装脚本，覆盖安装也要成功（Windows）
         if: runner.os == 'Windows'
         shell: pwsh
         env:
-          CALIPER_SOURCE: ${{ github.workspace }}
+          DATUM_SOURCE: ${{ github.workspace }}
         # 按 UTF-8 读进来再执行，和用户的 irm | iex 一样（偏离 D17：5.1 的 -File 会按系统编码读）
         run: powershell -NoProfile -ExecutionPolicy Bypass -Command 'Get-Content -Raw -Encoding UTF8 install.ps1 | Invoke-Expression; exit $LASTEXITCODE'
 
@@ -88,5 +88,5 @@ jobs:
         if: runner.os == 'macOS'
         shell: bash
         env:
-          CALIPER_SOURCE: ${{ github.workspace }}
+          DATUM_SOURCE: ${{ github.workspace }}
         run: sh install.sh

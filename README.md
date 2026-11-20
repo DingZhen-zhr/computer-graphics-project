@@ -29,10 +29,10 @@ curl -fsSL https://raw.githubusercontent.com/DingZhen-zhr/computer-graphics-proj
 1. 检查系统和芯片，不支持就说明原因并退出，什么都不改。
 2. 准备 [uv](https://docs.astral.sh/uv/)：电脑上没有就运行 uv 的官方安装脚本。不需要预先装 Python。
 3. 用 uv 准备一个独立的 Python 3.12 环境，装上卡尺（第一次要下载几百 MB）。
-4. 建快捷方式：Windows 是开始菜单和桌面上的"卡尺 Caliper"；Mac 是"应用程序"里的 Caliper。
+4. 建快捷方式：Windows 是开始菜单和桌面上的"Datum 基准"；Mac 是"应用程序"里的 Datum。装过第二版"卡尺"的话，旧的快捷方式会被删掉；旧程序本身不动，安装时会提示怎么卸载它。
 5. 运行一次自检 `datum doctor`，把结果打印出来。
 
-它只往当前用户的目录里写东西，不需要管理员权限。装好后，双击"卡尺 Caliper"打开；或者在终端里输入 `datum`（提示找不到时，关掉终端再开一个新的）。
+它只往当前用户的目录里写东西，不需要管理员权限。装好后，双击"Datum 基准"打开；或者在终端里输入 `datum`（提示找不到时，关掉终端再开一个新的）。
 
 **第一次打开**会进引导页：
 
@@ -47,11 +47,11 @@ curl -fsSL https://raw.githubusercontent.com/DingZhen-zhr/computer-graphics-proj
 **连不上 GitHub 或 PyPI，或者下载很慢。** 改走国内镜像，PyPI 用清华的镜像，Python 用 npmmirror 的镜像：
 
 ```powershell
-$env:CALIPER_MIRROR = "1"; irm https://raw.githubusercontent.com/DingZhen-zhr/computer-graphics-project/master/install.ps1 | iex
+$env:DATUM_MIRROR = "1"; irm https://raw.githubusercontent.com/DingZhen-zhr/computer-graphics-project/master/install.ps1 | iex
 ```
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/DingZhen-zhr/computer-graphics-project/master/install.sh | CALIPER_MIRROR=1 sh
+curl -fsSL https://raw.githubusercontent.com/DingZhen-zhr/computer-graphics-project/master/install.sh | DATUM_MIRROR=1 sh
 ```
 
 脚本里每一次下载都有 20 秒的连接超时，不会一直卡着。uv 本身是从它的官网下载的，镜像管不到这一步。
@@ -59,19 +59,19 @@ curl -fsSL https://raw.githubusercontent.com/DingZhen-zhr/computer-graphics-proj
 **GitHub 完全打不开：下载压缩包在本地装。**
 
 1. 想办法拿到本仓库发布标签 `v2.0.0` 的压缩包（GitHub 页面上的 Code → Download ZIP，或者找别人拷一份），解压。
-2. 把 `CALIPER_SOURCE` 指到解压出来的目录，再运行目录里的安装脚本。
+2. 把 `DATUM_SOURCE` 指到解压出来的目录，再运行目录里的安装脚本。
 
 Windows：
 
 ```powershell
-$env:CALIPER_SOURCE = "D:\下载\computer-graphics-project-2.0.0"
+$env:DATUM_SOURCE = "D:\下载\computer-graphics-project-3.0.0"
 Get-Content -Raw -Encoding UTF8 D:\下载\computer-graphics-project-2.0.0\install.ps1 | iex
 ```
 
 Mac：
 
 ```sh
-CALIPER_SOURCE=~/Downloads/computer-graphics-project-2.0.0 sh ~/Downloads/computer-graphics-project-2.0.0/install.sh
+DATUM_SOURCE=~/Downloads/computer-graphics-project-3.0.0 sh ~/Downloads/computer-graphics-project-3.0.0/install.sh
 ```
 
 在 Windows 上，本地的 `install.ps1` 要用上面这种"按 UTF-8 读进来再执行"的写法，不要用 `powershell -File install.ps1`。Windows 自带的 PowerShell 5.1 会按系统编码读文件，中文会乱。
@@ -80,10 +80,10 @@ CALIPER_SOURCE=~/Downloads/computer-graphics-project-2.0.0 sh ~/Downloads/comput
 
 **另外两个开关：**
 
-- `CALIPER_NO_SHORTCUT=1`：不建快捷方式。
-- `CALIPER_DRY_RUN=1`：只打印每一步要做什么，什么都不执行。
+- `DATUM_NO_SHORTCUT=1`：不建快捷方式。
+- `DATUM_DRY_RUN=1`：只打印每一步要做什么，什么都不执行。
 
-**提示"卡尺正在运行"。** Windows 不让替换正在运行的程序。关掉所有卡尺窗口，以及终端里运行着的 `datum`，再装一次。
+**提示"Datum 正在运行"。** Windows 不让替换正在运行的程序。关掉所有 Datum 窗口，以及终端里运行着的 `datum`，再装一次。
 
 **Windows 上窗口打不开（多见于 Windows 10）。** 通常是缺少 Microsoft Edge WebView2 运行时。到 <https://developer.microsoft.com/microsoft-edge/webview2/> 下载"常青版"装上。装好之前，可以先用 `datum --browser` 在默认浏览器里打开同样的界面。
 

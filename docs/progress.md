@@ -1208,3 +1208,8 @@
 - 新建 `cad_agent/versions_info.py`：`collect_versions(config)` 返回 `datum`、`python`、`simplecadapi`、`openai`、`anthropic`、`platform`、`provider`、`model`、`models_by_phase`（clarify/modeling/review），另加一项 `base_url`（只留协议、主机、端口、路径，去掉账号密码、查询参数和锚点）。不含 key。
 - `cli._banner` 改用它，命令行和桌面端（`app.build_hub` 里新建、打开、换设置时造智能体的地方）都写 `{"kind": "startup", **collect_versions(config)}`，命令行原来的 `cases`、`case_problems` 两项还在。原来的 `cad_agent` 键换成了 `datum`；终端开场白里的地址也改成去掉查询参数的。
 - 测试 `tests/test_versions_info.py` 5 个，先看到 `ModuleNotFoundError`，实现后通过；快速全量 1016 个通过（139 个 sca 跳过）。
+
+## 3.0 计划 1 · Task 5（2026-11-20）
+- 安装脚本、CI、README、安装笔记、Mac 清单改用 Datum；检测到旧版卡尺时只提示、不卸载，删掉旧快捷方式（偏离 D25，用户同意改测试）。
+- 快速全量 1021 通过。计划 1 没有改到会运行 SCA 的代码，完整全量留到计划 2 结束时一起跑，省 9 分钟。
+- 计划 1 全部完成。

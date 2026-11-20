@@ -59,7 +59,7 @@ def test_readme_mentions_unverified_parts():
 
 def test_readme_trouble_section():
     section = _section("## 装不上怎么办")
-    for word in ("CALIPER_MIRROR", "CALIPER_SOURCE", "WebView2", "datum doctor", "Get-Content -Raw -Encoding UTF8"):
+    for word in ("DATUM_MIRROR", "DATUM_SOURCE", "WebView2", "datum doctor", "Get-Content -Raw -Encoding UTF8"):
         assert word in section, word
     for item in ("platform", "python", "sca", "sandbox", "workdir", "window", "keyring", "data", "provider", "key"):
         assert f"`{item}`" in section, item

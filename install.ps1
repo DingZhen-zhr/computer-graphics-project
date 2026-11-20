@@ -1,14 +1,14 @@
-# 卡尺 Caliper 一行安装脚本（Windows）
+# Datum 基准 一行安装脚本（Windows）
 #
 # 用法（在 PowerShell 里粘贴这一行）：
 #   irm https://raw.githubusercontent.com/DingZhen-zhr/computer-graphics-project/master/install.ps1 | iex
 #
 # 选项都用环境变量传（"下载后直接执行"的用法传不了参数），先设好再运行上面那一行：
-#   CALIPER_SOURCE       从哪里装：一个 git 地址，或本地目录。默认是本仓库的发布标签 v3.0.0
-#   CALIPER_MIRROR=1     PyPI 和 Python 的下载走国内镜像
-#   CALIPER_NO_SHORTCUT=1  不建开始菜单和桌面的快捷方式
-#   CALIPER_DRY_RUN=1    只打印每一步要做什么，不执行
-# 例如：$env:CALIPER_MIRROR = "1"; irm https://raw.githubusercontent.com/DingZhen-zhr/computer-graphics-project/master/install.ps1 | iex
+#   DATUM_SOURCE         从哪里装：一个 git 地址，或本地目录。默认是本仓库的发布标签 v3.0.0
+#   DATUM_MIRROR=1       PyPI 和 Python 的下载走国内镜像
+#   DATUM_NO_SHORTCUT=1  不建开始菜单和桌面的快捷方式
+#   DATUM_DRY_RUN=1      只打印每一步要做什么，不执行
+# 例如：$env:DATUM_MIRROR = "1"; irm https://raw.githubusercontent.com/DingZhen-zhr/computer-graphics-project/master/install.ps1 | iex
 #
 # 这个脚本只往当前用户的目录里写东西，不需要管理员权限，不改系统设置。
 # 除了 uv 的官方安装脚本，它不下载执行任何别的脚本。每一步做之前先打印要做什么。
@@ -24,10 +24,12 @@
     $PypiMirror = 'https://pypi.tuna.tsinghua.edu.cn/simple'
     $PythonMirror = 'https://registry.npmmirror.com/-/binary/python-build-standalone'
     $HelpUrl = 'https://github.com/DingZhen-zhr/computer-graphics-project#装不上怎么办'
-    $ShortcutName = '卡尺 Caliper.lnk'
+    $ShortcutName = 'Datum 基准.lnk'
+    $OldShortcutName = '卡尺 Caliper.lnk'   # 第二版的快捷方式，发现了就删掉
+    $OldVersionHint = '检测到旧版"卡尺"（caliper-cad）。它可以和 Datum 同时存在；不需要的话运行：uv tool uninstall caliper-cad'
 
-    $DryRun = ($env:CALIPER_DRY_RUN -eq '1')
-    $Source = if ($env:CALIPER_SOURCE) { $env:CALIPER_SOURCE.Trim() } else { $DefaultSource }
+    $DryRun = ($env:DATUM_DRY_RUN -eq '1')
+    $Source = if ($env:DATUM_SOURCE) { $env:DATUM_SOURCE.Trim() } else { $DefaultSource }
 
     function Say([string]$Text) { Write-Host $Text }
     function Step([int]$N, [string]$Text) { Write-Host "[$N/5] $Text" -ForegroundColor Cyan }
@@ -35,13 +37,13 @@
         Write-Host ''
         Write-Host '装不上的话可以这样试：' -ForegroundColor Yellow
         Write-Host '  1. 检查网络：能不能打开 github.com 和 pypi.org；用代理的话确认代理开着。'
-        Write-Host '  2. 改走国内镜像再装一次：先运行 $env:CALIPER_MIRROR = "1"，再运行安装命令。'
+        Write-Host '  2. 改走国内镜像再装一次：先运行 $env:DATUM_MIRROR = "1"，再运行安装命令。'
         Write-Host "  3. 看 README 的“装不上怎么办”一节（里面有下载压缩包本地安装的办法）：$HelpUrl"
     }
     function Stop-Install([int]$Code, [string]$Text, [switch]$WithHelp) {
         Write-Host $Text -ForegroundColor Red
         if ($WithHelp) { Show-Help }
-        Set-Variable -Name CaliperInstallCode -Value $Code -Scope 2
+        Set-Variable -Name DatumInstallCode -Value $Code -Scope 2
     }
     function Find-Uv {
         $cmd = Get-Command uv -CommandType Application -ErrorAction SilentlyContinue | Select-Object -First 1
@@ -105,7 +107,7 @@ namespace CaliperInstall {
     }
     # <<< 建快捷方式
 
-    # 这个脚本临时改的 uv 设置，结束时还原（用 irm | iex 运行时，它们在用户自己的 PowerShell 里）；PATH 里加的 uv 目录保留，这个窗口里马上就能用 caliper
+    # 这个脚本临时改的 uv 设置，结束时还原（用 irm | iex 运行时，它们在用户自己的 PowerShell 里）；PATH 里加的 uv 目录保留，这个窗口里马上就能用 datum
     $saved = @{}
     foreach ($name in 'UV_DEFAULT_INDEX', 'UV_PYTHON_INSTALL_MIRROR', 'UV_HTTP_CONNECT_TIMEOUT') {
         $saved[$name] = [Environment]::GetEnvironmentVariable($name, 'Process')
@@ -117,10 +119,10 @@ namespace CaliperInstall {
         $os = [Environment]::OSVersion.Version
         $range = '支持的范围：Windows 10/11（64 位），或 Apple 芯片的 Mac（macOS 14 及以上）。'
         if ([Environment]::OSVersion.Platform -ne 'Win32NT' -or $os.Major -lt 10) {
-            Stop-Install 2 "这台电脑的系统是 Windows $os，卡尺需要 Windows 10 或 11。$range"; return
+            Stop-Install 2 "这台电脑的系统是 Windows $os，Datum 需要 Windows 10 或 11。$range"; return
         }
         if ($arch -ne 'AMD64') {
-            Stop-Install 2 "这台电脑的处理器是 $arch，卡尺只支持 64 位的 x64 处理器（SCA 没有别的安装包）。$range"; return
+            Stop-Install 2 "这台电脑的处理器是 $arch，Datum 只支持 64 位的 x64 处理器（SCA 没有别的安装包）。$range"; return
         }
         Say "  Windows $os，64 位（$arch），可以安装。"
 
@@ -148,9 +150,9 @@ namespace CaliperInstall {
         }
 
         # ------------------------------------------------------------ 3
-        Step 3 '安装卡尺（第一次要下载 Python 和 SCA，大约几百 MB，请耐心等）'
+        Step 3 '安装 Datum（第一次要下载 Python 和 SCA，大约几百 MB，请耐心等）'
         $env:UV_HTTP_CONNECT_TIMEOUT = '20'
-        if ($env:CALIPER_MIRROR -eq '1') {
+        if ($env:DATUM_MIRROR -eq '1') {
             Say "  走国内镜像：PyPI 用 $PypiMirror，Python 用 $PythonMirror"
             $env:UV_DEFAULT_INDEX = $PypiMirror
             $env:UV_PYTHON_INSTALL_MIRROR = $PythonMirror
@@ -165,17 +167,22 @@ namespace CaliperInstall {
                 Stop-Install 1 "从 git 地址安装需要先装 git：$Source" -WithHelp; return
             }
         }
+        if ($DryRun) {
+            Say '  （只打印，不执行）uv tool list：看有没有装着旧版"卡尺"（caliper-cad），有的话只提示，不卸载'
+        } elseif (@(& $uv tool list 2>$null | Where-Object { $_ -match '^caliper-cad\b' }).Count -gt 0) {
+            Say "  $OldVersionHint"
+        }
         if (-not $DryRun) {
-            # Windows 不让替换正在运行的程序文件：卡尺开着时 uv 会报"拒绝访问"。先查，查到就请用户关掉
-            $toolRoot = Join-Path (& $uv tool dir | Select-Object -First 1).Trim() 'caliper-cad'
+            # Windows 不让替换正在运行的程序文件：Datum 开着时 uv 会报"拒绝访问"。先查，查到就请用户关掉
+            $toolRoot = Join-Path (& $uv tool dir | Select-Object -First 1).Trim() 'datum-cad'
             $binRoot = (& $uv tool dir --bin | Select-Object -First 1).Trim()
             $running = @(Get-Process -ErrorAction SilentlyContinue | Where-Object {
                 $_.Path -and ($_.Path.StartsWith($toolRoot, [StringComparison]::OrdinalIgnoreCase) -or
-                    ($_.Path.StartsWith($binRoot, [StringComparison]::OrdinalIgnoreCase) -and $_.ProcessName -like 'caliper*'))
+                    ($_.Path.StartsWith($binRoot, [StringComparison]::OrdinalIgnoreCase) -and $_.ProcessName -like 'datum*'))
             })
             if ($running.Count -gt 0) {
                 $names = ($running | ForEach-Object { "$($_.ProcessName)（$($_.Id)）" }) -join '、'
-                Stop-Install 1 "卡尺正在运行：$names。Windows 不让替换正在运行的程序，请先关掉所有卡尺窗口和终端里运行的 caliper，再运行安装命令。"
+                Stop-Install 1 "Datum 正在运行：$names。Windows 不让替换正在运行的程序，请先关掉所有 Datum 窗口和终端里运行的 datum，再运行安装命令。"
                 return
             }
         }
@@ -195,39 +202,49 @@ namespace CaliperInstall {
             $bin = '<uv 工具目录>'
             $toolDir = '<uv 工具目录>'
         }
-        $caliper = Join-Path $bin 'caliper.exe'
-        $app = Join-Path $bin 'caliper-app.exe'
+        $datum = Join-Path $bin 'datum.exe'
+        $app = Join-Path $bin 'datum-app.exe'
 
         # ------------------------------------------------------------ 4
         Step 4 '建开始菜单和桌面的快捷方式'
-        if ($env:CALIPER_NO_SHORTCUT -eq '1') {
-            Say '  设了 CALIPER_NO_SHORTCUT=1，不建快捷方式。'
-        } else {
-            $places = @()
-            foreach ($folder in 'Programs', 'Desktop') {
-                $dir = [Environment]::GetFolderPath($folder)
-                if ($dir) { $places += $dir } else { Say "  找不到“$folder”文件夹，这个快捷方式跳过。" }
+        $places = @()
+        foreach ($folder in 'Programs', 'Desktop') {
+            $dir = [Environment]::GetFolderPath($folder)
+            if ($dir) { $places += $dir } else { Say "  找不到“$folder”文件夹，这个快捷方式跳过。" }
+        }
+        if ($DryRun) { Say "  （只打印，不执行）开始菜单和桌面上有旧版的快捷方式 $OldShortcutName 的话删掉它" }
+        foreach ($dir in $places) {   # 第二版的快捷方式指向旧程序，删掉，免得点错
+            $OldShortcut = Join-Path $dir $OldShortcutName
+            if ($DryRun) {
+                Say "  （只打印，不执行）删除 $OldShortcut（如果有）"
+            } elseif (Test-Path -LiteralPath $OldShortcut -PathType Leaf) {
+                Say "  删除旧版的快捷方式：$OldShortcut"
+                Remove-Item -LiteralPath $OldShortcut -Force
             }
+        }
+        if ($env:DATUM_NO_SHORTCUT -eq '1') {
+            Say '  设了 DATUM_NO_SHORTCUT=1，不建快捷方式。'
+        } else {
             if ($DryRun) {
                 foreach ($dir in $places) { Say "  （只打印，不执行）建快捷方式 $(Join-Path $dir $ShortcutName) → $app" }
             } else {
-                $python = Join-Path $toolDir 'caliper-cad\Scripts\python.exe'
+                $python = Join-Path $toolDir 'datum-cad\Scripts\python.exe'
                 $icon = (& $python -I -c "import cad_agent, pathlib; print(pathlib.Path(cad_agent.__file__).parent / 'desk' / 'static' / 'icon.ico')" | Select-Object -First 1)
                 if (-not ($icon -and (Test-Path -LiteralPath $icon))) { $icon = '' }
                 foreach ($dir in $places) {
                     $lnk = Join-Path $dir $ShortcutName
                     Say "  建快捷方式：$lnk → $app"
-                    New-CaliperShortcut -Path $lnk -Target $app -WorkingDirectory $HOME -Description '卡尺 Caliper：用平常话做 CAD 零件' -Icon $icon
+                    New-CaliperShortcut -Path $lnk -Target $app -WorkingDirectory $HOME -Description 'Datum 基准：用平常话做 CAD 零件和会动的产品' -Icon $icon
                 }
             }
         }
 
         # ------------------------------------------------------------ 5
-        Step 5 '自检（caliper doctor）'
+        Step 5 '自检（datum doctor）'
         if ($DryRun) {
-            Say "  （只打印，不执行）$caliper doctor"
+            Say "  （只打印，不执行）$datum doctor"
         } else {
-            & $caliper doctor
+            & $datum doctor
             if ($LASTEXITCODE -ne 0) {
                 Stop-Install 1 '自检里有不能用的项（标着 ✗ 的），按它下面的提示处理；处理不了可以看 README 的“装不上怎么办”一节。'
                 return
@@ -235,18 +252,18 @@ namespace CaliperInstall {
         }
         Say ''
         if ($DryRun) {
-            Say '这是演示模式（CALIPER_DRY_RUN=1）：上面每一步都只打印了，没有真的安装。'
+            Say '这是演示模式（DATUM_DRY_RUN=1）：上面每一步都只打印了，没有真的安装。'
         } else {
-            Say '装好了。打开方法：双击桌面上的“卡尺 Caliper”，或者在终端里输入 caliper。'
-            Say '如果终端里提示找不到 caliper，关掉这个终端再开一个新的。'
+            Say '装好了。打开方法：双击桌面上的“Datum 基准”，或者在终端里输入 datum。'
+            Say '如果终端里提示找不到 datum，关掉这个终端再开一个新的。'
         }
     } finally {
         foreach ($name in $saved.Keys) { [Environment]::SetEnvironmentVariable($name, $saved[$name], 'Process') }
     }
 }
 # 用 -File 运行时把返回码交出去；用 irm | iex 运行时不能 exit（那会关掉用户的 PowerShell 窗口）
-if ($CaliperInstallCode) {
-    $code = $CaliperInstallCode
-    Remove-Variable -Name CaliperInstallCode -ErrorAction SilentlyContinue
+if ($DatumInstallCode) {
+    $code = $DatumInstallCode
+    Remove-Variable -Name DatumInstallCode -ErrorAction SilentlyContinue
     if ($PSCommandPath) { exit $code } else { $global:LASTEXITCODE = $code }
 }
