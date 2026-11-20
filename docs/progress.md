@@ -1236,3 +1236,7 @@
 - `render_notebook` 加 `notebook_id`、`material`、`color` 三个只限关键字的参数；默认值时输出和改动前逐字相同（对照样本 `tests/data/notebook_v2_golden.json` 是用改动前的代码生成的）。
 - `cad_agent/product/render.py`：`render_part_notebook`、`render_assembly_notebook`、`part_notebook_path`。偏离 D27（引用路径 `parts/<编号>/model.py`）。
 - 测试 `tests/test_product_render.py` 7 个，其中 1 个 `sca` 在真实 SCA 里把两个零件装起来；先看到导入失败。快速全量通过。
+
+## 3.0 计划 2 Task 6：摆放、关节姿态与取样
+- `cad_agent/product/kinematics.py`，纯 Python。配合的算法：moving 端的坐标系对到 fixed 端（沿 z 移 gap、绕 z 转 angle，opposite 时再绕 x 转 180 度）；关节在父零件的坐标里动，子树一起动（嵌套关节也对）。另外公开了 `joint_values`（各关节的值，含联动），Task 7、8 要用。
+- 测试 `tests/test_kinematics.py` 8 个，数都是手算的；先看到导入失败。
