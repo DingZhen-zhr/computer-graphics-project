@@ -674,6 +674,8 @@ ring = scad.std.gear.make_spur_ring_gear_rsolid(n_teeth=teeth_n, module=gear_m, 
 - `scad.capture` 只收 `PartDefinition`、`AssemblyDefinition`、`PartBuildResult`、`AssemblyBuildResult`；在 notebook 外面手搭的 `Assembly` 不能直接 capture。所以**整个产品的 STEP 由运行装配 notebook 得到**：`cap = scad.capture(run.definition, pkg)`，再 `export_product_package_to_step(cap.package, step)`（2 个 occurrence，35 KB）；`export_product_package_to_stl` 也能导出整个产品（2 个实体）。
 - 摆放：`scad.make_placement_rplacement(origin, x_axis=..., y_axis=...)` 就是矩阵的三列：零件自己的 x、y 轴在装好后朝哪里、原点在哪里（z 轴 = x × y）。实测盖子 `x_axis=(1,0,0)`、`y_axis=(0,0,1)`、原点 (0,0,12) 后，产品 STL 的 z 范围到 32（= 12 + 20），和手算一致。
 
+- **整个产品的截图**：`render_screenshot_rpath` 不收 `Assembly`、`AssemblyDefinition`，也不收 `make_compound_from_assembly_rcompound` 得到的 `Compound`；**收 Solid 的列表**（`render_screenshot_rpath([a, b], path, view="iso")` 成功，86 KB）。所以产品截图把每个零件用 SCA 的 `rotate_shape`、`translate_shape` 摆好（得到的仍是 `Solid`），再把列表传进去。
+
 ## 26. 约束驱动与闭环
 
 - 转动约束能驱动：两个零件各加一个面连接点（`add_connector_rpart(part, make_face_connector_rconnector("top", face))`，被动零件的底面连接点 `flip=True`），`ground_component_rassembly(asm, "base")`，`add_revolute_constraint_rassembly(asm, "hinge", make_connector_ref_rconnectorref("base", "top"), make_connector_ref_rconnectorref("arm", "bottom"), drive_angle_degrees=30)`，`solve_assembly_constraints_rassembly(asm)`。解出来 `arm` 的 `placement` 是绕底座顶面中心、沿顶面法向转 30°/60°/90°（x 轴 (0.866, 0.5, 0)、(0.5, 0.866, 0)、(0, 1, 0)），和手算一致（误差 1e-15），每次不到 1 毫秒。

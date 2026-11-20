@@ -93,6 +93,11 @@ def _error(cell: str | None, e: BaseException) -> dict:
 
 
 def _work(job: dict, out: dict[str, Any]) -> None:
+    if job["mode"] == "assembly":   # 多零件的装配（3.0）
+        from cad_agent.sandbox.runner_assembly import work
+
+        work(job, out)
+        return
     if job["mode"] != "probe":
         _run(job, out)
         return

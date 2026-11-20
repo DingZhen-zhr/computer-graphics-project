@@ -14,6 +14,7 @@ from .materials import MATERIALS
 from .workspace import part_param_names
 
 if TYPE_CHECKING:
+    from ..brief import Param
     from ..tools import Workspace
 
 PRODUCT_ID = "product"
@@ -51,7 +52,12 @@ def _placement(m: list[float]) -> str:
 
 
 def render_assembly_notebook(ws: "Workspace", placements: dict[str, list[float]]) -> str:
-    params = ws.brief.params
+    parts = [(p.id, part_param_names(ws, p.id)) for p in ws.brief.parts]
+    return assembly_notebook_text(ws.brief.params, parts, placements)
+
+
+def assembly_notebook_text(params: list["Param"], parts: list[tuple[str, list[str]]], placements: dict[str, list[float]]) -> str:
+    """装配 notebook 的文本。parts 是 (零件编号, 它的参数名)；沙盒子进程里没有工作区，直接用这个。"""
     lines = HEADER.replace('id = "model"', f'id = "{PRODUCT_ID}"').splitlines()
 
     def add_cell(sig: list[str], body: list[str]) -> None:
@@ -69,11 +75,10 @@ def render_assembly_notebook(ws: "Workspace", placements: dict[str, list[float]]
         body.append(f"return ({names[0]},)" if len(names) == 1 else "return " + ", ".join(names))
         add_cell([], body)
     body = ["# ---- assembly ----", f'_a = scad.make_assembly_rassembly("{PRODUCT_ID}")']
-    for part in ws.brief.parts:
-        own = part_param_names(ws, part.id)
+    for pid, own in parts:
         overrides = "".join(f", {n}={n}" for n in own)
-        body.append(f'_{part.id} = scad.use("{part_notebook_path(part.id)}"{overrides})')
-        body.append(f'_a = scad.add_component_rassembly(_a, _{part.id}, "{part.id}", {_placement(placements[part.id])})')
+        body.append(f'_{pid} = scad.use("{part_notebook_path(pid)}"{overrides})')
+        body.append(f'_a = scad.add_component_rassembly(_a, _{pid}, "{pid}", {_placement(placements[pid])})')
     body += ["product = _a", "return (product,)"]
     add_cell(sorted(names), body)
     return "\n".join(lines) + "\n" + FOOTER

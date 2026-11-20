@@ -1240,3 +1240,8 @@
 ## 3.0 计划 2 Task 6：摆放、关节姿态与取样
 - `cad_agent/product/kinematics.py`，纯 Python。配合的算法：moving 端的坐标系对到 fixed 端（沿 z 移 gap、绕 z 转 angle，opposite 时再绕 x 转 180 度）；关节在父零件的坐标里动，子树一起动（嵌套关节也对）。另外公开了 `joint_values`（各关节的值，含联动），Task 7、8 要用。
 - 测试 `tests/test_kinematics.py` 8 个，数都是手算的；先看到导入失败。
+
+## 3.0 计划 2 Task 7：沙盒里的装配运行
+- 子进程：`cad_agent/sandbox/runner_assembly.py`（`AssemblyRun` 和流程）、`assembly_geom.py`（连接点取几何、OCP 摆放、重叠体积、距离、同轴和贴平的量法）；`runner.py` 遇到 `mode == "assembly"` 时交给它。父进程：`execute.run_assembly`，准备和整理放在 `assembly_job.py`。超时上限 = `timeout_s ×（零件数 + 1）+ 60`。
+- 产品截图要把零件用 SCA 的转动、平移摆好再一起传给截图函数（补测写进笔记第 25 节）。
+- 测试 `tests/test_runner_assembly.py` 8 个（`sca`，共约 25 秒）。这次是先写的实现再写的测试，没有先看到失败；第一次运行时测试自己的摆臂零件把孔开在了边上（选中 2 个面），改了测试零件。`test_sample_error_is_reported_not_ignored` 用环境变量 `DATUM_TEST_FAIL_SAMPLE` 在指定位置故意出错。

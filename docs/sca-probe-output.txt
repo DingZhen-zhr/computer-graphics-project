@@ -290,3 +290,4 @@ What happened: ，4429ms
 [实验 2b 用时] 0.0s
 [27 补测] 面类型 ['GeomAbs_SurfaceType.GeomAbs_Cylinder', 'GeomAbs_SurfaceType.GeomAbs_Plane'] Plane/Cylinder 常量 GeomAbs_SurfaceType.GeomAbs_Plane GeomAbs_SurfaceType.GeomAbs_Cylinder
 [27 补测] 边类型 ['GeomAbs_CurveType.GeomAbs_Circle', 'GeomAbs_CurveType.GeomAbs_Line'] Circle 常量 GeomAbs_CurveType.GeomAbs_Circle
+[25 补测] render_screenshot_rpath：Assembly、AssemblyDefinition、Compound 都失败（SimpleCADError）；[Solid, Solid] 列表成功 85850 字节

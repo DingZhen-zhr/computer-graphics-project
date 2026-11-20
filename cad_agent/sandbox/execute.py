@@ -14,12 +14,16 @@ import tempfile
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Callable, Iterable, Literal
+from typing import TYPE_CHECKING, Callable, Iterable, Literal
 
 from cad_agent.checks.spec import CheckResult
 from cad_agent.notebook import RenderedNotebook
 from cad_agent.paths import work_root
 from cad_agent.sandbox.guard import clean_env
+
+if TYPE_CHECKING:
+    from cad_agent.sandbox.runner_assembly import AssemblyRun
+    from cad_agent.tools import Workspace
 
 GRACE_S = 30  # 子进程里除了运行模型，还要跑检查、导出、截图，所以外层超时比 timeout_s 多留一点
 PROBE_OUTPUT_LIMIT = 2000  # probe 打印的内容最多返回这么多字符
@@ -91,6 +95,18 @@ def _copy_out(src: Path, dst: Path) -> Path:
     return dst
 
 
+def _spawn(workdir: Path, job_path: Path, secret_names: Iterable[str]) -> subprocess.Popen:
+    env = clean_env(os.environ, secret_names)
+    env["PYTHONUTF8"] = "1"
+    # -I 会忽略 PYTHONUTF8，所以再用 -X utf8 明确打开
+    cmd = [sys.executable, "-I", "-X", "utf8", "-m", "cad_agent.sandbox.runner", str(job_path)]
+    flags = subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0
+    return subprocess.Popen(
+        cmd, cwd=workdir, env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+        text=True, encoding="utf-8", errors="replace", creationflags=flags,
+    )
+
+
 def run_job(
     rendered: RenderedNotebook,
     checks_raw: list[dict],
@@ -134,15 +150,7 @@ def run_job(
         job_path = workdir / "job.json"
         job_path.write_text(json.dumps(job, ensure_ascii=False), encoding="utf-8")
 
-        env = clean_env(os.environ, secret_names)
-        env["PYTHONUTF8"] = "1"
-        # -I 会忽略 PYTHONUTF8，所以再用 -X utf8 明确打开
-        cmd = [sys.executable, "-I", "-X", "utf8", "-m", "cad_agent.sandbox.runner", str(job_path)]
-        flags = subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0
-        proc = subprocess.Popen(
-            cmd, cwd=workdir, env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-            text=True, encoding="utf-8", errors="replace", creationflags=flags,
-        )
+        proc = _spawn(workdir, job_path, secret_names)
         outcome, stderr = _wait(proc, timeout_s + GRACE_S, should_stop)
         if outcome == "stopped":
             return RunResult(ok=False, error=dict(STOPPED_ERROR), duration_s=time.monotonic() - started,
@@ -177,3 +185,24 @@ def run_job(
         )
     finally:
         shutil.rmtree(workdir, ignore_errors=True)  # 只是清理临时目录，删不掉（比如被占用）不应让整次运行失败
+
+
+def run_assembly(ws: "Workspace", *, mode: Literal["check", "export"], samples: int, timeout_s: float,
+                 secret_names: Iterable[str], out_dir: Path | None = None, should_stop: Callable[[], bool] | None = None,
+                 values: dict[str, float] | None = None) -> "AssemblyRun":
+    """在子进程里把多零件产品装起来、量、取样；mode 是 export 时再导出，文件复制到 out_dir。
+
+    values 给了时用这组参数值（参数直改、扰动验证用）。超时、停止的处理和 run_job 一样。
+    """
+    from cad_agent.sandbox.assembly_job import collect, prepare
+
+    started = time.monotonic()
+    workdir = Path(tempfile.mkdtemp(prefix="cad-asm-", dir=work_root()))
+    try:
+        job_path = prepare(ws, workdir, mode=mode, samples=samples, timeout_s=timeout_s, values=values)
+        limit = timeout_s * (len(ws.brief.parts) + 1) + GRACE_S * 2
+        proc = _spawn(workdir, job_path, secret_names)
+        outcome, stderr = _wait(proc, limit, should_stop)
+        return collect(workdir, outcome, stderr, proc.returncode, time.monotonic() - started, limit, out_dir)
+    finally:
+        shutil.rmtree(workdir, ignore_errors=True)  # 只是清理临时目录
