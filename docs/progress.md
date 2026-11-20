@@ -1160,3 +1160,11 @@
 
 - 用户本人决定先发布、Mac 之后补（偏离 D21）。由规划会话执行发布：发布前重跑全部测试，推送 master，打 `v2.0.0` 标签并推送，然后从 GitHub 按公开的安装命令实际装一次。结果见下一段。
 - 还差：有 M 芯片 Mac 的组员按 `docs/mac-checklist.md` 做一遍并交回；交回后做 Step 2（更新 README 里关于 Mac 的那一句、处理清单里的问题）。
+
+## 第二版 发布 v2.0.0（2026-11-20，规划会话执行）
+
+- 发布前重跑全部测试：1123 个通过（8 分 58 秒）。
+- 推送 master 到 `36f4e24`，打带说明的标签 `v2.0.0` 并推送；`git ls-remote` 确认远程有这个标签。
+- 从 GitHub 实际装一次（装到临时目录，没动这台电脑上原来装好的那一份）：`uv tool install --python 3.12 --force git+https://github.com/DingZhen-zhr/computer-graphics-project@v2.0.0`，24 秒（uv 有缓存），返回码 0；`caliper --version` 是 `卡尺 Caliper 2.0.0`；`caliper doctor --offline` 全部正常（模型服务一项按离线跳过）。装完把临时目录删了。
+- 从 GitHub 下载公开的 `install.ps1`，用 `CALIPER_DRY_RUN=1` 跑了一遍：五步都打印正常，装的来源是 `@v2.0.0`。
+- 还没做：Task 8 Step 4 要求的"在一台没装过卡尺的电脑（或一个新的 Windows 用户）上完整装一次"——上面这次用了本机已有的 uv 和缓存，不算全新机器；Mac 人工清单（D21）。
