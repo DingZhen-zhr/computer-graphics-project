@@ -988,3 +988,29 @@
 - 看完后我把这个窗口关掉了。
 
 **全部测试**：1121 个通过（含 `sca`，用时 9 分 17 秒）。
+
+## 第二版 计划 4 Task 4 第三次运行（推送 c4dc7ac 之后）和第三轮修改
+
+- 用户同意后推送了 `53493fa` 和 `c4dc7ac`（`4a447a4..c4dc7ac`）。
+- "发布产品主页"运行 44661268466 成功。
+- 持续集成运行 44661268468 没过，日志仍是在浏览器面板里只读看的。
+
+**Windows：测试这一步全部通过；安装这一步失败。**
+
+- 这是安装、自检、smoke 这几步第一次在持续集成上跑到。uv 装好了 77 个包，到第 4 步建快捷方式时报 `Unable to save shortcut "…\Programs\?? Caliper.lnk"`。
+- 原因：持续集成的机器是英文 Windows，`WScript.Shell` 把文件名按系统编码转换，"卡尺"变成了问号。
+- 本机用 GBK 表示不了的泰文复现了：文件名里有这种字时存不了；目标路径里有这种字时连设置目标都报错。所以英文 Windows 的用户、以及用户名里有系统编码表示不了的字的用户，安装都会停在第 4 步。
+- 改法（D20）：`install.ps1` 里加函数 `New-CaliperShortcut`，用 `Add-Type` 编译一小段 C#，调 Unicode 的 IShellLinkW。
+- 先加了测试 `test_ps1_shortcut_handles_characters_outside_the_code_page`：名字、目标、工作目录、说明、图标全用泰文，建好后用 Shell.Application 读回来核对。先看到它失败，再改。
+- 用改过的脚本在本机重装了一次（`CALIPER_SOURCE=.`）：两个快捷方式都建好了，读回来的目标、说明、图标都对；自检十项全部 ✓（"模型服务"只建立了连接，没有发请求；"密钥"只说了来源）。
+- 记进了 `docs/install-notes.md` 第 8 节，计划 Task 3 第 4 步那一句后面加了注。
+
+**Mac（macos-15）：1116 个通过、3 个跳过、2 个失败。**
+
+- 失败的是 `test_install_sh_platform_gate[x86_64-…]` 和 `test_install_sh_refuses_linux`：脚本没有在第 1 步退出，而是认成了"macOS 14.5，Apple 芯片（arm64）"。
+- 原因在测试里：假的 `uname` 是用 `write_text` 写的，没有加可执行权限。Mac 上 PATH 里没有可执行权限的文件会被跳过，用的就是真的 `uname`。Windows 的 Git sh 不看这个权限，所以本机测不出来。
+- 另外两条（演示模式、arm64 + 13.6）恰好和真机一致，或者用的是加了权限的假 `sw_vers`，所以通过了。
+- 改法：加了一个小函数 `_fake_uname`，写好后加可执行权限（和已有的 `_fake` 一样），三处都改用它。断言一个字没动。
+- `install.sh` 本身没有问题。
+
+**全部测试**：1122 个通过（含 `sca`，用时 9 分 41 秒）。

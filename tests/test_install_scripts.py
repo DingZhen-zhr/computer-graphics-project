@@ -61,6 +61,14 @@ def _fake(bin_dir: Path, name: str, output: str) -> None:
     os.chmod(bin_dir / name, 0o755)
 
 
+def _fake_uname(bin_dir: Path, machine: str, system: str) -> None:
+    """假的 uname：-m 打印 machine，其他打印 system。必须加可执行权限：Mac 上 PATH 里没有可执行权限的文件会被跳过，
+    用的就成了真的 uname（持续集成第三次运行实测；Windows 的 Git sh 不看这个权限，本机测不出来）。"""
+    (bin_dir / "uname").write_text(f'#!/bin/sh\nif [ "$1" = "-m" ]; then echo {machine}; else echo {system}; fi\n',
+                                   encoding="utf-8", newline="\n")
+    os.chmod(bin_dir / "uname", 0o755)
+
+
 def _steps_in_order(out: str) -> None:
     positions = [out.find(f"[{n}/5]") for n in range(1, 6)]
     assert all(p >= 0 for p in positions), out
@@ -131,7 +139,7 @@ def test_ps1_dry_run_through_iex_keeps_the_shell(tmp_path):
 @needs_sh
 def test_sh_dry_run_prints_five_steps(tmp_path):
     bin_dir, marker = _fake_bin(tmp_path)
-    (bin_dir / "uname").write_text('#!/bin/sh\nif [ "$1" = "-m" ]; then echo arm64; else echo Darwin; fi\n', encoding="utf-8", newline="\n")
+    _fake_uname(bin_dir, "arm64", "Darwin")
     _fake(bin_dir, "sw_vers", "14.5")
     env = _env(tmp_path, CALIPER_DRY_RUN="1", PATH=f"{bin_dir}{os.pathsep}{os.environ['PATH']}")
     r = subprocess.run([SH_EXE, str(SH)], capture_output=True, text=True, encoding="utf-8", errors="replace", env=env, timeout=120)
@@ -147,8 +155,7 @@ def test_sh_dry_run_prints_five_steps(tmp_path):
 @pytest.mark.parametrize("arch, version, reason", [("x86_64", "14.5", "Apple 芯片"), ("arm64", "13.6", "14")])
 def test_install_sh_platform_gate(tmp_path, arch, version, reason):
     bin_dir, marker = _fake_bin(tmp_path)
-    (bin_dir / "uname").write_text(f'#!/bin/sh\nif [ "$1" = "-m" ]; then echo {arch}; else echo Darwin; fi\n',
-                                   encoding="utf-8", newline="\n")
+    _fake_uname(bin_dir, arch, "Darwin")
     _fake(bin_dir, "sw_vers", version)
     env = _env(tmp_path, PATH=f"{bin_dir}{os.pathsep}{os.environ['PATH']}")
     r = subprocess.run([SH_EXE, str(SH)], capture_output=True, text=True, encoding="utf-8", errors="replace", env=env, timeout=60)
@@ -163,7 +170,7 @@ def test_install_sh_platform_gate(tmp_path, arch, version, reason):
 @needs_sh
 def test_install_sh_refuses_linux(tmp_path):
     bin_dir, marker = _fake_bin(tmp_path)
-    (bin_dir / "uname").write_text('#!/bin/sh\nif [ "$1" = "-m" ]; then echo x86_64; else echo Linux; fi\n', encoding="utf-8", newline="\n")
+    _fake_uname(bin_dir, "x86_64", "Linux")
     env = _env(tmp_path, PATH=f"{bin_dir}{os.pathsep}{os.environ['PATH']}")
     r = subprocess.run([SH_EXE, str(SH)], capture_output=True, text=True, encoding="utf-8", errors="replace", env=env, timeout=60)
     assert r.returncode == 2 and not marker.exists() and "[2/5]" not in r.stdout
@@ -274,3 +281,42 @@ def test_sh_variables_are_braced():
     bare = [line.strip() for line in _text(SH).splitlines()
             if not line.lstrip().startswith("#") and re.search(r"\$[A-Za-z_][A-Za-z0-9_]*", line.replace("\\$", ""))]
     assert bare == [], bare[:5]
+
+
+# 快捷方式函数在 install.ps1 里夹在这两行注释之间，测试把它单独取出来运行
+SHORTCUT_BEGIN, SHORTCUT_END = "# >>> 建快捷方式", "# <<< 建快捷方式"
+
+
+@windows_only
+def test_ps1_shortcut_handles_characters_outside_the_code_page(tmp_path):
+    """持续集成第三次运行：英文 Windows 上 WScript.Shell 存不了"卡尺 Caliper.lnk"（文件名被换成"?? Caliper.lnk"，安装停在第 4 步）。
+    本机复现：系统编码表示不了的字（这里用泰文）不论在文件名、目标路径还是说明里，WScript.Shell 都会出错。
+    所以安装脚本改用 Unicode 的 IShellLinkW 建快捷方式；这里名字、目标、工作目录、说明、图标全用泰文，建好后用 Shell.Application 读回来核对。"""
+    text = _text(PS1)
+    begin, end = text.find(SHORTCUT_BEGIN), text.find(SHORTCUT_END)
+    assert 0 <= begin < end, "install.ps1 里找不到建快捷方式的函数"
+    function = text[begin:end]
+    assert "-ComObject WScript.Shell" not in text   # 注释里会提到它，但代码里不能再用
+
+    thai = "ทดสอบ"
+    target_dir = tmp_path / thai
+    target_dir.mkdir()
+    target = target_dir / "app.exe"
+    target.write_bytes(b"x")
+    icon = target_dir / "icon.ico"
+    shutil.copyfile(STATIC / "icon.ico", icon)
+    lnk = tmp_path / f"{thai} Caliper.lnk"
+    result = tmp_path / "result.txt"
+    script = tmp_path / "probe.ps1"
+    script.write_text(
+        function
+        + f"\nNew-CaliperShortcut -Path '{lnk}' -Target '{target}' -WorkingDirectory '{target_dir}' -Description '说明 {thai}' -Icon '{icon}'\n"
+        + f"$link = (New-Object -ComObject Shell.Application).NameSpace('{tmp_path}').ParseName('{lnk.name}').GetLink\n"
+        + "$icon = ''; $null = $link.GetIconLocation([ref]$icon)\n"
+        + f"Set-Content -LiteralPath '{result}' -Encoding UTF8 -Value @($link.Path, $link.WorkingDirectory, $link.Description, $icon)\n",
+        encoding="utf-8-sig")   # 带 BOM，Windows PowerShell 5.1 才会按 UTF-8 读 -File 的脚本
+    r = subprocess.run([POWERSHELL, "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", str(script)],
+                       capture_output=True, text=True, encoding=PS_ENCODING, errors="replace", timeout=120)
+    assert r.returncode == 0 and r.stderr.strip() == "", r.stdout + r.stderr
+    assert lnk.is_file()
+    assert result.read_text(encoding="utf-8-sig").splitlines() == [str(target), str(target_dir), f"说明 {thai}", str(icon)]

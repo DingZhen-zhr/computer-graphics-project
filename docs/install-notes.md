@@ -66,3 +66,13 @@ Get-Content -Raw -Encoding UTF8 install.ps1 | iex
 - 微软的说法：常青版 WebView2 运行时在 EdgeUpdate 的注册表项 `Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}` 下有一个值 `pv`（版本号）；按机器安装时在 `HKLM\SOFTWARE\WOW6432Node\Microsoft\EdgeUpdate\Clients\…`，按用户安装时在 `HKCU\Software\Microsoft\EdgeUpdate\Clients\…`。`pv` 为空或 `0.0.0.0` 表示没装好。pywebview 6.2.1 自己判断时（`webview/platforms/winforms.py` 的 `_is_chromium`）也是查这几处。
 - 本机实测：HKLM 的 WOW6432Node 下 `pv = 157.0.4341.60`，HKCU 下没有这一项。
 - `cad_agent/doctor.py` 的 `_webview2_version` 依次查 HKLM（WOW6432Node）、HKLM、HKCU，只读不写。
+
+## 8. Windows 快捷方式和系统编码（偏离 D20）
+
+- `WScript.Shell` 的 `CreateShortcut` 会把路径按系统编码（ANSI 代码页）转换。系统编码表示不了的字会变成 `?`。
+  - 文件名里有这种字：`Save()` 报 "Unable to save shortcut"（持续集成的英文 Windows 上，"卡尺 Caliper.lnk" 就是这样失败的）；
+  - 目标路径里有这种字：设置 `TargetPath` 就报"值不在预期的范围内"。
+  - 本机实测（中文 Windows，GBK）：用泰文复现了这两种情况；"卡尺"在 GBK 里能表示，所以本机正常。
+- 改用 IShellLinkW（`Add-Type` 编译的一小段 C#）后，泰文的名字、目标、工作目录、说明、图标全部正确，用 Shell.Application 读回来核对过。
+- 2026-11-20 用改过的脚本在本机重装了一次（`CALIPER_SOURCE=.`）：两个快捷方式都建好了，读回来的目标是 `C:\Users\18258\.local\bin\caliper-app.exe`，图标是包里的 `icon.ico`，自检全部正常。
+- 读快捷方式也别用 `WScript.Shell`（同样的问题）；用 `(New-Object -ComObject Shell.Application).NameSpace(目录).ParseName(文件名).GetLink`。

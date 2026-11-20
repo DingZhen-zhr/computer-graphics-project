@@ -172,7 +172,7 @@ docs/mac-checklist.md              Mac 人工清单（Task 7）
   1. 检查平台。Windows：必须是 64 位、Windows 10 及以上。Mac：`uname -m` 必须是 `arm64`，`sw_vers -productVersion` 的主版本必须不小于 14。不满足就打印原因和支持的范围，以返回码 2 退出。
   2. 准备 uv：`uv` 命令已经有就用现成的；没有就运行 uv 的官方安装脚本，并把它的安装目录加进本次脚本的 PATH。
   3. 安装：`uv tool install --python 3.12 --force <来源>`（镜像相关的参数按 `docs/install-notes.md`）。失败时打印原因，并打印三条提示：检查网络；设 `CALIPER_MIRROR=1` 再试；README"装不上怎么办"一节。
-  4. 快捷方式：Windows 用 `WScript.Shell` 建两个 `.lnk`，目标是 uv 工具目录里的 `caliper-app.exe`，图标用包里的 `icon.ico`；Mac 建 `~/Applications/Caliper.app`（`Info.plist`、一个调用 `caliper-app` 的启动脚本、`icon.icns`）。
+  4. 快捷方式：Windows 用 `WScript.Shell` 建两个 `.lnk`（执行时改成了 IShellLinkW，见 `docs/deviations.md` D20：`WScript.Shell` 在英文 Windows 上存不了中文名字的快捷方式），目标是 uv 工具目录里的 `caliper-app.exe`，图标用包里的 `icon.ico`；Mac 建 `~/Applications/Caliper.app`（`Info.plist`、一个调用 `caliper-app` 的启动脚本、`icon.icns`）。
   5. 运行 `caliper doctor`，把结果原样打印；最后一行告诉用户怎么启动（Windows：桌面上的"卡尺 Caliper"，或在终端输入 `caliper`；Mac：在"应用程序"里找 Caliper，或在终端输入 `caliper`；如果 PATH 还没生效，提示重开终端）。
 - 每一次网络下载都带超时（连接 20 秒）。脚本出错就停，不继续往下做。
 - 图标：`scripts/make_icon.py` 用 Pillow 画一个卡尺的简笔图形（米白底、墨色线、一处制图蓝），输出 256×256 的 `icon.png`、多尺寸的 `icon.ico`、`icon.icns`。生成的三个文件提交进仓库。

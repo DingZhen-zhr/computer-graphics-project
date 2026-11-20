@@ -54,6 +54,56 @@
         $shown = ($Arguments | ForEach-Object { if ($_ -match '\s') { '"' + $_ + '"' } else { $_ } }) -join ' '
         if ($DryRun) { Say "  （只打印，不执行）$Exe $shown" } else { Say "  运行：$Exe $shown" }
     }
+    # >>> 建快捷方式
+    # 不用 WScript.Shell：它把路径按系统编码转换，系统编码表示不了的字（英文 Windows 上的"卡尺"、用户名里的生僻字）
+    # 会变成问号，快捷方式存不了。这里直接用 Windows 的 Unicode 接口 IShellLinkW（Windows PowerShell 5.1 自带编译 C# 的功能）。
+    function New-CaliperShortcut([string]$Path, [string]$Target, [string]$WorkingDirectory, [string]$Description, [string]$Icon) {
+        if (-not ('CaliperInstall.Shortcut' -as [type])) {
+            Add-Type -TypeDefinition @'
+using System;
+using System.Runtime.InteropServices;
+using System.Runtime.InteropServices.ComTypes;
+using System.Text;
+namespace CaliperInstall {
+    [ComImport, Guid("000214F9-0000-0000-C000-000000000046"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+    interface IShellLinkW {
+        void GetPath([Out, MarshalAs(UnmanagedType.LPWStr)] StringBuilder file, int size, IntPtr findData, int flags);
+        void GetIDList(out IntPtr idList);
+        void SetIDList(IntPtr idList);
+        void GetDescription([Out, MarshalAs(UnmanagedType.LPWStr)] StringBuilder name, int size);
+        void SetDescription([MarshalAs(UnmanagedType.LPWStr)] string name);
+        void GetWorkingDirectory([Out, MarshalAs(UnmanagedType.LPWStr)] StringBuilder dir, int size);
+        void SetWorkingDirectory([MarshalAs(UnmanagedType.LPWStr)] string dir);
+        void GetArguments([Out, MarshalAs(UnmanagedType.LPWStr)] StringBuilder args, int size);
+        void SetArguments([MarshalAs(UnmanagedType.LPWStr)] string args);
+        void GetHotkey(out short hotkey);
+        void SetHotkey(short hotkey);
+        void GetShowCmd(out int showCmd);
+        void SetShowCmd(int showCmd);
+        void GetIconLocation([Out, MarshalAs(UnmanagedType.LPWStr)] StringBuilder iconPath, int size, out int index);
+        void SetIconLocation([MarshalAs(UnmanagedType.LPWStr)] string iconPath, int index);
+        void SetRelativePath([MarshalAs(UnmanagedType.LPWStr)] string relPath, int reserved);
+        void Resolve(IntPtr hwnd, int flags);
+        void SetPath([MarshalAs(UnmanagedType.LPWStr)] string file);
+    }
+    [ComImport, Guid("00021401-0000-0000-C000-000000000046")]
+    class ShellLink { }
+    public static class Shortcut {
+        public static void Save(string path, string target, string workingDirectory, string description, string icon) {
+            IShellLinkW link = (IShellLinkW)new ShellLink();
+            link.SetPath(target);
+            link.SetWorkingDirectory(workingDirectory);
+            link.SetDescription(description);
+            if (!String.IsNullOrEmpty(icon)) { link.SetIconLocation(icon, 0); }
+            ((IPersistFile)link).Save(path, true);
+        }
+    }
+}
+'@
+        }
+        [CaliperInstall.Shortcut]::Save($Path, $Target, $WorkingDirectory, $Description, $Icon)
+    }
+    # <<< 建快捷方式
 
     # 这个脚本临时改的 uv 设置，结束时还原（用 irm | iex 运行时，它们在用户自己的 PowerShell 里）；PATH 里加的 uv 目录保留，这个窗口里马上就能用 caliper
     $saved = @{}
@@ -163,16 +213,11 @@
             } else {
                 $python = Join-Path $toolDir 'caliper-cad\Scripts\python.exe'
                 $icon = (& $python -I -c "import cad_agent, pathlib; print(pathlib.Path(cad_agent.__file__).parent / 'desk' / 'static' / 'icon.ico')" | Select-Object -First 1)
-                $shell = New-Object -ComObject WScript.Shell
+                if (-not ($icon -and (Test-Path -LiteralPath $icon))) { $icon = '' }
                 foreach ($dir in $places) {
                     $lnk = Join-Path $dir $ShortcutName
                     Say "  建快捷方式：$lnk → $app"
-                    $s = $shell.CreateShortcut($lnk)
-                    $s.TargetPath = $app
-                    $s.WorkingDirectory = $HOME
-                    $s.Description = '卡尺 Caliper：用平常话做 CAD 零件'
-                    if ($icon -and (Test-Path -LiteralPath $icon)) { $s.IconLocation = "$icon,0" }
-                    $s.Save()
+                    New-CaliperShortcut -Path $lnk -Target $app -WorkingDirectory $HOME -Description '卡尺 Caliper：用平常话做 CAD 零件' -Icon $icon
                 }
             }
         }

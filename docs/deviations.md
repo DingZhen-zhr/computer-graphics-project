@@ -141,3 +141,10 @@
 - 实际情况：`test_desk_static.py` 用一个小函数 `_own_files` 收集 `desk/static/` 下面的全部文件，再检查"没有网址""不超过 300 行""脚本里没有颜色字面值"。three.js 搬进来以后，它这几条都不满足（第三方文件里有网址注释、上万行、颜色常量），而这些规矩本来就只管我们自己写的文件。three.js 原样保存，不能改。
 - 怎么改：只改 `_own_files` 一处，跳过 `vendor/` 下面的文件；三条测试的断言一个字没动。和 D15 是同一个道理。另外 `test_desk_export.py` 和 `test_desk_legacy.py::test_old_web_package_is_gone` 会检查 three.js 确实在新位置、`REVISION` 仍是 `'160'`。
 - 影响：只影响这一个测试文件。
+
+## D20（第二版计划 4 Task 4，持续集成第三次运行）Windows 的快捷方式改用 IShellLinkW，不用 WScript.Shell
+- 原计划：Task 3 第 4 步"Windows 用 `WScript.Shell` 建两个 `.lnk`"。
+- 实际情况：持续集成的 Windows 机器是英文系统，`WScript.Shell` 把"卡尺 Caliper.lnk"存成了"?? Caliper.lnk"，报"Unable to save shortcut"，安装停在第 4 步。本机用系统编码（GBK）表示不了的泰文复现：文件名里有这种字时存不了；目标路径里有这种字时设置目标就报错。也就是说，凡是系统编码表示不了的字都会出问题：英文 Windows 上的"卡尺"、用户名里有这种字时的目标路径。中文 Windows 上用"卡尺"这个名字不会出问题，所以之前本机实测没发现。
+- 怎么改：`install.ps1` 里加一个函数 `New-CaliperShortcut`，用 Windows PowerShell 5.1 自带的 `Add-Type` 编译一小段 C#，直接调 Windows 的 Unicode 接口 IShellLinkW 建快捷方式（目标、工作目录、说明、图标和以前一样）。不需要新的依赖。快捷方式的名字和位置不变，`maintenance.shortcut_paths()` 不用改。
+- 测试：加了 `test_ps1_shortcut_handles_characters_outside_the_code_page`，名字、目标、工作目录、说明、图标路径全用泰文，建好后用 Shell.Application 读回来逐项核对。先看到它失败，再改。
+- 影响：只影响 `install.ps1` 的第 4 步。计划 4 后面的任务不受影响。
