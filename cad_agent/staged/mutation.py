@@ -13,7 +13,8 @@ from typing import TYPE_CHECKING, Callable, Iterable, Literal
 
 from cad_agent.brief import Param
 from cad_agent.checks.spec import MANDATORY_IDS
-from cad_agent.notebook import NotebookError, render_notebook
+from cad_agent.notebook import NotebookError
+from cad_agent.product.scope import gate_params, render_scoped, scoped_params
 from cad_agent.sandbox.execute import RunResult
 from cad_agent.staged.select import final_checks
 
@@ -43,14 +44,15 @@ def perturbations(p: Param) -> list[float]:
 
 def _mutate_one(ws: "Workspace", p: Param, run_job: Callable[..., RunResult], timeout_s: float,
                 secret_names: tuple[str, ...]) -> MutationResult:
-    original = {q.name: float(q.value) for q in ws.brief.params}
+    scoped = scoped_params(ws)
+    original = {q.name: float(q.value) for q in scoped}
     checks = final_checks(ws)
     tried: list[float] = []
     for value in perturbations(p):
         tried.append(value)
-        params = [dataclasses.replace(q, value=value) if q.name == p.name else q for q in ws.brief.params]
+        params = [dataclasses.replace(q, value=value) if q.name == p.name else q for q in scoped]
         try:
-            rendered = render_notebook(params, ws.features.items)
+            rendered = render_scoped(ws, params, ws.features.items)
         except NotebookError:
             continue  # 拼不出来也算这个方向建不出来
         run = run_job(rendered, checks, set(original), mode="build", check_values=dict(original),
@@ -67,7 +69,7 @@ def _mutate_one(ws: "Workspace", p: Param, run_job: Callable[..., RunResult], ti
 def run_mutation(ws: "Workspace", run_job: Callable[..., RunResult], *, timeout_s: float,
                  secret_names: Iterable[str], workers: int = 4) -> tuple[list[MutationResult], list[str]]:
     """扰动前 LIMIT 个用户参数（按需求单里的顺序），各参数之间并行。返回 (结果, 超出上限没扰动的参数名)。"""
-    users = [p for p in ws.brief.params if p.source == "user"]
+    users = [p for p in gate_params(ws) if p.source == "user"]
     chosen, skipped = users[:LIMIT], [p.name for p in users[LIMIT:]]
     if not chosen:
         return [], skipped

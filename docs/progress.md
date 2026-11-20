@@ -1251,3 +1251,10 @@
 - 沙盒取样每个位置多记一项 `joints`（各关节的值，ratio 检查用）；reach 检查要的值不在均匀取样里时补取一次。
 - 测试 `tests/test_product_checks.py` 10 个（先看到导入失败）；`test_runner_assembly.py` 重跑通过。快速全量 1072 通过。
 - Task 7 提交前那次快速全量有 1 个失败，马上重跑两次都没复现（1062 全过），像是计时相关的偶发失败，没找到是哪一个；之后再出现就查。
+
+## 3.0 计划 2 Task 9：五个新工具
+- `cad_agent/product/tools.py`（`ProductTools`）；`scripts/gen_staged_specs.py` 生成 17 个工具说明（update_brief 换成 3.0 的，末尾 5 个）。单零件时 5 个工具不出现在工具表里，调用只返回"这个需求只有一个零件，用不到这个工具。"。`update_brief` 多零件时多一个 `parts_missing_relations`。
+- 多零件时第二版的分阶段工具只看当前零件的参数：新文件 `cad_agent/product/scope.py`，改了 `staged/build.py`、`extras.py`、`mutation.py`、`final_gate.py`、`tools.py` 里取参数的地方（单零件时不变）。
+- `build_assembly` 全过之后要做产品终检，所以 Task 10 的 `run_product_gate` 提前在这里写了（放在 `product/gate.py`，`product/flow.py` 导出它）。
+- 旧测试：按清单改了 `test_specs_v2_are_verbatim`；另外 `test_schemas_by_phase_v2` 一行计划漏列，问过用户同意后改了（偏离 D28）。
+- 新测试 `tests/test_product_tools.py` 9 个，快速全量 1081 通过。

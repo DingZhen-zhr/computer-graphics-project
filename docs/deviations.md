@@ -213,3 +213,9 @@
 - 实际：会话目录和版本目录里零件 notebook 放在 `parts/<编号>/model.py`（Task 4、Task 10）。引用 `parts/<编号>.py` 时，交付的 `assembly.py` 在版本目录里没法直接运行。
 - 改法：引用路径改成 `parts/<编号>/model.py`（函数 `part_notebook_path`），沙盒临时目录也按这个放。零件 notebook 的文件头和 `part_id` 是零件编号，产品变量名仍是 `model`：实测 SCA 按 `part_id` 找产品，不看变量名（`test_assembly_notebook_runs` 通过），这样零件编号和特征名、参数名重名时也不冲突。材料名字写材料的英文键。
 - 影响：Task 7、Task 10 按这个路径放文件。
+
+## D28（3.0 计划 2 Task 9）改 `test_schemas_by_phase_v2` 的一行（计划漏列，用户同意）
+- 原计划："要改的旧测试"清单只列了 `test_specs_v2_are_verbatim`。
+- 实际：`tests/test_staged_tools.py::test_schemas_by_phase_v2` 断言单零件确认后的工具表等于 `TOOL_NAMES_V2`。工具说明变成 17 个后，计划又要求单零件时 5 个多零件工具不出现在 `schemas()` 里，这一行必然要改。
+- 改法（用户同意）：期望值从 `TOOL_NAMES_V2` 改成 `TOOL_NAMES_V2[:12]`（第二版的 12 个，顺序不变），断言没有放松。
+- 另外：多零件时第二版的分阶段工具只看当前零件的参数（新文件 `cad_agent/product/scope.py`；`staged/build.py`、`extras.py`、`mutation.py`、`final_gate.py`、`tools.py` 里把 `ws.brief.params` 换成它）。单零件时取到的就是全部参数，行为不变。

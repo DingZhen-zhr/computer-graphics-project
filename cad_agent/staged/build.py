@@ -12,7 +12,8 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable, Iterable, Literal
 
 from cad_agent.checks.spec import CheckSpecError, parse_checks
-from cad_agent.notebook import NotebookError, render_notebook
+from cad_agent.notebook import NotebookError
+from cad_agent.product.scope import render_scoped, scoped_params
 from cad_agent.sandbox.execute import RunResult
 from cad_agent.staged import messages as msg
 from cad_agent.staged.final_gate import run_final_gate
@@ -40,10 +41,11 @@ class Advance:
 def _run_stage(ws: "Workspace", stage_id: str, run_job: Callable[..., RunResult], timeout_s: float,
                secret_names: tuple[str, ...], stl_dir: Path | None) -> RunResult:
     """验证一个阶段。渲染或解析检查就出错时不运行，结果和旧流程 _build_without_run 的一样。"""
-    names = set(ws.brief.param_values())
+    params = scoped_params(ws)
+    names = {p.name for p in params}
     checks = checks_for_stage(ws.checks_raw, ws.plan, stage_id)
     try:
-        rendered = render_notebook(ws.brief.params, features_upto(ws, stage_id))
+        rendered = render_scoped(ws, params, features_upto(ws, stage_id))
         parse_checks(checks, names)
     except NotebookError as e:
         return RunResult(ok=False, error={"cell": e.feature, "type": "NotebookError", "message": str(e)})

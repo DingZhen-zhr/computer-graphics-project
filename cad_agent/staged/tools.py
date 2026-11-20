@@ -12,6 +12,7 @@ from typing import TYPE_CHECKING, Any, Callable
 from cad_agent.checks.spec import CheckSpecError, missing_coverage, parse_checks
 from cad_agent.notebook import Feature, NotebookError
 from cad_agent.plan import PlanError, revise
+from cad_agent.product.scope import gate_params, scoped_params
 from cad_agent.sandbox.guard import check_code
 from cad_agent.staged import messages as msg
 from cad_agent.staged.select import insert_index
@@ -152,12 +153,13 @@ class StagedTools:
         at = positions[0] if positions else len(others)  # 放在这个阶段原来的检查所在的位置，原来没有就接在末尾
         combined = others[:at] + new + others[at:]
         try:
-            parsed = parse_checks(combined, set(ws.brief.param_values()))
+            parsed = parse_checks(combined, {p.name for p in scoped_params(ws)})
         except CheckSpecError as e:
             return _err(f"检查项没有通过校验，原有检查项保持不变：{e}")
         ws.checks_raw = combined
         self._invalidate(stage)
         self.box.unbuilt_edits = True
-        missing = sorted(missing_coverage([c for c in parsed if c.holds == "from_here"], ws.brief.user_param_names()))
+        users = {p.name for p in gate_params(ws) if p.source == "user"}
+        missing = sorted(missing_coverage([c for c in parsed if c.holds == "from_here"], users))
         body: dict[str, Any] = {"ok": True, "stage": stage, "count": len(new), "missing_coverage": missing}
         return ToolOutcome(_json(body))

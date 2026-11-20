@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING, Callable, Iterable
 
 from cad_agent.checks.spec import missing_coverage, parse_checks
 from cad_agent.gates import Gates
+from cad_agent.product.scope import gate_params, scoped_params
 from cad_agent.sandbox.execute import RunResult
 from cad_agent.staged.mutation import MutationResult, run_mutation
 from cad_agent.staged.select import final_checks
@@ -41,8 +42,9 @@ class GateResult:
 
 def coverage_gaps(ws: "Workspace") -> list[str]:
     """哪些用户参数没有被任何 from_here 检查用到（按最终模型要跑的检查算）。"""
-    checks = parse_checks(final_checks(ws), set(ws.brief.param_values()))
-    return sorted(missing_coverage([c for c in checks if c.holds == "from_here"], ws.brief.user_param_names()))
+    checks = parse_checks(final_checks(ws), {p.name for p in scoped_params(ws)})
+    users = {p.name for p in gate_params(ws) if p.source == "user"}   # 多零件时只看这个零件的（第 3.0 版）
+    return sorted(missing_coverage([c for c in checks if c.holds == "from_here"], users))
 
 
 def run_final_gate(ws: "Workspace", run_job: Callable[..., RunResult], gates: Gates, *,

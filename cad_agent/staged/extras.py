@@ -7,7 +7,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from cad_agent.notebook import NotebookError, render_notebook
+from cad_agent.notebook import NotebookError
+from cad_agent.product.scope import render_scoped, scoped_params
 from cad_agent.references import RefError, read_reference
 from cad_agent.sandbox.guard import check_code
 from cad_agent.staged import messages as msg
@@ -33,10 +34,10 @@ def probe_tool(box: "ToolBox", args: dict) -> ToolOutcome:
     cur = ws.plan.current()
     stage_id = cur.id if cur is not None else ws.plan.ids()[-1]
     try:
-        rendered = render_notebook(ws.brief.params, features_upto(ws, stage_id), probe=code)
+        rendered = render_scoped(ws, scoped_params(ws), features_upto(ws, stage_id), probe=code)
     except NotebookError as e:
         return _err(str(e))
-    run = box.run_job(rendered, [], set(ws.brief.param_values()), mode="probe",
+    run = box.run_job(rendered, [], {p.name for p in scoped_params(ws)}, mode="probe",
                       timeout_s=box.timeout_s, secret_names=box.secret_names)
     ws.probes_used += 1
     return ToolOutcome(_json({

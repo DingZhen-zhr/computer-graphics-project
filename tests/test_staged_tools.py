@@ -20,6 +20,7 @@ from helpers import BOX, PHONE_W, Runner, make_brief
 PLANS = Path(__file__).resolve().parent.parent / "docs" / "superpowers" / "plans"
 DOC_V2 = PLANS / "2026-11-10-caliper-1-kernel-prompts.md"
 DOC_V11 = PLANS / "2026-11-09-cad-agent-v1.1-prompts.md"
+DOC_V3 = DOC_V11.parent / "2026-11-20-datum-2-multipart-prompts.md"
 STAGES = [{"title": "底板", "done_when": "有一块底板"}, {"title": "立板", "done_when": "左端有立板"}, {"title": "圆角", "done_when": "棱边倒圆"}]
 WALL = "wall = scad.union_rsolid(base, scad.make_box_rsolid(width=8, height=40, depth=60, bottom_face_center=(-35, 0, 0)))"
 ROUND = "round = wall"
@@ -74,11 +75,17 @@ def test_specs_v2_are_verbatim():
     old_sec = section(DOC_V11, "## 4. 工具说明", "## 5. 程序代按按钮时用到的原文")
     old = {d["name"]: d for d in (json.loads(b) for b in re.findall(r"```json\n(.*?)\n```", old_sec, flags=re.S))}
     order = re.search(r"顺序：(.+?)。", sec6).group(1).split("、")
-    assert TOOL_NAMES_V2 == order and len(order) == 12
+    # 3.0 计划 2（要改的旧测试）：update_brief 对照 3.0 提示词文档第 3 节；工具 17 个，末尾 5 个也对照第 3 节
+    sec3 = section(DOC_V3, "## 3. 工具说明", "## 4. 程序生成的消息")
+    v3 = {d["name"]: d for d in (json.loads(b) for b in re.findall(r"```json\n(.*?)\n```", sec3, flags=re.S))}
+    tail = ["select_part", "set_connectors", "set_assembly", "set_assembly_checks", "build_assembly"]
+    assert TOOL_NAMES_V2 == order + tail and len(TOOL_NAMES_V2) == 17
     got = {s["function"]["name"]: s["function"] for s in TOOL_SPECS_V2}
     assert all(s["type"] == "function" for s in TOOL_SPECS_V2)
     for name in new:
-        assert got[name] == new[name], name
+        assert got[name] == (v3[name] if name == "update_brief" else new[name]), name
+    for name in tail:
+        assert got[name] == v3[name], name
     for name in ("ask_user", "request_confirmation", "remove_feature", "inspect", "api_help"):
         assert got[name] == old[name], name
     # set_checks：description 两段直接相连，parameters 在 1.1 版基础上改两处
@@ -134,7 +141,8 @@ def test_schemas_by_phase_v2():
     assert box.ws.brief.require_relations is True
     assert [s["function"]["name"] for s in box.schemas()] == PRE_CONFIRM_TOOLS_V2
     box.ws.brief.confirmed = True
-    assert [s["function"]["name"] for s in box.schemas()] == TOOL_NAMES_V2
+    # 3.0 计划 2（偏离 D28，用户同意）：单零件时多零件的 5 个工具不出现，其余 12 个和第二版相同
+    assert [s["function"]["name"] for s in box.schemas()] == TOOL_NAMES_V2[:12]
     out = make_box(confirmed=False).call("set_plan", {"stages": STAGES})
     assert "需求单现在不能建模" in j(out)["error"]
 

@@ -31,6 +31,7 @@ if TYPE_CHECKING:
     from cad_agent.staged.final_gate import GateResult
 
 MAX_QUESTIONS = 5
+PRODUCT_TOOL_NAMES = ("select_part", "set_connectors", "set_assembly", "set_assembly_checks", "build_assembly")
 
 
 @dataclass
@@ -71,6 +72,8 @@ class ToolBox(LegacyTools):
         self.timeout_s = timeout_s
         self.secret_names = tuple(secret_names)
         self.max_build_failures = 3  # 由主循环按配置设置
+        self.run_assembly = execute.run_assembly   # 多零件的装配运行（测试里换成假的）
+        self.motion_samples = 24                   # 每个关节取几个位置，由主循环按配置设置
         self.build_failures = 0      # 本轮用户消息内 build 没通过的次数
         self.unbuilt_edits = False   # 有没有 build 的改动：update_brief、upsert_feature、remove_feature、set_checks 成功后为真，build 一运行就清掉
         self._handlers: dict[str, Callable[[dict], ToolOutcome]] = {
@@ -86,6 +89,9 @@ class ToolBox(LegacyTools):
             ws.brief.require_relations = True
             self._specs, self._names, self._pre_confirm = TOOL_SPECS_V2, list(TOOL_NAMES_V2), list(PRE_CONFIRM_TOOLS_V2)
             self._handlers = StagedTools(self).handlers()
+            from cad_agent.product.tools import ProductTools
+
+            self._handlers.update(ProductTools(self).handlers())
 
     # ---- 运行沙盒 ----
     @property
@@ -113,7 +119,10 @@ class ToolBox(LegacyTools):
 
     def available(self) -> list[str]:
         ok, _ = self.ws.brief.can_build()
-        return list(self._names) if ok else list(self._pre_confirm)
+        names = list(self._names) if ok else list(self._pre_confirm)
+        if not self.ws.brief.is_multipart():   # 只有一个零件时，多零件的工具不出现
+            names = [n for n in names if n not in PRODUCT_TOOL_NAMES]
+        return names
 
     def schemas(self) -> list[dict]:
         names = set(self.available())
@@ -134,6 +143,8 @@ class ToolBox(LegacyTools):
             return _err(f"工具 {name} 的参数必须是 JSON 对象")
         if "__raw__" in args:
             return _err(f"工具 {name} 的参数不是合法 JSON，没有执行。收到的原文：{str(args['__raw__'])[:200]}。请按工具说明重新调用")
+        if name in PRODUCT_TOOL_NAMES and not self.ws.brief.is_multipart():
+            return _err("这个需求只有一个零件，用不到这个工具。")
         if name not in self.available():
             ok, why = self.ws.brief.can_build()
             return _err(f"需求单现在不能建模：{why}。建模工具要等需求单确认后才能用。现在可用的工具：{'、'.join(self.available())}")
@@ -160,6 +171,8 @@ class ToolBox(LegacyTools):
         missing = self.ws.brief.missing_relations()
         if missing:
             body["relations_missing"] = missing
+            if self.ws.brief.is_multipart():   # 多零件时，没写怎么相接的是零件
+                body["parts_missing_relations"] = missing
         return ToolOutcome(_json(body))
 
     def _ask_user(self, args: dict) -> ToolOutcome:

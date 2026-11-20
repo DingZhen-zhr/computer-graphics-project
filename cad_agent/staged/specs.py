@@ -1,7 +1,7 @@
 """分阶段流程的工具说明（OpenAI function 格式）。
 
 由 scripts/gen_staged_specs.py 生成，不要手改。内容逐字取自第二版提示词文档第 6 节和 1.1 版提示词文档第 4 节；
-set_checks 按第 6 节写的拼法算出。tests/test_staged_tools.py 会逐项比对。
+update_brief 和末尾 5 个取自 3.0 计划 2 提示词文档第 3 节；set_checks 按第 6 节写的拼法算出。tests/test_staged_tools.py 会逐项比对。
 """
 
 from __future__ import annotations
@@ -11,14 +11,14 @@ import json
 _RAW: list[str] = [
     r'''{
   "name": "update_brief",
-  "description": "修改需求单。只传要改的部分：set_params 里的同名参数会被覆盖；features、relations 和 open_questions 只要传了就整体替换。返回改动列表，以及现在能不能建模。要提问时，在同一次回复里先调用本工具，再调用 ask_user。需求单完整、没有待问问题、位置关系写全时，程序会自动请用户确认。交付后只改已有参数的数值时，程序会自动从第一个阶段起重新验证并交付。",
+  "description": "修改需求单。只传要改的部分：set_params 里的同名参数会被覆盖；features、relations、parts、motions、open_questions 只要传了就整体替换。返回改动列表，以及现在能不能建模。要提问时，在同一次回复里先调用本工具，再调用 ask_user。需求单完整、没有待问问题、位置关系写全时，程序会自动请用户确认。交付后只改已有参数的数值时，程序会自动从头重新验证并交付。产品由多个零件组成时，parts 写每个零件，motions 写每个会动的地方。",
   "parameters": {
     "type": "object",
     "properties": {
       "part": {
         "type": "object",
         "properties": {
-          "name": {"type": "string", "description": "零件名称"},
+          "name": {"type": "string", "description": "零件或产品的名称"},
           "purpose": {"type": "string", "description": "用途，一句话"}
         }
       },
@@ -31,14 +31,31 @@ _RAW: list[str] = [
             "value": {"type": "number"},
             "unit": {"type": "string", "enum": ["mm", "deg", "1"]},
             "source": {"type": "string", "enum": ["user", "suggested"], "description": "user：用户给出或明确同意；suggested：你自己定的"},
-            "note": {"type": "string", "description": "这个参数的含义；suggested 时写上理由"}
+            "note": {"type": "string", "description": "这个参数的含义；suggested 时写上理由"},
+            "part": {"type": "string", "description": "可选：只属于某一个零件时，写零件编号；几个零件共用就不写"}
           },
           "required": ["name", "value", "unit", "source", "note"]
         }
       },
       "remove_params": {"type": "array", "items": {"type": "string"}},
-      "features": {"type": "array", "items": {"type": "string"}, "description": "零件由哪些部分组成，每项是一个部件的名字和大致位置，如：底部托唇"},
-      "relations": {"type": "array", "items": {"type": "string"}, "description": "各部分怎么相接，每项一句话，要原样写出两个部分的名字，如：立板的下端和底板的一端重叠，外侧面和底板的端面平齐"},
+      "features": {"type": "array", "items": {"type": "string"}, "description": "只有一个零件时：零件由哪些部分组成，每项一个部件的名字和大致位置"},
+      "relations": {"type": "array", "items": {"type": "string"}, "description": "各部分或各零件怎么相接，每项一句话，要原样写出两边的名字"},
+      "parts": {
+        "type": "array",
+        "description": "产品由多个零件组成时才写：每个零件一项",
+        "items": {
+          "type": "object",
+          "properties": {
+            "id": {"type": "string", "pattern": "^[a-z][a-z0-9_]*$", "description": "零件编号，小写英文，如 lid"},
+            "name": {"type": "string", "description": "零件名字，如 盖子"},
+            "material": {"type": "string", "enum": ["abs", "aluminum", "anodized", "steel", "brass", "rubber", "wood"]},
+            "color": {"type": "string", "description": "可选：颜色，如 #4767E8；不写就用材料的默认颜色"},
+            "features": {"type": "array", "items": {"type": "string"}, "description": "这个零件由哪些部分组成"}
+          },
+          "required": ["id", "name", "material", "features"]
+        }
+      },
+      "motions": {"type": "array", "items": {"type": "string"}, "description": "每个会动的地方一句话：哪个零件、绕哪里转或沿哪个方向滑、动多少；不会动就传空数组"},
       "open_questions": {"type": "array", "items": {"type": "string"}, "description": "还需要问用户的问题；没有就传空数组"}
     }
   }
@@ -259,6 +276,126 @@ _RAW: list[str] = [
     },
     "required": ["name"]
   }
+}''',
+    r'''{
+  "name": "select_part",
+  "description": "切换到某个零件，之后的 set_plan、set_checks、upsert_feature、remove_feature、build、probe 都作用于这个零件。一般不用调用：程序会自动带你做下一个零件。装配时发现某个零件要改，用它回到那个零件。",
+  "parameters": {
+    "type": "object",
+    "properties": {"part": {"type": "string", "description": "零件编号"}},
+    "required": ["part"]
+  }
+}''',
+    r'''{
+  "name": "set_connectors",
+  "description": "整体替换某个零件的连接点。每个连接点必须选中这个零件上恰好一个真实的面或边：选圆柱面（geom.type == CYLINDER）得到它的轴线，原点在圆柱面中心；选平面（geom.type == PLANE）得到它的中心和朝外的法向；选圆形的边（geom.type == CIRCLE）得到圆心和圆所在平面的法向。可以用 offset 沿连接点自己的方向再移动一段（表达式可以用参数名）；flip 为 true 时方向反过来。",
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "part": {"type": "string", "description": "零件编号"},
+      "connectors": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "name": {"type": "string", "pattern": "^[a-z][a-z0-9_]*$", "description": "连接点名字，如 hinge_axis"},
+            "kind": {"type": "string", "enum": ["faces", "edges"]},
+            "where": {"type": "array", "items": {"type": "array"}, "description": "选择条件，写法同 set_checks"},
+            "offset": {"type": ["number", "string"], "description": "可选：沿连接点方向移动多少，默认 0"},
+            "flip": {"type": "boolean", "description": "可选：方向反过来"}
+          },
+          "required": ["name", "kind", "where"]
+        }
+      }
+    },
+    "required": ["part", "connectors"]
+  }
+}''',
+    r'''{
+  "name": "set_assembly",
+  "description": "整体替换装配关系。ground 是固定不动的零件。mates 的每一项把两个连接点对上：align 为 same 时两个方向相同，opposite 时相反（两个面贴在一起用 opposite）；gap 是沿方向留的距离；angle 是绕方向转多少度。连接点写成 零件编号.连接点名字。每个零件除 ground 外都要被某一个配合连到已经装好的零件上，配合之间不能连成一圈。joints 声明某个配合会动：revolute 绕配合的方向转，prismatic 沿 direction 滑；range 是可以动的范围；label 是给用户看的名字，如 盖子翻开。couplings 让一个关节带动另一个：ratio 是被带动的关节动多少 / 带动的关节动多少（齿轮外啮合是负数）。",
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "ground": {"type": "string", "description": "固定不动的零件编号"},
+      "mates": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "id": {"type": "string", "pattern": "^[a-z][a-z0-9_]*$"},
+            "fixed": {"type": "string", "description": "已经装好的那一边的连接点，如 body.hinge_axis"},
+            "moving": {"type": "string", "description": "被装上去的那一边的连接点，如 lid.hinge_axis"},
+            "align": {"type": "string", "enum": ["same", "opposite"]},
+            "gap": {"type": ["number", "string"], "description": "可选，默认 0"},
+            "angle": {"type": ["number", "string"], "description": "可选，默认 0，单位度"}
+          },
+          "required": ["id", "fixed", "moving", "align"]
+        }
+      },
+      "joints": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "id": {"type": "string", "pattern": "^[a-z][a-z0-9_]*$"},
+            "mate": {"type": "string", "description": "在哪个配合上动"},
+            "type": {"type": "string", "enum": ["revolute", "prismatic"]},
+            "range": {"type": "array", "items": {"type": ["number", "string"]}, "minItems": 2, "maxItems": 2},
+            "direction": {"type": "array", "items": {"type": "number"}, "minItems": 3, "maxItems": 3, "description": "prismatic 才要：装好时在世界坐标里滑动的方向"},
+            "label": {"type": "string", "description": "给用户看的名字"}
+          },
+          "required": ["id", "mate", "type", "range", "label"]
+        }
+      },
+      "couplings": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "driver": {"type": "string", "description": "带动的关节"},
+            "driven": {"type": "string", "description": "被带动的关节"},
+            "ratio": {"type": ["number", "string"]},
+            "kind": {"type": "string", "enum": ["gear", "belt"]}
+          },
+          "required": ["driver", "driven", "ratio", "kind"]
+        }
+      }
+    },
+    "required": ["ground", "mates"]
+  }
+}''',
+    r'''{
+  "name": "set_assembly_checks",
+  "description": "整体替换装配和运动的检查（零件自己的检查仍然用 set_checks）。程序会自动加上：每个连接点都选中了真实几何、任意两个零件装好后不穿模、每个会动的地方从头到尾都不碰撞，不用你写。\ninterference：零件 a 和 b 装好后重叠的体积不超过 tol（默认 0.01 立方毫米）。\nclearance：a 和 b 之间最短距离，op 默认 >=，要写 expected。\ncoaxial：a、b 各写 {\"part\": 零件编号, \"kind\": ..., \"where\": [...]}，各选中一个圆柱面，量两条轴线之间的距离和夹角；expected 是距离，默认 0，tol 默认 0.05。\nflush：a、b 各选中一个平面，量两个平面的距离和夹角，expected 是距离。\nmotion_clear：关节 joint 从头到尾，零件 a 和 b 在每个取样位置都不穿模；不写 a、b 就是所有零件两两之间。\nreach：关节 joint 能动到 value，中间不出错。\nratio：关节 driven 动的量 / 关节 driver 动的量，等于 expected。\n装好后的坐标是 ground 零件的坐标。",
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "checks": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "id": {"type": "string"},
+            "type": {"type": "string", "enum": ["interference", "clearance", "coaxial", "flush", "motion_clear", "reach", "ratio"]},
+            "a": {}, "b": {},
+            "joint": {"type": "string"}, "driver": {"type": "string"}, "driven": {"type": "string"},
+            "value": {"type": ["number", "string"]},
+            "expected": {"type": ["number", "string"]},
+            "op": {"type": "string", "enum": ["==", ">=", "<="]},
+            "tol": {"type": "number"}
+          },
+          "required": ["id", "type"]
+        }
+      }
+    },
+    "required": ["checks"]
+  }
+}''',
+    r'''{
+  "name": "build_assembly",
+  "description": "按当前的零件、连接点、装配关系和检查，把产品装起来并检查；有会动的地方时，每个关节从头到尾取若干位置，每个位置都检查碰撞。全部零件都做完才能调用。全过之后程序会做最后检查（把每个尺寸改一改，确认检查真的管得住它），通过就自动交付。返回：连接点各选中了什么；没通过的检查；碰撞发生在哪个关节的哪个位置、哪两个零件、重叠多少；下一步该做什么。",
+  "parameters": {"type": "object", "properties": {}}
 }''',
 ]
 

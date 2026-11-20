@@ -1,4 +1,6 @@
-"""从两份提示词文档生成 cad_agent/staged/specs.py（分阶段流程的 12 个工具说明）。
+"""从三份提示词文档生成 cad_agent/staged/specs.py（分阶段流程的 17 个工具说明）。
+
+- 3.0 计划 2 提示词文档第 3 节：update_brief（替换第二版的）和多零件的 5 个工具，接在最后；
 
 - 第二版提示词文档第 6 节的 json 块：update_brief、set_plan、upsert_feature、build、probe、read_reference；
 - 1.1 版提示词文档第 4 节的同名 json 块：ask_user、request_confirmation、remove_feature、inspect、api_help；
@@ -18,6 +20,8 @@ ROOT = Path(__file__).resolve().parent.parent
 PLANS = ROOT / "docs" / "superpowers" / "plans"
 DOC_V2 = PLANS / "2026-11-10-caliper-1-kernel-prompts.md"
 DOC_V11 = PLANS / "2026-11-09-cad-agent-v1.1-prompts.md"
+DOC_V3 = PLANS / "2026-11-20-datum-2-multipart-prompts.md"
+PRODUCT_TOOLS = ("select_part", "set_connectors", "set_assembly", "set_assembly_checks", "build_assembly")
 OUT = ROOT / "cad_agent" / "staged" / "specs.py"
 REUSED = ("ask_user", "request_confirmation", "remove_feature", "inspect", "api_help")
 
@@ -49,24 +53,30 @@ def build_raw() -> tuple[list[str], list[str]]:
     params["properties"]["checks"]["items"]["properties"]["holds"] = {"type": "string", "enum": ["from_here", "here_only"]}
     sc["parameters"] = params
 
+    sec3 = _section(DOC_V3, "## 3. 工具说明", "## 4. 程序生成的消息")
+    v3 = {json.loads(b)["name"]: b for b in _json_blocks(sec3)}   # 3.0：update_brief 换成多零件的版本，末尾加 5 个
     raw: list[str] = []
     for name in order:
-        if name == "set_checks":
+        if name == "update_brief":
+            raw.append(v3[name])
+        elif name == "set_checks":
             raw.append(json.dumps(sc, ensure_ascii=False, indent=2))
         elif name in REUSED:
             raw.append(old[name])
         else:
             raw.append(new[name])
-    return order, raw
+    for name in PRODUCT_TOOLS:
+        raw.append(v3[name])
+    return order + list(PRODUCT_TOOLS), raw
 
 
 def main() -> None:
     order, raw = build_raw()
-    assert len(order) == 12, order
+    assert len(order) == 17, order
     parts = [
         '"""分阶段流程的工具说明（OpenAI function 格式）。\n\n'
         "由 scripts/gen_staged_specs.py 生成，不要手改。内容逐字取自第二版提示词文档第 6 节和 1.1 版提示词文档第 4 节；\n"
-        'set_checks 按第 6 节写的拼法算出。tests/test_staged_tools.py 会逐项比对。\n"""\n\n',
+        'update_brief 和末尾 5 个取自 3.0 计划 2 提示词文档第 3 节；set_checks 按第 6 节写的拼法算出。tests/test_staged_tools.py 会逐项比对。\n"""\n\n',
         "from __future__ import annotations\n\nimport json\n\n_RAW: list[str] = [\n",
     ]
     for r in raw:
