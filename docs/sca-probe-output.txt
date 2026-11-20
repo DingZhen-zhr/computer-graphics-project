@@ -201,3 +201,92 @@
 [9 渲染 preset-top] view='top' 文件=True 大小=10744 用时 0.0 秒
 [9 渲染 preset-right] view='right' 文件=True 大小=11081 用时 0.0 秒
 [9 渲染目录] C:\Users\18258\AppData\Local\Temp\cad-probe2-views-2sy1h334
+
+
+===== 3.0 计划 2 Task 1：装配探测（scripts/probe_assembly.py，2026-11-20）=====
+[开始] 3.0 计划 2 Task 1 装配探测
+[1 组装] 成功，2.21s，产品类型 Assembly，definition AssemblyDefinition
+[1 组件] ['body', 'lid']
+[1 部分覆盖] 异常 ValueError: body.py: the cell defining h also defines w; override them together, or define them in cells of their own
+[1 编号写死 model] 异常 ProductNotFoundError: body.py: no top-level Part or Assembly has the notebook id 'model'; Parts and Assemblies found: body (id 'body')
+[1 id 覆盖] Assembly
+[实验 1 用时] 3.3s
+[2 原始] [-10.0, -5.0, 0.0, 10.0, 5.0, 4.0]
+[2 摆放后] [92.5, -10.328427, 39.393398, 110.328427, 7.5, 60.606602]，2.2ms
+[2 手算] [92.5, -10.3284, 39.3934, 110.3284, 7.5, 60.6066]
+[实验 2 用时] 0.5s
+[3 不重叠] 体积 SimpleCADError: Operation: intersect_rsolid
+Signature: intersect_rsolid(*solids)
+Documentation: For full usage details, run help(simplecadapi.intersect_rsolid).
+What happened: ，66.0ms
+[3 贴面] 体积 SimpleCADError: Operation: intersect_rsolid
+Signature: intersect_rsolid(*solids)
+Documentation: For full usage details, run help(simplecadapi.intersect_rsolid).
+What happened: ，63.6ms
+[3 重叠 1mm] 体积 399.9999999999999，4.0ms
+[3 包围盒] 两个包围盒 2.17ms/次
+[3 OCP 包围盒] 0.25ms/次，不相交=True
+[3 轴在孔里(间隙0.2)] 体积 SimpleCADError: Operation: intersect_rsolid
+Signature: intersect_rsolid(*solids)
+Documentation: For full usage details, run help(simplecadapi.intersect_rsolid).
+What happened: ，55.4ms
+[3 轴在孔里(零间隙)] 体积 SimpleCADError: Operation: intersect_rsolid
+Signature: intersect_rsolid(*solids)
+Documentation: For full usage details, run help(simplecadapi.intersect_rsolid).
+What happened: ，3.7ms
+[实验 3 用时] 0.2s
+[4 材料] 异常 SimpleCADError: Operation: make_material_rmaterial | Signature: make_material_rmaterial(material_id, name=None, density=None, density_unit=None, color=None) | Documentation: For full usage details, run help(simplecadapi.make_material_rmaterial). | What happened: Failed to create the material definition. | Possible 
+[4 零件] a Part material=None
+[4 材料] 异常 SimpleCADError: Operation: make_material_rmaterial | Signature: make_material_rmaterial(material_id, name=None, density=None, density_unit=None, color=None) | Documentation: For full usage details, run help(simplecadapi.make_material_rmaterial). | What happened: Failed to create the material definition. | Possible 
+[4 零件] b Part material=None
+[4 材料] 异常 SimpleCADError: Operation: make_material_rmaterial | Signature: make_material_rmaterial(material_id, name=None, density=None, density_unit=None, color=None) | Documentation: For full usage details, run help(simplecadapi.make_material_rmaterial). | What happened: Failed to create the material definition. | Possible 
+[4 零件] c Part material=None
+[4 装配] Assembly
+[4 capture 装配] 异常 TypeError: result must be a PartDefinition, AssemblyDefinition, PartBuildResult, or AssemblyBuildResult
+[4 assemble] <function assemble at 0x000002E4A3263B00>
+[实验 4 用时] 0.0s
+[5 转动] 30° 0ms placement=Placement(origin=(-17.320508075688775, -9.999999999999998, 10.0), x_axis=(0.8660254037844387, 0.49999999999999994, 0.0), y_axis=(-0.49999999999999994, 0.8660254037844387, 0.0), z_axis=(0.0, -0.0, 1.0))
+[5 转动] 60° 0ms placement=Placement(origin=(-10.000000000000002, -17.32050807568877, 10.0), x_axis=(0.5000000000000001, 0.8660254037844386, 0.0), y_axis=(-0.8660254037844386, 0.5000000000000001, 0.0), z_axis=(0.0, -0.0, 1.0))
+[5 转动] 90° 0ms placement=Placement(origin=(-1.1857889932854728e-15, -20.0, 10.0), x_axis=(6.123233995736766e-17, 1.0, 0.0), y_axis=(-1.0, 6.123233995736766e-17, 0.0), z_axis=(0.0, -0.0, 1.0))
+[5 报告] <simplecadapi.product.constraint.ConstraintReport object at 0x000002E4DC767070>
+[实验 5 用时] 0.0s
+[7 生成] 0.08s
+[7 对上齿槽] 重叠 SimpleCADError: Operation: intersect_rsolid
+Signature: intersect_rsolid(*solids)
+Documentation: For full usage details, run help(simplecadapi.intersect_rsolid).
+What happened: ，4755ms
+[7 齿顶对齿顶] 重叠 51.38826629521222，227ms
+[7 一起转半齿] 重叠 SimpleCADError: Operation: intersect_rsolid
+Signature: intersect_rsolid(*solids)
+Documentation: For full usage details, run help(simplecadapi.intersect_rsolid).
+What happened: ，4429ms
+[实验 7 用时] 9.6s
+[8 圆柱面] center=(4.999999999999999, 1.175393883748596e-16, 5.0) 轴点=(5.000,0.000,-1.000) 轴向=(0.000,0.000,1.000) 半径=3.000
+[8 平面] center=(-0.12065253284068755, -1.1137207512953977e-15, 10.0) normal=(0.0, 0.0, 1.0)
+[8 平面 -x] center=(-20.0, -7.105427357601003e-16, 5.0) normal=(-1.0, -0.0, 0.0)
+[8 圆边] center=(5.000000000000013, 2.5905203907920316e-16, 9.999999999999998) 圆心=(5.000,0.000,10.000) 法向=(0.000,0.000,1.000) r=3.000
+[8 面类型] None
+[8 圆柱连接点] <simplecadapi.product.connector.Connector object at 0x000002E4DC58E570>
+[实验 8 用时] 0.0s
+[3b OCP 不重叠] 体积 0.0000，1.6ms，出错=False
+[3b OCP 贴面] 体积 0.0000，2.4ms，出错=False
+[3b OCP 重叠 1mm] 体积 400.0000，4.4ms，出错=False
+[3b OCP 轴在孔里(间隙0.2)] 体积 0.0000，2.2ms，出错=False
+[3b OCP 轴在孔里(零间隙)] 体积 0.0000，2.4ms，出错=False
+[3b OCP 齿轮 对上齿槽] 体积 0.0000，457.5ms，出错=False
+[3b OCP 齿轮 齿顶对齿顶] 体积 196.7302，641.5ms，出错=False
+[3b OCP 齿轮 一起转半齿] 体积 0.0000，903.7ms，出错=False
+[3b OCP 齿轮 转 4 度] 体积 0.0000，1026.1ms，出错=False
+[实验 3b 用时] 3.2s
+[4b 产品 STEP] 35279 字节 occurrence=2 含颜色=True
+[4b 产品 STL] 三角形 24 实体 2
+[4b 产品 STL 范围] y -20.00~20.00 z -8.00~32.00（lid 转 90 度后 z 应到 12+20=32）
+[4b 组件] ['body', 'lid'] Component 属性 ['component_id', 'item', 'name', 'placement', 'to_dict']
+[4b 零件 STEP 颜色] True
+[4b 零件材料] Material(material_id='abs', name='ABS', density=None, density_unit=None, color=(0.227, 0.247, 0.278))
+[实验 4b 用时] 0.9s
+[2b gp_Trsf] (1, 1, 0) 90° → [92.5, -10.3284, 39.3934, 110.3284, 7.5, 60.6066] 体积 800.0000
+[2b gp_Trsf] (1, 0, 0) 180° → [-10.0, -5.0, 6.0, 10.0, 5.0, 10.0] 体积 800.0000
+[实验 2b 用时] 0.0s
+[27 补测] 面类型 ['GeomAbs_SurfaceType.GeomAbs_Cylinder', 'GeomAbs_SurfaceType.GeomAbs_Plane'] Plane/Cylinder 常量 GeomAbs_SurfaceType.GeomAbs_Plane GeomAbs_SurfaceType.GeomAbs_Cylinder
+[27 补测] 边类型 ['GeomAbs_CurveType.GeomAbs_Circle', 'GeomAbs_CurveType.GeomAbs_Line'] Circle 常量 GeomAbs_CurveType.GeomAbs_Circle

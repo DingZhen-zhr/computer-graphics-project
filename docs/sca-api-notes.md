@@ -635,3 +635,70 @@ ring = scad.std.gear.make_spur_ring_gear_rsolid(n_teeth=teeth_n, module=gear_m, 
 
 - 每张都正常写出 PNG（500×400 时约 11 KB，iso 约 20 KB）。预设名和对应的角度元组得到的图一样（左下角标注不同："front" 与 "view"）。
 - 渲染在独立子进程里完成，不会拖垮调用方。
+
+## 23. 零件 notebook 的组装
+
+探测脚本 `scripts/probe_assembly.py`（3.0 计划 2 Task 1，2026-11-20），输出在 `docs/sca-probe-output.txt` 末尾。
+
+- 零件 notebook 文件头的 `id` 和产品变量都用零件编号（`id = "body"`，`body = scad.Part(part_id="body", body=...)`）。装配 notebook（文件头 `id = "product"`）里：
+  ```python
+  body = scad.use("body.py", h=h, w=w)      # 相对装配 notebook 所在目录
+  _a = scad.make_assembly_rassembly("product")
+  _a = scad.add_component_rassembly(_a, body, "body", scad.make_placement_rplacement((0, 0, 0)))
+  product = _a
+  ```
+  运行成功（2.2 秒），`run.product` 是 `Assembly`，`run.definition` 是 `AssemblyDefinition`，`run.product.components` 的 `component_id` 是 `['body', 'lid']`。
+- **覆盖值要把参数 cell 里的变量一起传**：只传 `h` 不传 `w` 报 `ValueError: body.py: the cell defining h also defines w; override them together, or define them in cells of their own`。所以装配 notebook 把零件参数 cell 里的全部参数都传过去。
+- 编号写死成 `model`、但产品变量是 `body` 时报 `ProductNotFoundError: body.py: no top-level Part or Assembly has the notebook id 'model'; Parts and Assemblies found: body (id 'body')`。`scad.use("body.py", id="body", ...)` 可以改编号（能运行），但我们直接在文件头写零件编号，不用这个参数。
+
+## 24. 摆放与重叠体积
+
+- 4×4 矩阵（3×3 旋转 + 平移）放实体，两种写法和手算的包围盒都一致（绕 (1,1,0) 转 90° 再平移 (100,0,50) → `[92.5, -10.3284, 39.3934, 110.3284, 7.5, 60.6066]`）：
+  - SCA：`rotate_shape(shape, angle, axis, origin=(0,0,0))` 再 `translate_shape(shape, vector)`，要从矩阵算轴角，转 180° 时轴要另算；
+  - **OCP（沙盒里用这个）**：`gp_Trsf().SetValues(r00, r01, r02, tx, r10, ..., r22, tz)` + `BRepBuilderAPI_Transform(solid.wrapped, trsf, True).Shape()`，转 180° 也对。注意得到的是 OCP 形状：**SCA 的 `Solid` 不能从 OCP 形状构造**（`TypeError: No constructor defined!`），所以摆好的零件只用 OCP 和检视函数量（检视函数可以直接传 OCP 形状）。
+- 重叠体积：
+  - `scad.intersect_rsolid(a, b)` **不重叠、贴面时都抛 `SimpleCADError`**（"What happened" 为空），没法和真正的出错区分，而且齿轮啮合时一次要 7 秒多。**不用它。**
+  - **用 OCP**：`BRepAlgoAPI_Common(a, b)`、`.Build()`，再 `BRepGProp.VolumeProperties_s(op.Shape(), props)`、`props.Mass()`。不重叠 0、贴面 0、重叠 1 毫米 400（20×20×1）、轴在孔里（单边间隙 0.2 或零间隙）都是 0；方块几毫秒，齿轮 0.5～1 秒。`op.IsDone()` 判断有没有算成。
+  - 先比包围盒：OCP `Bnd_Box` + `BRepBndLib.Add_s` + `IsOut` 约 1 毫秒一对，不相交就跳过。
+- 齿轮（模数 2，20 齿和 40 齿，中心距 60）：大齿轮转半个齿距（4.5°）让齿槽对着小齿轮的齿 → 重叠 0；齿顶对齿顶 → 196.73；小齿轮转 9°、大齿轮反向转 4.5°（一起转半齿）→ 0；转 4°/2° → 0。标准齿轮正确啮合时重叠就是 0。
+
+## 25. 装配、材料与导出
+
+- 材料：`scad.make_material_rmaterial("abs", name="ABS", color=(0.227, 0.247, 0.278))`。**颜色是 0～1 的三个浮点数**，写 `"#3A3F47"` 或 0～255 的整数都报 `Failed to create the material definition`。程序把 `#RRGGBB` 换成三个浮点数（保留三位小数）再写进 notebook。
+- 在 notebook 里赋材料要用 `make_part_rpart`：
+  ```python
+  body = scad.assign_material_rpart(scad.make_part_rpart("body", base), scad.make_material_rmaterial("abs", name="ABS", color=(0.227, 0.247, 0.278)))
+  ```
+  写成 `assign_material_rpart(scad.Part(...), ...)` 报 `ValueError: unrecorded Part cannot be used in active graph 'body'; build it inside this GraphSession`。运行后 `run.product` 是 `Part`，`.body` 是 `Solid`，`.material` 就是这个材料。
+- 零件和产品的 STEP 里都带颜色（文件里有 `COLOUR_RGB`）。
+- `scad.capture` 只收 `PartDefinition`、`AssemblyDefinition`、`PartBuildResult`、`AssemblyBuildResult`；在 notebook 外面手搭的 `Assembly` 不能直接 capture。所以**整个产品的 STEP 由运行装配 notebook 得到**：`cap = scad.capture(run.definition, pkg)`，再 `export_product_package_to_step(cap.package, step)`（2 个 occurrence，35 KB）；`export_product_package_to_stl` 也能导出整个产品（2 个实体）。
+- 摆放：`scad.make_placement_rplacement(origin, x_axis=..., y_axis=...)` 就是矩阵的三列：零件自己的 x、y 轴在装好后朝哪里、原点在哪里（z 轴 = x × y）。实测盖子 `x_axis=(1,0,0)`、`y_axis=(0,0,1)`、原点 (0,0,12) 后，产品 STL 的 z 范围到 32（= 12 + 20），和手算一致。
+
+## 26. 约束驱动与闭环
+
+- 转动约束能驱动：两个零件各加一个面连接点（`add_connector_rpart(part, make_face_connector_rconnector("top", face))`，被动零件的底面连接点 `flip=True`），`ground_component_rassembly(asm, "base")`，`add_revolute_constraint_rassembly(asm, "hinge", make_connector_ref_rconnectorref("base", "top"), make_connector_ref_rconnectorref("arm", "bottom"), drive_angle_degrees=30)`，`solve_assembly_constraints_rassembly(asm)`。解出来 `arm` 的 `placement` 是绕底座顶面中心、沿顶面法向转 30°/60°/90°（x 轴 (0.866, 0.5, 0)、(0.5, 0.866, 0)、(0, 1, 0)），和手算一致（误差 1e-15），每次不到 1 毫秒。
+- 滑动约束 `add_prismatic_constraint_rassembly(..., drive_distance=...)` 签名相同，这次没有单独实测。
+- **闭环（曲柄滑块）没有测**：用户要求省时间，本计划也不做闭环。结论：不支持（本计划只做树形装配）。
+- 多零件验收（`benchmarks/assembly_accept.py`）用的就是上面的转动约束驱动；滑动关节在验收里独立写平移。
+
+## 27. 连接点取几何
+
+孔（φ6，轴线沿 z，中心 x=5）的块，用 OCP 的适配器读真实几何：
+
+```python
+from OCP.BRepAdaptor import BRepAdaptor_Curve, BRepAdaptor_Surface
+s = BRepAdaptor_Surface(face.wrapped); ax = s.Cylinder().Axis()     # 圆柱面
+ax.Location(), ax.Direction(), s.Cylinder().Radius()                 # (5, 0, -1)、(0, 0, 1)、3.0
+c = BRepAdaptor_Curve(edge.wrapped).Circle(); c.Axis().Location(), c.Axis().Direction(), c.Radius()   # 圆形的边
+```
+
+- 圆柱面：`get_center()` 是 (5, 0, 5)（面中间），轴线上的点是 (5, 0, −1)（圆柱的起点）。**连接点的原点取 `get_center()` 投影到轴线上的点**（这里是 (5, 0, 5)），方向取轴线方向。轴线方向的正负由 SCA 定（这里是 +z），所以模型要用 `flip` 定朝向。
+- 平面：原点 `get_center()`，方向 `get_normal_at()`（朝材料外）。注意 `get_center()` 是面的形心，带孔的面形心会偏（顶面形心 x = −0.12）。
+- 圆形的边：原点是圆心 `Circle().Axis().Location()`（(5, 0, 10)），方向是 `Axis().Direction()`（(0, 0, 1)）。
+- 判断类型：面用 `BRepAdaptor_Surface(f.wrapped).GetType()`（`GeomAbs_Plane`、`GeomAbs_Cylinder`），边用 `BRepAdaptor_Curve(e.wrapped).GetType()`（`GeomAbs_Circle`）。SCA 的面对象没有 `get_type()`。
+
+## 三个常量（3.0 计划 2 Task 1 定下）
+
+- `CONTACT_TOL_MM3 = 0.5`：实测"接触"（轴在孔里、齿轮正确啮合、贴面）的重叠体积都是 0；按规则 2 × 0 向上取到 0.5 的整数倍是 0，那样接触配对就和普通配对一样了，所以取最小的正值 0.5。
+- 默认取样数 24：齿轮一次重叠约 0.5～1 秒，一个齿轮关节 24 个位置约 20 秒（方块之类不到 1 秒）。
+- 闭环：没有测，本计划不做（见第 26 节）。

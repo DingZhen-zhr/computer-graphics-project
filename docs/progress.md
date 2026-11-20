@@ -1213,3 +1213,8 @@
 - 安装脚本、CI、README、安装笔记、Mac 清单改用 Datum；检测到旧版卡尺时只提示、不卸载，删掉旧快捷方式（偏离 D25，用户同意改测试）。
 - 快速全量 1021 通过。计划 1 没有改到会运行 SCA 的代码，完整全量留到计划 2 结束时一起跑，省 9 分钟。
 - 计划 1 全部完成。
+
+## 3.0 计划 2 Task 1：探测 SCA 的装配
+- `scripts/probe_assembly.py`，结论写进笔记第 23–27 节。零件 notebook 用 `scad.use` 组装能跑通；摆放用 OCP 的 `gp_Trsf`（SCA 的 Solid 不能从 OCP 形状构造，摆好的零件只用 OCP 量）；重叠体积用 OCP 的 `BRepAlgoAPI_Common`（SCA 的 `intersect_rsolid` 不重叠时直接抛错、齿轮要 7 秒，不用）。
+- 材料颜色要写成 0～1 的三个浮点数，赋材料要用 `make_part_rpart`。整个产品的 STEP 只能运行装配 notebook 后 capture。
+- 三个常量：`CONTACT_TOL_MM3 = 0.5`（接触实测都是 0，取最小正值）；默认取样 24；闭环没有测（用户要求省时间），本计划不做。
