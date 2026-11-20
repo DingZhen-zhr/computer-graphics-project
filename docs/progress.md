@@ -1323,3 +1323,6 @@
 ## 3.0 计划 5 Task 1：一键整理提交材料
 - `cad_agent/submission.py` 和子命令 `datum submission`：六个文件夹加清单.md；整理前搜一遍要复制的文字文件里有没有 key（环境变量里名字带 KEY、TOKEN 的值和钥匙串里的 key），搜到就停、说明文件和行号；目标已存在就另建带序号的；没交付过的会话只带运行日志并在清单里写明。偏离 D39（不做桌面端菜单）。
 - 测试 `tests/test_submission.py` 7 个。第一次运行时扫描器把测试文件里写死的假 key 抓出来了（扫描是对的），改成运行时拼出来。
+
+## 3.0 计划 5 Task 3：演示脚本和实验报告初稿
+- `docs/demo-script.md`（四个镜头、单零件版、录制前的检查清单）、`docs/report-draft.md`（五节；真实评测的数字还没有，写的是"还没有测"）。测试 `tests/test_report_docs.py` 4 个：标题齐全、报告里的"x/y"都能在 results-v3.md 里找到、成员分工没有人名、没有 key。
