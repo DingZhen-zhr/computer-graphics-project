@@ -84,6 +84,7 @@ class StagedHooks:
             if cur is not None:
                 return msg.stage_cap_text(cur.id, cur.title, cfg.max_tool_calls_per_stage)
             return TOTAL_CAP_TEXT.format(n=cfg.max_tool_calls_per_stage)   # 规划中或终检时：没有当前阶段
-        if c.tool_calls >= cfg.max_tool_calls_total:
-            return TOTAL_CAP_TEXT.format(n=cfg.max_tool_calls_total)
+        total = self.agent.product.total_cap(cfg.max_tool_calls_total)   # 多零件时按零件数放大
+        if c.tool_calls >= total:
+            return TOTAL_CAP_TEXT.format(n=total)
         return None

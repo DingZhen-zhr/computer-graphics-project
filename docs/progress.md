@@ -1258,3 +1258,9 @@
 - `build_assembly` 全过之后要做产品终检，所以 Task 10 的 `run_product_gate` 提前在这里写了（放在 `product/gate.py`，`product/flow.py` 导出它）。
 - 旧测试：按清单改了 `test_specs_v2_are_verbatim`；另外 `test_schemas_by_phase_v2` 一行计划漏列，问过用户同意后改了（偏离 D28）。
 - 新测试 `tests/test_product_tools.py` 9 个，快速全量 1081 通过。
+
+## 3.0 计划 2 Task 10：多零件的流程、终检和交付
+- `product/flow.py`（`ProductFlow`、`part_finished`、`finish_part`）、`product/delivery.py`（版本目录、`motion.json`、交付文字）、`product/gate.py`（产品终检：每个用户参数改一改，重做用到它的零件和装配）。主循环只加了几处调用；单零件时 `ProductFlow` 什么都不做。
+- 零件做完：标记 done，记下检查结果，换下一个零件，这一段往来在本次回复执行完后折叠成"【零件已做完（程序生成）】……"。改了已经做完的零件：它变回没做完，装配结果作废。工具调用总上限 = 每零件份额 × 零件数 + 100。新配置项 `motion_samples`（默认 24，不少于 12）。
+- 偏离 D29：多零件交付时不做看图审查。
+- 测试 `tests/test_product_flow.py` 6 个；第一次运行时剧本里盖子用到了 `w` 却没写检查，程序按规矩拦住了（是剧本写错，改了剧本）。快速全量 1087 通过。

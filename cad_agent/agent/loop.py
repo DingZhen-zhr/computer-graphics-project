@@ -27,8 +27,8 @@ from cad_agent.config import Config
 from cad_agent.agent.turn import (AFFIRMATIVE, CONFIRMED_MESSAGE, STOPPED_TEXT, AgentTurn, Kind, _raw_arguments,  # noqa: F401
                                   is_affirmative)
 from cad_agent.llm.client import LLM, LLMError, LLMReply, LLMStopped, ToolCall
-from cad_agent.notebook import NotebookError, render_notebook
-from cad_agent.product.workspace import product_state
+from cad_agent.product.flow import ProductFlow
+from cad_agent.agent.save import save_state
 from cad_agent.session import Session
 from cad_agent.tools import ToolBox, ToolOutcome, Workspace
 
@@ -46,6 +46,8 @@ class Agent:
         self.toolbox.max_build_failures = config.max_build_failures
         self.staged = toolbox.gates.staged
         self.hooks = StagedHooks(self) if self.staged else None   # 旧流程没有它，行为和 1.2 版逐字相同
+        self.product = ProductFlow(self) if self.staged else None   # 多零件（3.0）；单零件时什么都不做
+        self.toolbox.motion_samples = config.motion_samples
         if self.staged:
             self.toolbox.stage_dir = session.dir / "stages"
         self.system_prompt = load_system_prompt(self.staged)
@@ -80,6 +82,8 @@ class Agent:
         # 阶段在一轮开始、处理完确认之后决定，这一轮内不换模型（换了缓存就断了）
         phase = "modeling" if self.ws.brief.can_build()[0] else "clarify"
         llm = self.modeling_llm if phase == "modeling" and self.modeling_llm is not None else self.llm
+        if self.product is not None:
+            self.product.begin_turn()
         self.context.start_turn(content, self._snapshot())
         if self.hooks is not None:
             self.hooks.begin_turn()
@@ -152,6 +156,8 @@ class Agent:
             skipped = tc.name == "build" and errored  # C3：同一次回复里前面的调用出错了，这个 build 不运行
             outcome = ToolOutcome(SKIPPED_BUILD_MESSAGE) if skipped else self.toolbox.call(tc.name, tc.arguments)
             ok = not has_error(outcome.content)
+            if self.product is not None:
+                self.product.after_call(tc.name, ok)
             errored = errored or not ok
             calls.append((tc.name, ok))
             sent = self._warn(tc.name, outcome, c)
@@ -175,6 +181,7 @@ class Agent:
         """一次回复里的工具全部执行完、本轮还没结束时：程序代模型按按钮（C1 自动请确认、C2 自动重建）。"""
         if self.hooks is not None:
             self.hooks.maybe_fold()
+            self.product.maybe_fold()
         if should_auto_confirm(self.ws, calls):
             outcome = self.toolbox.call("request_confirmation", {})
             if not has_error(outcome.content):
@@ -207,6 +214,7 @@ class Agent:
             self._flush_review_note()
         if ended is None and self.hooks is not None:
             self.hooks.maybe_fold()
+            self.product.maybe_fold()
         return ended
 
     def _warn(self, name: str, outcome: ToolOutcome, c: _Counters) -> str:
@@ -221,12 +229,20 @@ class Agent:
             self._pending_changes.extend(json.loads(outcome.content).get("changes", []))
         if tc.name == "build" and outcome.build is not None:
             self._log_build(outcome)
-            if outcome.deliverable:
+            if outcome.deliverable and self.product is not None and self.product.active():
+                self.product.part_ready(c)   # 多零件：这个零件做完，换下一个，不交付
+            elif outcome.deliverable:
                 ended = self._deliver(c) if not self.staged else self._review_then_deliver(c)
                 if ended is not None:
                     return ended
             elif self.toolbox.build_failures >= self.config.max_build_failures:
                 return self._end("failed", failure_text(self.toolbox, outcome), c)
+        if tc.name == "build_assembly" and not has_error(outcome.content):
+            self.product.log_assembly(outcome.content)
+            if outcome.deliverable:
+                return self.product.deliver(c)
+            if self.toolbox.build_failures >= self.config.max_build_failures:
+                return self.product.failed(outcome.content, c)
         if outcome.end_turn:
             lead = reply.content.strip() + "\n\n" if reply.content.strip() else ""
             if outcome.kind == "question":
@@ -265,13 +281,7 @@ class Agent:
 
     # ---------------------------------------------------------------- 结束一轮
     def _save(self) -> None:
-        ws = self.ws
-        try:
-            text = render_notebook(ws.brief.params, ws.features.items).text
-        except NotebookError as e:
-            text = f"# 当前的特征还不能拼成 notebook：{e}\n"
-        self.session.save_state(ws.brief, ws.features.to_list(), ws.checks_raw, text,
-                                plan=ws.plan.to_list() if ws.plan is not None else None, product=product_state(ws))
+        save_state(self.session, self.ws)
 
     def _confirm_extra(self, reply: LLMReply) -> dict:
         return {"lead": reply.content.strip(), "brief": self.ws.brief.to_dict()}

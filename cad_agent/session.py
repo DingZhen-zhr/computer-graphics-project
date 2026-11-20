@@ -120,6 +120,7 @@ class Session:
                 _write_json(pd / "features.json", st["features"])
                 _write_json(pd / "checks.json", st["checks"])
                 _write_json(pd / "connectors.json", st["connectors"])
+                _write_json(pd / "results.json", st.get("results") or [])
                 if st["plan"] is not None:
                     _write_json(pd / "plan.json", st["plan"])
                 if part_notebooks and pid in part_notebooks:
@@ -134,6 +135,14 @@ class Session:
             return []
         found = [(int(m.group(1)), p) for p in root.iterdir() if p.is_dir() and (m := VERSION_RE.match(p.name))]
         return [p for _, p in sorted(found)]
+
+    def reserve_version(self) -> Path:
+        """建好下一个版本目录（多零件交付用）并返回。"""
+        existing = self.versions()
+        n = int(VERSION_RE.match(existing[-1].name).group(1)) + 1 if existing else 1  # type: ignore[union-attr]
+        v = self.part_dir() / "versions" / f"v{n}"
+        v.mkdir(parents=True)
+        return v
 
     def new_version(
         self,

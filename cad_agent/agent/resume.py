@@ -71,7 +71,7 @@ def _load_product(session: Session, ws: Workspace) -> None:
         pd = session.dir / "parts" / p.id
         parts[p.id] = {"features": _read(pd / "features.json", []) or [], "checks": _read(pd / "checks.json", []) or [],
                        "plan": _read(pd / "plan.json", None), "connectors": _read(pd / "connectors.json", []) or [],
-                       "done": p.id in done}
+                       "results": _read(pd / "results.json", []) or [], "done": p.id in done}
     restore_product(ws, {"active": meta.get("active"), "parts": parts, "assembly": meta.get("assembly"),
                          "assembly_checks": _read(session.dir / "assembly_checks.json", []) or [],
                          "assembly_passed": meta.get("assembly_passed")})

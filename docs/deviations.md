@@ -219,3 +219,9 @@
 - 实际：`tests/test_staged_tools.py::test_schemas_by_phase_v2` 断言单零件确认后的工具表等于 `TOOL_NAMES_V2`。工具说明变成 17 个后，计划又要求单零件时 5 个多零件工具不出现在 `schemas()` 里，这一行必然要改。
 - 改法（用户同意）：期望值从 `TOOL_NAMES_V2` 改成 `TOOL_NAMES_V2[:12]`（第二版的 12 个，顺序不变），断言没有放松。
 - 另外：多零件时第二版的分阶段工具只看当前零件的参数（新文件 `cad_agent/product/scope.py`；`staged/build.py`、`extras.py`、`mutation.py`、`final_gate.py`、`tools.py` 里把 `ws.brief.params` 换成它）。单零件时取到的就是全部参数，行为不变。
+
+## D29（3.0 计划 2 Task 10）多零件交付时不做看图审查；产品终检放在 `product/gate.py`
+- 原计划：Task 10 没有提看图审查；Task 11 给审查清单加"整体做工"。`run_product_gate` 写在 `product/flow.py`。
+- 实际：第二版的看图审查是对单个 notebook 渲染四个视角，多零件的产品不是一个 notebook。
+- 改法：多零件交付时不做看图审查（单零件照旧做）；Task 11 的审查提示词改动照做，单零件时生效。`run_product_gate` 写在 `product/gate.py`，`product/flow.py` 导出它（`flow.py` 放流程控制 `ProductFlow`）。主循环的保存挪到 `agent/save.py`，`loop.py` 保持 300 行。
+- 影响：多零件产品没有看图审查这一关，交付文字里也没有审查那一行。以后要做时需要把产品截成四个视角。

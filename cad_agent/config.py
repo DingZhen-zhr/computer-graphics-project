@@ -67,6 +67,7 @@ class Config:
     provider: str = ""                   # 预设 id（来自 settings.toml 时才有）
     vision: bool = False                 # 看图审查用的模型能不能识图
     review: PhaseOverride = field(default_factory=PhaseOverride)
+    motion_samples: int = 24             # 多零件时每个关节取几个位置检查碰撞（不少于 12）
 
     def api_key(self) -> str:
         key = os.environ.get(self.api_key_env, "").strip()
@@ -98,7 +99,8 @@ _SCHEMA: dict[str, dict[str, type | tuple[type, ...]]] = {
             "kind": str, "vision": bool, "review": dict},
     "agent": {"run_timeout_s": (int, float), "max_build_failures": int, "max_tool_calls": int, "sessions_dir": str,
               "staged": bool, "mutation_check": bool, "visual_review": bool, "cases": bool,
-              "max_tool_calls_per_stage": int, "max_tool_calls_total": int, "cases_dir": str},
+              "max_tool_calls_per_stage": int, "max_tool_calls_total": int, "cases_dir": str,
+              "motion_samples": int},
 }
 _GATE_KEYS = ("staged", "mutation_check", "visual_review", "cases")
 _POSITIVE_KEYS = ("max_tool_calls_per_stage", "max_tool_calls_total")
@@ -184,6 +186,8 @@ def load_config(path: Path) -> Config:
     for key in _POSITIVE_KEYS:
         if key in values and values[key] <= 0:
             raise ConfigError(f"[agent] 的 {key} 应该是正整数，收到 {values[key]!r}")
+    if "motion_samples" in values and values["motion_samples"] < 12:
+        raise ConfigError(f"[agent] 的 motion_samples 不能少于 12，收到 {values['motion_samples']!r}")
     values["gates"] = Gates(**{k: values.pop(k) for k in _GATE_KEYS if k in values})
     if "pricing" in values:
         values["pricing"] = _parse_pricing("llm.pricing", values["pricing"])

@@ -27,6 +27,7 @@ class PartState:
     last_build_content: str | None = None
     done: bool = False
     connectors: list[Connector] = field(default_factory=list)
+    results: list[dict] = field(default_factory=list)   # 做完时最后一次 build 的检查结果（交付时写进 checks.json）
 
 
 def _store(ws: "Workspace") -> None:
@@ -87,7 +88,7 @@ def product_state(ws: "Workspace") -> dict[str, Any] | None:
     return {
         "active": ws.active,
         "parts": {pid: {"features": st.features.to_list(), "checks": st.checks_raw,
-                        "plan": st.plan.to_list() if st.plan is not None else None, "done": st.done,
+                        "plan": st.plan.to_list() if st.plan is not None else None, "done": st.done, "results": st.results,
                         "connectors": [c.to_dict() for c in st.connectors]} for pid, st in ws.parts.items()},
         "assembly": ws.assembly.to_dict() if ws.assembly is not None else None,
         "assembly_checks": ws.assembly_checks_raw,
@@ -104,7 +105,7 @@ def restore_product(ws: "Workspace", data: dict[str, Any]) -> None:
     for pid, raw in (data.get("parts") or {}).items():
         plan = Plan.from_list(raw["plan"]) if raw.get("plan") else None
         st = PartState(FeatureList.from_list(raw.get("features") or []), list(raw.get("checks") or []), plan,
-                       done=bool(raw.get("done")))
+                       done=bool(raw.get("done")), results=list(raw.get("results") or []))
         try:
             st.connectors = parse_connectors(pid, raw.get("connectors") or [], names)
         except ProductError:
