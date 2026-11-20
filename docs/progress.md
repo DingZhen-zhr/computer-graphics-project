@@ -1222,3 +1222,7 @@
 ## 3.0 计划 2 Task 2：需求单写零件和运动
 - `Param.part`、`PartInfo`、`Brief.parts/motions/is_multipart/params_of`，多零件时 `missing_relations` 看零件名字，`render_text` 分组列参数、列零件和会动的地方。单零件的 `to_dict` 不变。
 - 新测试 `tests/test_brief_parts.py` 13 个（先看到全部失败）。快速全量通过。偏离 D26（键的顺序、拆出 `brief_parts.py`）。
+
+## 3.0 计划 2 Task 3：产品的声明
+- `cad_agent/product/spec.py`（校验、配合树、子树、接触配对）和 `model.py`（数据结构，从 spec 里拆出来以免超过 300 行，spec 照样能导入全部名字）。`Assembly` 多一个字段 `notes`，放"范围写反了，已经按从小到大处理"这类给模型的说明；范围两端都是数时才在声明阶段交换，是表达式时到取样时再排序。
+- 测试 `tests/test_product_spec.py` 8 个（先看到导入失败），快速全量通过。
