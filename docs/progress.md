@@ -1305,3 +1305,7 @@
 - 删掉和替换的旧测试：`tests/test_desk_style.py` 的 8 条换成新的同名测试；`test_index_has_three_columns_and_import_map` 换成 `test_index_has_stage_and_import_map`；`test_page_texts_are_verbatim` 改为对照计划 3 的界面文字；`tooltree.test.js`、`viewer-dims.test.js` 随模块删除。都在计划的"要改的旧测试"清单里。
 - 走查发现并修掉的：画布没设显示尺寸，2 倍像素时画面偏到右下；零件清单把按钮数组当成文字；安全策略挡住内联样式；在线示例里没有调参数按钮时报错；1100×700 下零件清单碰到左下的工具；调参数每行的来源标签挤到下一行；金属质感在没有环境光时太暗。
 - 偏离 D35、D36。已知问题：真的桌面窗口、1600×1000、Mac 没有看过。快速全量 1119 通过。
+
+## 3.0 计划 4 Task 1：账本、按时段计价、真正的硬上限
+- `benchmarks/ledger.py`（账本、记账的模型包装）、`benchmarks/metered_run.py`（账本模式）；配置加 `[llm.offpeak]`；报告认得"到上限没跑""空闲时段结束没跑"。偏离 D37（保留旧的 --budget）。
+- 测试 `tests/test_ledger.py` 10 个（假模型、可替换的时钟），先写测试后实现；快速全量通过。

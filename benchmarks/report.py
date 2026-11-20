@@ -14,7 +14,8 @@ SKIPPED_TEXT = "因预算跳过"
 
 
 def is_skipped(result: dict) -> bool:
-    return bool(result.get("skipped_for_budget"))
+    """没跑的任务：到了花费上限（第二版的 --budget 或 3.0 的账本），或者空闲时段已经结束。"""
+    return bool(result.get("skipped_for_budget") or result.get("skipped_for_cap") or result.get("skipped_for_offpeak"))
 
 
 def max_dimension_deviation(result: dict) -> float | None:

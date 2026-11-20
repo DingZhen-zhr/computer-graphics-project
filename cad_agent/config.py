@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import datetime
 import os
 import tomllib
 from dataclasses import dataclass, field
@@ -12,6 +13,10 @@ from cad_agent.gates import Gates
 from cad_agent.llm.client import Pricing
 
 
+OFFPEAK_MISSING = ("按时段计价要在配置文件里填两段价格：[llm.pricing]（高峰价）和 [llm.offpeak]（空闲时段 start、end，"
+                   "以及这段时间的 input_hit、input_miss、output）。照 DeepSeek 官网的价目页自己填，单位是 元 / 百万 token。")
+
+
 class ConfigError(Exception):
     """配置有问题；信息是中文，可以直接显示给用户。"""
 
@@ -19,6 +24,18 @@ class ConfigError(Exception):
 Phase = Literal["base", "clarify", "modeling", "review"]
 Kind = Literal["openai", "anthropic"]
 KINDS = ("openai", "anthropic")
+
+
+@dataclass(frozen=True)
+class Offpeak:
+    """空闲时段（本机时间，可以跨午夜）和这段时间的价格（评测按调用结束的时刻计价，3.0 计划 4）。"""
+    start: str
+    end: str
+    pricing: Pricing
+
+    def contains(self, t: "datetime.time") -> bool:
+        s, e = (datetime.time.fromisoformat(x) for x in (self.start, self.end))
+        return s <= t < e if s <= e else (t >= s or t < e)
 
 
 @dataclass(frozen=True)
@@ -68,6 +85,16 @@ class Config:
     vision: bool = False                 # 看图审查用的模型能不能识图
     review: PhaseOverride = field(default_factory=PhaseOverride)
     motion_samples: int = 24             # 多零件时每个关节取几个位置检查碰撞（不少于 12）
+    offpeak: Offpeak | None = None       # 空闲时段和价格（[llm.offpeak]），评测按时段计价用
+
+    def is_offpeak(self, now: "datetime.datetime") -> bool:
+        return self.offpeak is not None and self.offpeak.contains(now.time())
+
+    def price_at(self, now: "datetime.datetime") -> Pricing:
+        """这一刻的价格：空闲时段内是空闲价，否则是高峰价（[llm.pricing]）。两段都要填，缺了抛 ConfigError。"""
+        if self.pricing is None or self.offpeak is None:
+            raise ConfigError(OFFPEAK_MISSING)
+        return self.offpeak.pricing if self.is_offpeak(now) else self.pricing
 
     def api_key(self) -> str:
         key = os.environ.get(self.api_key_env, "").strip()
@@ -96,7 +123,7 @@ class Config:
 _SCHEMA: dict[str, dict[str, type | tuple[type, ...]]] = {
     "llm": {"base_url": str, "model": str, "api_key_env": str, "temperature": (int, float),
             "extra_body": dict, "pricing": dict, "clarify": dict, "modeling": dict,
-            "kind": str, "vision": bool, "review": dict},
+            "kind": str, "vision": bool, "review": dict, "offpeak": dict},
     "agent": {"run_timeout_s": (int, float), "max_build_failures": int, "max_tool_calls": int, "sessions_dir": str,
               "staged": bool, "mutation_check": bool, "visual_review": bool, "cases": bool,
               "max_tool_calls_per_stage": int, "max_tool_calls_total": int, "cases_dir": str,
@@ -116,6 +143,16 @@ def _check_type(section: str, key: str, value: object, typ: type | tuple[type, .
         return
     if isinstance(value, bool) or not isinstance(value, typ):
         raise ConfigError(f"[{section}] 的 {key} 类型不对，收到 {value!r}")
+
+
+def _parse_offpeak(data: dict) -> Offpeak:
+    times = {k: data.get(k) for k in ("start", "end")}
+    for k, v in times.items():
+        try:
+            datetime.time.fromisoformat(str(v))
+        except ValueError:
+            raise ConfigError(f"[llm.offpeak] 的 {k} 要写成本机时间 \"HH:MM\"，收到 {v!r}") from None
+    return Offpeak(str(times["start"]), str(times["end"]), _parse_pricing("llm.offpeak", {k: v for k, v in data.items() if k not in times}))
 
 
 def _parse_pricing(section: str, data: dict) -> Pricing:
@@ -191,6 +228,8 @@ def load_config(path: Path) -> Config:
     values["gates"] = Gates(**{k: values.pop(k) for k in _GATE_KEYS if k in values})
     if "pricing" in values:
         values["pricing"] = _parse_pricing("llm.pricing", values["pricing"])
+    if "offpeak" in values:
+        values["offpeak"] = _parse_offpeak(values["offpeak"])
     if "kind" in values:
         _check_kind("llm", values["kind"])
     for phase in ("clarify", "modeling", "review"):
