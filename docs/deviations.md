@@ -148,3 +148,10 @@
 - 怎么改：`install.ps1` 里加一个函数 `New-CaliperShortcut`，用 Windows PowerShell 5.1 自带的 `Add-Type` 编译一小段 C#，直接调 Windows 的 Unicode 接口 IShellLinkW 建快捷方式（目标、工作目录、说明、图标和以前一样）。不需要新的依赖。快捷方式的名字和位置不变，`maintenance.shortcut_paths()` 不用改。
 - 测试：加了 `test_ps1_shortcut_handles_characters_outside_the_code_page`，名字、目标、工作目录、说明、图标路径全用泰文，建好后用 Shell.Application 读回来逐项核对。先看到它失败，再改。
 - 影响：只影响 `install.ps1` 的第 4 步。计划 4 后面的任务不受影响。
+
+## D21（第二版计划 4 Task 8）先发布 v2.0.0，Mac 人工清单之后补
+
+- 原计划：Task 8 Step 1 要求 Mac 人工清单填好交回之后，才推送并打 `v2.0.0` 标签；清单没交回就停在这里。
+- 实际情况：2026-11-20 清单还没有交回（16 项都没勾）。持续集成在 Windows 和 Mac（macOS 15，Apple 芯片）上都已通过。没有标签，README 里公开的那一行安装命令装不上。
+- 怎么改：用户本人决定先发布，原话是"先发布，Mac 后补"。由规划会话执行：发布前重跑全部测试，推送 master，打 `v2.0.0` 标签并推送，再从 GitHub 按公开的安装命令实际装一次做验证。README"验证到什么程度"一节本来就写着"Mac 界面还没有人工看过"，不用改。
+- 影响：Task 8 Step 2（根据 Mac 清单更新 README）挪到清单交回之后再做；清单里发现的问题按需要发 `v2.0.1` 之类的补丁版本。成功标准里"Mac 清单勾完"这一条暂时没有达成。
