@@ -13,6 +13,7 @@ from typing import Callable
 
 from benchmarks.ledger import LEDGER, BudgetExceeded, Ledger, LedgerError, metered
 from benchmarks.report import render_results_md, render_summary_md
+from benchmarks.report_v3 import render_v3_md
 from benchmarks.run import _write_results, load_task, run_task
 from benchmarks.sim_user import SimUser
 from cad_agent.config import OFFPEAK_MISSING, Config, ConfigError
@@ -81,6 +82,7 @@ def run_metered(names: list[str], *, config: Config, label: str, cap: float, all
         print_fn(f"== 任务 {name}：{'成功' if result.get('success') else '没有成功'} ==")
         _write_results(results_dir, results)
     _write_results(results_dir, results)
+    (results_dir / "results-v3.md").write_text(render_v3_md(results), encoding="utf-8")
     print_fn(f"已花费 ¥{ledger.spent:.2f}，上限 ¥{ledger.cap:.2f}，剩 ¥{ledger.remaining():.2f}")
     return results
 

@@ -1309,3 +1309,7 @@
 ## 3.0 计划 4 Task 1：账本、按时段计价、真正的硬上限
 - `benchmarks/ledger.py`（账本、记账的模型包装）、`benchmarks/metered_run.py`（账本模式）；配置加 `[llm.offpeak]`；报告认得"到上限没跑""空闲时段结束没跑"。偏离 D37（保留旧的 --budget）。
 - 测试 `tests/test_ledger.py` 10 个（假模型、可替换的时钟），先写测试后实现；快速全量通过。
+
+## 3.0 计划 4 Task 2：任务分组和作业要求的统计
+- `V3_DEV`（10 个）、`V3_HOLDOUT`（4 个）和 `v3dev`、`v3holdout`、`v3all` 三组，分组搬到 `benchmarks/task_sets.py`（run.py 照样能导入）；`benchmarks/report_v3.py` 出四张表（开发 / 留出 × 单零件 / 多零件）和覆盖情况表；每个任务多记一项"模型问过几次"。账本模式跑完会多写一份 `results-v3.md`。
+- 测试 `tests/test_benchmarks_v3.py` 4 个；第一次运行抓到一个真问题：耗时 100 秒被写成"1"（去掉末尾 0 时没看小数点），已修。

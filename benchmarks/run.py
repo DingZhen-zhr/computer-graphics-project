@@ -27,18 +27,11 @@ from cad_agent.llm.factory import make_llm
 from cad_agent.notebook import RenderedNotebook
 from cad_agent.sandbox import execute
 
+from benchmarks.task_sets import (ALL_TASKS, HARD_TASKS, HOLDOUT_TASKS, MEDIUM_TASKS, MULTI_TASKS, TASK_SETS,  # noqa: F401
+                                  V3_DEV, V3_HOLDOUT)
+
 TASKS_DIR = Path(__file__).parent / "tasks"
 MULTI_TYPES = ("joint", "at_pose")
-ALL_TASKS = ["phone_stand", "flange", "l_bracket"]
-HOLDOUT_TASKS: list[str] = ["enclosure", "stepped_shaft"]  # 留出任务：只用来测，不许为它们调提示词
-MEDIUM_TASKS = ["bearing_block", "battery_box", "spur_gear"]   # 第二版：中等
-HARD_TASKS = ["heatsink", "tee_fitting", "bracket_arm"]        # 第二版：困难
-MULTI_TASKS = ["toolbox", "drawer_cabinet", "gear_pair"]         # 3.0：多零件、会动
-TASK_SETS: dict[str, list[str]] = {
-    "dev": ALL_TASKS, "holdout": HOLDOUT_TASKS, "all": ALL_TASKS + HOLDOUT_TASKS,
-    "medium": MEDIUM_TASKS, "hard": HARD_TASKS, "v2": ALL_TASKS + HOLDOUT_TASKS + MEDIUM_TASKS + HARD_TASKS,
-    "multi": MULTI_TASKS, "v3": ALL_TASKS + HOLDOUT_TASKS + MEDIUM_TASKS + HARD_TASKS + MULTI_TASKS,
-}
 DEFAULT_MAX_USER_TURNS = 12
 
 
@@ -90,6 +83,7 @@ def _converse(agent, sim_user: SimUser, first_message: str, max_turns: int, tota
     for i in range(max_turns):
         turn = agent.handle_user(message)
         totals["user_turns"] += 1
+        totals["questions"] += turn.kind == "question"
         totals["repairs"] += turn.repairs
         totals["llm_calls"] += turn.llm_calls
         totals["tokens"] += turn.tokens
@@ -148,7 +142,7 @@ def run_task(task: dict, make_agent: Callable[[Path], object], sim_user: SimUser
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
     agent = make_agent(out_dir)
-    totals = {"repairs": 0, "llm_calls": 0, "tokens": 0, "user_turns": 0, "prompt_tokens": 0, "completion_tokens": 0,
+    totals = {"repairs": 0, "llm_calls": 0, "tokens": 0, "user_turns": 0, "questions": 0, "prompt_tokens": 0, "completion_tokens": 0,
               "cached_tokens": 0, "reasoning_tokens": 0}
     costs: list[float | None] = []
     max_turns = int(task.get("max_user_turns", DEFAULT_MAX_USER_TURNS))
