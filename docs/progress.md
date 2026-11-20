@@ -1268,5 +1268,5 @@
 ## 3.0 计划 2 Task 11：系统提示词和速查表
 - `system_multipart.md` 照抄提示词文档第 1 节，分阶段系统提示词变成 5 段；快照多零件时在"计划"前列零件进度，全部做完后列装配状态；审查提示词末尾加"整体做工"那一句，审查清单末尾多一个"整体做工"。
 - 速查表加 `## 装配的写法` 4 条（两个面贴在一起、铰链、抽屉、齿轮联动），例子的编号和 Task 14 的标准答案一致。
-- 旧测试：按清单改了 3 个；`test_review_pass_then_deliver` 计划漏列，问过用户同意后改了（偏离 D30）。
+- 旧测试：按清单改了 3 个；`test_review_pass_then_deliver`、`test_cheatsheet_more_sections` 计划漏列，问过用户同意后改了（偏离 D30、D31）。上一次提交时快速全量里 `test_cheatsheet_more_sections` 失败了没注意到，这次补上。
 - 新测试 `tests/test_prompts_multipart.py` 6 个。这次是先改的提示词再写测试，没有先看到失败。快速全量 1093 通过。

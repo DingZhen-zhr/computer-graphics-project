@@ -37,7 +37,8 @@ def test_cheatsheet_more_sections():
     block = text_blocks(doc_section("8. 速查表补充"))[0].splitlines()
     text = read("sca_cheatsheet_more.md")
     assert text.splitlines()[0] == block[0]
-    assert ["## " + h for h in re.findall(r"^## (.+)$", text, flags=re.M)] == block[1:]
+    # 3.0 计划 2 Task 11（偏离 D31，用户同意）：末尾多一节"装配的写法"
+    assert ["## " + h for h in re.findall(r"^## (.+)$", text, flags=re.M)] == block[1:] + ["## 装配的写法"]
 
 
 def test_cheatsheet_more_staged_rules_verbatim():

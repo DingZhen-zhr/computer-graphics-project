@@ -235,3 +235,7 @@
 - 原计划：Task 11 只列了 `test_reviewer_prompt_is_verbatim`、`test_review_targets`。
 - 实际：审查清单末尾多了"整体做工"，`tests/test_review_loop.py::test_review_pass_then_deliver` 里剧本审查员只答了 3 项，断言也是 3 项。
 - 改法（用户同意）：这一个测试里审查员四项都答"符合"，断言改成 4 项和"4 项符合"，没有放松。
+
+## D31（3.0 计划 2 Task 11）改 `test_cheatsheet_more_sections`（计划漏列，用户同意）
+- 实际：速查表补充末尾多了"## 装配的写法"，`tests/test_prompts_v2.py::test_cheatsheet_more_sections` 要求小节标题和第二版文档的列表完全相同。
+- 改法（用户同意）：期望值改成第二版的列表后面接"## 装配的写法"，前面的小节照样逐个比对。
