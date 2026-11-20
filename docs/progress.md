@@ -1226,3 +1226,8 @@
 ## 3.0 计划 2 Task 3：产品的声明
 - `cad_agent/product/spec.py`（校验、配合树、子树、接触配对）和 `model.py`（数据结构，从 spec 里拆出来以免超过 300 行，spec 照样能导入全部名字）。`Assembly` 多一个字段 `notes`，放"范围写反了，已经按从小到大处理"这类给模型的说明；范围两端都是数时才在声明阶段交换，是表达式时到取样时再排序。
 - 测试 `tests/test_product_spec.py` 8 个（先看到导入失败），快速全量通过。
+
+## 3.0 计划 2 Task 4：多零件工作区
+- `cad_agent/product/workspace.py`：`PartState`、`select_part`、`ensure_parts`、`part_param_names`，另加 `product_state` / `restore_product`（保存和恢复用）。`Workspace` 加 6 个字段，单零件时都是默认值。
+- `Session.part_dir(id)` 多零件时是 `parts/<id>`；`save_state` 加可选参数 `product`、`part_notebooks`，各零件写自己的目录，装配写 `assembly.json`（含 active、done、装配声明）、`assembly_checks.json`；`resume.load_workspace` 读回。主循环保存时带上 `product_state(ws)`。
+- 测试 `tests/test_product_workspace.py` 6 个（先看到导入失败），快速全量 1048 通过。

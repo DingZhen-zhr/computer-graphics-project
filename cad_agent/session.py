@@ -96,11 +96,17 @@ class Session:
             f.write(json.dumps(row, ensure_ascii=False, default=str) + "\n")
 
     def part_dir(self, part_id: str = "main") -> Path:
-        """零件状态（需求单、计划、特征、检查、版本）放在哪个目录。这一版只有一个零件，就是会话目录本身（设计文档第 3.9 节）。"""
-        return self.dir
+        """零件状态放在哪个目录：单零件（main）就是会话目录本身；多零件时是 parts/<编号>（不存在就建）。"""
+        if part_id == "main":
+            return self.dir
+        d = self.dir / "parts" / part_id
+        d.mkdir(parents=True, exist_ok=True)
+        return d
 
     def save_state(self, brief: Brief, features_list: list[dict], checks_raw: list[dict], notebook_text: str,
-                   plan: list[dict] | None = None) -> None:
+                   plan: list[dict] | None = None, product: dict | None = None,
+                   part_notebooks: dict[str, str] | None = None) -> None:
+        """product 是多零件时 product.workspace.product_state 的结果：各零件写进自己的目录，装配写 assembly.json。"""
         d = self.part_dir()
         _write_json(d / "brief.json", brief.to_dict())
         _write_json(d / "features.json", features_list)
@@ -108,6 +114,19 @@ class Session:
         (d / "model.py").write_text(notebook_text, encoding="utf-8")
         if plan is not None:
             _write_json(d / "plan.json", plan)
+        if product is not None:
+            for pid, st in product["parts"].items():
+                pd = self.part_dir(pid)
+                _write_json(pd / "features.json", st["features"])
+                _write_json(pd / "checks.json", st["checks"])
+                _write_json(pd / "connectors.json", st["connectors"])
+                if st["plan"] is not None:
+                    _write_json(pd / "plan.json", st["plan"])
+                if part_notebooks and pid in part_notebooks:
+                    (pd / "model.py").write_text(part_notebooks[pid], encoding="utf-8")
+            _write_json(d / "assembly.json", {k: product[k] for k in ("active", "assembly", "assembly_passed")}
+                        | {"done": [pid for pid, st in product["parts"].items() if st["done"]]})
+            _write_json(d / "assembly_checks.json", product["assembly_checks"])
 
     def versions(self) -> list[Path]:
         root = self.part_dir() / "versions"

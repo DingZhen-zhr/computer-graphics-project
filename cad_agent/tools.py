@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import copy
 import difflib
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable, Iterable
 
@@ -24,6 +24,9 @@ from cad_agent.tool_specs import PRE_CONFIRM_TOOLS, TOOL_NAMES, TOOL_SPECS
 from cad_agent.tools_legacy import LegacyTools
 
 if TYPE_CHECKING:
+    from cad_agent.product.model import Assembly
+    from cad_agent.product.workspace import PartState
+    from cad_agent.sandbox.runner_assembly import AssemblyRun
     from cad_agent.staged.build import Advance
     from cad_agent.staged.final_gate import GateResult
 
@@ -40,6 +43,13 @@ class Workspace:
     last_build_content: str | None = None   # 上次 build 返回给模型的 JSON 原文；_build 和 _build_without_run 都要设
     plan: Plan | None = None                 # 分阶段计划；旧流程一直是 None
     probes_used: int = 0                     # 当前阶段已经用了几次 probe
+    # 多零件（3.0）：单零件时都保持默认。parts 里存各零件的状态，上面几个字段是当前零件（active）的
+    parts: dict[str, "PartState"] = field(default_factory=dict)
+    active: str | None = None
+    assembly: "Assembly | None" = None
+    assembly_checks_raw: list[dict] = field(default_factory=list)
+    assembly_passed: bool = False
+    last_assembly: "AssemblyRun | None" = None
 
 
 class ToolBox(LegacyTools):

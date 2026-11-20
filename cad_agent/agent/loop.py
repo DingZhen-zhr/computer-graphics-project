@@ -28,6 +28,7 @@ from cad_agent.agent.turn import (AFFIRMATIVE, CONFIRMED_MESSAGE, STOPPED_TEXT, 
                                   is_affirmative)
 from cad_agent.llm.client import LLM, LLMError, LLMReply, LLMStopped, ToolCall
 from cad_agent.notebook import NotebookError, render_notebook
+from cad_agent.product.workspace import product_state
 from cad_agent.session import Session
 from cad_agent.tools import ToolBox, ToolOutcome, Workspace
 
@@ -270,7 +271,7 @@ class Agent:
         except NotebookError as e:
             text = f"# 当前的特征还不能拼成 notebook：{e}\n"
         self.session.save_state(ws.brief, ws.features.to_list(), ws.checks_raw, text,
-                                plan=ws.plan.to_list() if ws.plan is not None else None)
+                                plan=ws.plan.to_list() if ws.plan is not None else None, product=product_state(ws))
 
     def _confirm_extra(self, reply: LLMReply) -> dict:
         return {"lead": reply.content.strip(), "brief": self.ws.brief.to_dict()}

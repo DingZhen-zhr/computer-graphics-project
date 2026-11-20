@@ -55,7 +55,26 @@ def load_workspace(session: Session) -> Workspace:
         checks = [{**c, "stage": c.get("stage") or "s1"} for c in checks]
     ws = Workspace(brief, features, checks)
     ws.plan = plan
+    if brief.is_multipart() and (d / "assembly.json").is_file():
+        _load_product(session, ws)
     return ws
+
+
+def _load_product(session: Session, ws: Workspace) -> None:
+    """多零件：各零件从 parts/<编号> 读回，装配从 assembly.json、assembly_checks.json 读回。"""
+    from cad_agent.product.workspace import restore_product
+
+    meta = _read(session.dir / "assembly.json", {}) or {}
+    done = set(meta.get("done") or [])
+    parts = {}
+    for p in ws.brief.parts:
+        pd = session.dir / "parts" / p.id
+        parts[p.id] = {"features": _read(pd / "features.json", []) or [], "checks": _read(pd / "checks.json", []) or [],
+                       "plan": _read(pd / "plan.json", None), "connectors": _read(pd / "connectors.json", []) or [],
+                       "done": p.id in done}
+    restore_product(ws, {"active": meta.get("active"), "parts": parts, "assembly": meta.get("assembly"),
+                         "assembly_checks": _read(session.dir / "assembly_checks.json", []) or [],
+                         "assembly_passed": meta.get("assembly_passed")})
 
 
 def past_turns(rows: list[dict]) -> list[dict]:
