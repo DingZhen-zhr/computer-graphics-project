@@ -1245,3 +1245,9 @@
 - 子进程：`cad_agent/sandbox/runner_assembly.py`（`AssemblyRun` 和流程）、`assembly_geom.py`（连接点取几何、OCP 摆放、重叠体积、距离、同轴和贴平的量法）；`runner.py` 遇到 `mode == "assembly"` 时交给它。父进程：`execute.run_assembly`，准备和整理放在 `assembly_job.py`。超时上限 = `timeout_s ×（零件数 + 1）+ 60`。
 - 产品截图要把零件用 SCA 的转动、平移摆好再一起传给截图函数（补测写进笔记第 25 节）。
 - 测试 `tests/test_runner_assembly.py` 8 个（`sca`，共约 25 秒）。这次是先写的实现再写的测试，没有先看到失败；第一次运行时测试自己的摆臂零件把孔开在了边上（选中 2 个面），改了测试零件。`test_sample_error_is_reported_not_ignored` 用环境变量 `DATUM_TEST_FAIL_SAMPLE` 在指定位置故意出错。
+
+## 3.0 计划 2 Task 8：装配和运动的检查
+- `cad_agent/product/checks.py`：解析 7 类检查、必做检查（连接点、装好时不穿模、每个关节一条 motion_clear）、按量到的结果判断，detail 都写清哪两个零件、哪个位置、重叠多少。
+- 沙盒取样每个位置多记一项 `joints`（各关节的值，ratio 检查用）；reach 检查要的值不在均匀取样里时补取一次。
+- 测试 `tests/test_product_checks.py` 10 个（先看到导入失败）；`test_runner_assembly.py` 重跑通过。快速全量 1072 通过。
+- Task 7 提交前那次快速全量有 1 个失败，马上重跑两次都没复现（1062 全过），像是计时相关的偶发失败，没找到是哪一个；之后再出现就查。

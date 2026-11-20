@@ -144,7 +144,7 @@ def _relative(a: list[float], b: list[float]) -> list[float]:
 
 def _sweep(job: dict, asm: Any, frames: dict, rest: dict, raw_shapes: dict, out: dict) -> None:
     from cad_agent.checks.expr import eval_expr
-    from cad_agent.product.kinematics import joint_value_samples, poses_at
+    from cad_agent.product.kinematics import joint_value_samples, joint_values, poses_at
     from cad_agent.sandbox.assembly_geom import bbox, overlap_volume, placed
     from cad_agent.sandbox.runner import summarize_exception
 
@@ -154,8 +154,15 @@ def _sweep(job: dict, asm: Any, frames: dict, rest: dict, raw_shapes: dict, out:
     for j in asm.joints:
         lo, hi = (float(v) if isinstance(v, (int, float)) else eval_expr(v, values) for v in (j.lo, j.hi))
         rows = []
-        for i, v in enumerate(joint_value_samples(lo, hi, job["samples"])):
-            row: dict[str, Any] = {"value": _r(v), "poses": {}, "hits": [], "error": None}
+        targets = joint_value_samples(lo, hi, job["samples"])
+        for chk in job["checks"]:   # reach 检查要的位置也取一次（均匀取样不一定正好落在那里）
+            if chk.get("type") == "reach" and chk.get("joint") == j.id:
+                want = float(chk["value"]) if isinstance(chk["value"], (int, float)) else eval_expr(chk["value"], values)
+                if min(lo, hi) <= want <= max(lo, hi) and all(abs(want - t) > 1e-9 for t in targets):
+                    targets = sorted(targets + [want])
+        for i, v in enumerate(targets):
+            row: dict[str, Any] = {"value": _r(v), "poses": {}, "hits": [], "error": None,
+                                   "joints": {k: _r(x) for k, x in joint_values(asm, {j.id: v}, values).items()}}
             try:
                 if fail == f"{j.id}:{i}":
                     raise RuntimeError("测试用：故意在这个位置出错")
