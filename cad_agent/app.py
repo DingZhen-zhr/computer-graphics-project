@@ -26,7 +26,7 @@ import time
 import webbrowser
 from pathlib import Path
 
-from cad_agent import __version__, brand, cli, doctor, maintenance, paths
+from cad_agent import __version__, brand, cli, doctor, maintenance, migrate, paths
 from cad_agent.agent.loop import Agent
 from cad_agent.brief import Brief
 from cad_agent.cases import load_cases
@@ -168,6 +168,15 @@ def _setup_logging() -> None:
     root.setLevel(logging.INFO)
 
 
+def _migrate_then_log() -> None:
+    """从第二版升级时复制旧数据目录（见 migrate.py），再开程序日志，把结果记进去。
+    顺序不能反：开日志会建出新数据目录，迁移就会以为"新目录已存在"而跳过。复制失败不打断启动。"""
+    result = migrate.migrate_home()
+    _setup_logging()
+    failed = result.reason.startswith("复制失败")
+    logger.log(logging.WARNING if failed else logging.INFO, "数据目录迁移：%s", result.reason)
+
+
 def _run_cli(config_file: str | None) -> int:
     if config_file:
         return cli.main(["--config", config_file])
@@ -216,6 +225,8 @@ def _smoke(port: int, token: str) -> int:
 def main(argv: list[str] | None = None) -> int:
     argv = list(sys.argv[1:] if argv is None else argv)
     if argv and argv[0] in SUBCOMMANDS:
+        if argv[0] == "doctor":   # 安装脚本装完就运行自检，自检会建出数据目录：迁移要在它前面
+            _migrate_then_log()
         return SUBCOMMANDS[argv[0]](argv[1:])
     cmd = brand.COMMAND
     parser = argparse.ArgumentParser(prog=cmd, description=f"{brand.DISPLAY}：用平常话做 CAD 零件，每一步都由程序实测。"
@@ -228,7 +239,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--demo-script", type=Path, help=argparse.SUPPRESS)
     parser.add_argument("--smoke", action="store_true", help=argparse.SUPPRESS)
     args = parser.parse_args(argv)
-    _setup_logging()
+    _migrate_then_log()
     if args.cli:
         return _run_cli(args.config)
     try:

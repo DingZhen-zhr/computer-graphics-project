@@ -17,18 +17,28 @@ HOME_ENV = brand.HOME_ENV
 APP_DIR = brand.HOME_DIR
 
 
+def _default_home(dir_name: str) -> Path:
+    """按系统取默认位置：Windows %LOCALAPPDATA%\\<名字>，Mac ~/Library/Application Support/<名字>，其他 ~/.<小写名字>。"""
+    if sys.platform == "win32":
+        local = os.environ.get("LOCALAPPDATA", "").strip()
+        base = Path(local) if local else Path.home() / "AppData" / "Local"
+        return base / dir_name
+    if sys.platform == "darwin":
+        return Path.home() / "Library" / "Application Support" / dir_name
+    return Path.home() / f".{dir_name.lower()}"
+
+
 def app_home() -> Path:
     """数据目录：环境变量 DATUM_HOME 优先（空白不算）；否则按系统取默认位置。不在这里创建目录。"""
     custom = os.environ.get(HOME_ENV, "").strip()
     if custom:
         return Path(custom)
-    if sys.platform == "win32":
-        local = os.environ.get("LOCALAPPDATA", "").strip()
-        base = Path(local) if local else Path.home() / "AppData" / "Local"
-        return base / APP_DIR
-    if sys.platform == "darwin":
-        return Path.home() / "Library" / "Application Support" / APP_DIR
-    return Path.home() / f".{APP_DIR.lower()}"
+    return _default_home(APP_DIR)
+
+
+def old_app_home() -> Path:
+    """第二版的数据目录（升级迁移用）：和 app_home 同样的默认位置，目录名用旧的。不看 DATUM_HOME。"""
+    return _default_home(brand.OLD_HOME_DIR)
 
 
 def settings_path() -> Path:

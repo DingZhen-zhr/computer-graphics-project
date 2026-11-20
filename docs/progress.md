@@ -1182,3 +1182,16 @@
 - `.venv` 里先 `pip uninstall caliper-cad` 再 `pip install --no-deps -e .`，没装新东西；现在从源码启动用 `.venv\Scripts\datum`。
 - 用一个临时数据目录、剧本假模型起了一次桌面端服务，在内置浏览器里打开：标题和顶栏是 Datum，`/api/boot`、`/api/sessions` 等请求都是 200（新请求头被接受），控制台没有错误；刷新页面后恢复页用存的令牌重新进来了。没有连任何模型服务。
 - 全部测试：1126 个通过（9 分 54 秒）。Task 2、3 的测试文件这时已经写好但没实现，这次全量运行用 `--ignore` 排除了它们，它们也不在这次提交里。
+
+## 3.0 计划 1 Task 2：数据目录的迁移
+
+- 新建 `cad_agent/migrate.py`：`MigrationResult(done, reason)` 和 `migrate_home()`，接口照计划。只有"没设 `DATUM_HOME`、新目录不存在、旧目录存在"三条都成立才复制；先复制到 `Datum.migrating`，全部成功再改名成 `Datum`；失败就删掉临时目录，返回"复制失败（原因）"。只复制，从不删旧目录；文件逐字节复制，`settings.toml` 里的旧名字原样保留。
+- `paths.py` 加 `old_app_home()`：和 `app_home()` 同样的默认位置，目录名用旧的，不看 `DATUM_HOME`。两者共用一个 `_default_home`。
+- `app.main`（`gui_main` 也走它）参数解析完先迁移、再开程序日志、把结果写进 `datum.log`。顺序不能反：开日志会建出新目录。
+- **计划之外多做的一处**：`datum doctor` 子命令前也先迁移。原因：安装脚本装完马上运行 `datum doctor`，自检的"数据目录"一项会建出 `Datum` 目录；如果迁移只在打开窗口时做，老用户装完 3.0 第一次打开时会看到"新目录已存在"，数据永远带不过来。`update`、`uninstall` 不迁移。为此加了测试 `test_doctor_first_does_not_block_migration`（先看到它失败）。
+- 新测试 `tests/test_migrate.py` 11 个：计划列的 7 个，另加 `test_leftover_temp_dir_from_a_crash_is_replaced`（上次复制到一半被关掉）、`test_app_start_survives_failed_migration`（复制失败不打断启动、日志里有一条）、`test_doctor_first_does_not_block_migration`，以及 `test_old_app_home_per_platform` 里检查 `DATUM_HOME` 不影响旧目录。全部在临时目录里，`sys.platform`、`LOCALAPPDATA`、`HOME`、`USERPROFILE` 都换掉；钥匙串用内存假后端。
+- 先看到失败：模块不存在（`ImportError`），写好 `migrate.py` 后 8 个失败（没有 `old_app_home`、启动时不迁移）。
+- 实现时测试抓到一个真问题：复制失败时 `shutil.Error` 的文字是一长串路径，截断后看不到原因。改成取第一个出错文件的名字和原因（"复制失败（settings.toml：[Errno 28] No space left on device）"）。`test_brand` 也抓到我在 `app.py` 注释里写了旧名字，改了措辞。
+- 这台电脑上真的有 `%LOCALAPPDATA%\Caliper`。查过所有调用 `app.main` 的旧测试：要么设了 `DATUM_HOME`，要么在 `--version`、`--help` 处就退出了，不会碰到真实目录。
+- README"数据放在哪"加了一句升级时会复制旧目录。
+- 全部测试：1136 个通过（9 分 56 秒；Task 3 的测试文件还没实现，用 `--ignore` 排除，不在这次提交里）。

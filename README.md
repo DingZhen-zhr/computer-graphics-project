@@ -203,6 +203,7 @@ CALIPER_SOURCE=~/Downloads/computer-graphics-project-2.0.0 sh ~/Downloads/comput
 ## 数据放在哪
 
 - Windows：`%LOCALAPPDATA%\Datum`；Mac：`~/Library/Application Support/Datum`。可以用环境变量 `DATUM_HOME` 改到别处。
+- 从第二版"卡尺"升级：第一次启动（或第一次运行 `datum doctor`）时，如果旧的数据目录 `Caliper` 还在、新目录还没有，会把它整个复制过来，旧目录原样保留。设了 `DATUM_HOME` 时不复制。
 - 里面有：`settings.toml`（除 key 以外的全部设置）、`sessions/`（每个会话一个目录）、`cases/`（你存的案例）、`logs/`（程序日志）。
 - 一个会话目录里有：
   - `log.jsonl`：每条消息、工具调用、结果、耗时、token，以及启动时的软件和模型版本；
