@@ -67,12 +67,15 @@ def review_json(turn) -> dict:
 
 
 def test_review_pass_then_deliver(tmp_path):
-    agent, ws, llm, review_llm, runner, session = make(tmp_path, [PLAN, S1, S2], [verdicts("match", "match", "match")])
+    # 3.0 计划 2（偏离 D30，用户同意）：清单最后多一项"整体做工"，剧本里的审查员四项都答符合
+    four = verdicts("match", "match", "match")
+    four.tool_calls[0].arguments["items"].append({"target": "整体做工", "verdict": "match", "reason": "整体做工：match 的理由"})
+    agent, ws, llm, review_llm, runner, session = make(tmp_path, [PLAN, S1, S2], [four])
     turn = agent.handle_user("开始")
     assert turn.kind == "delivered"
     data = review_json(turn)
-    assert data["passed"] is True and [i["verdict"] for i in data["items"]] == ["match"] * 3
-    assert "看图审查：通过（3 项符合，0 项看不出）。" in turn.text
+    assert data["passed"] is True and [i["verdict"] for i in data["items"]] == ["match"] * 4
+    assert "看图审查：通过（4 项符合，0 项看不出）。" in turn.text
     rows = [r for r in log_rows(session) if r["kind"] == "review"]
     assert len(rows) == 1 and rows[0]["round"] == 1 and rows[0]["passed"] is True and rows[0]["overall"] == "总体印象"
     assert turn.llm_calls == 4 and turn.prompt_tokens >= 1000 and turn.completion_tokens >= 30   # 审查的用量计入本轮
@@ -80,7 +83,7 @@ def test_review_pass_then_deliver(tmp_path):
     out = runner.view_calls[0]
     assert out == session.dir / "review" / "round-1" and sorted(p.name for p in out.iterdir()) == [f"{v}.png" for v in sorted(VIEWS)]
     lines = turn.text.splitlines()
-    assert lines.index("看图审查：通过（3 项符合，0 项看不出）。") > 0
+    assert lines.index("看图审查：通过（4 项符合，0 项看不出）。") > 0
 
 
 def test_review_mismatch_goes_back_once(tmp_path):

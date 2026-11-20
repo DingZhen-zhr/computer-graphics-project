@@ -40,3 +40,13 @@
 - 圆角和倒角单独放在最后一个阶段；选边之前先用 probe 打印选中了几条边、各在哪里。
 - probe 里量尺寸：体积用 `model.get_volume()`；包围盒用全部顶点坐标的范围（只有平面围成的零件才准）；面数、边数用 `len(ql.faces().resolve(model))`。`brep.inspect_shape_rbrepinspection` 这类检视函数在 probe 里不能用。
   例：`_pts = [v.get_center() for v in ql.vertices().resolve(model)]; _xs = [p.x for p in _pts]; print("体积", round(model.get_volume(), 3), "x 向尺寸", round(max(_xs) - min(_xs), 3))`
+
+## 装配的写法
+- 连接点挂在零件上真实存在的一个面或一条边上。两个面贴在一起：两边各选那个平面（朝外的法向），配合写 align 为 opposite；要留缝就写 gap。
+  例：{"part": "handle", "connectors": [{"name": "base", "kind": "faces", "where": [["geom.type", "==", "PLANE"], ["geom.normal.z", "<=", -0.99]]}]}
+- 铰链（转动）：两边各选铰链孔或轴的圆柱面（得到轴线），配合写 align 为 same，关节写 revolute，range 是能转的角度；正负方向不对时把一边的连接点 flip。
+  例：{"ground": "body", "mates": [{"id": "lid_hinge", "fixed": "body.hinge_axis", "moving": "lid.hinge_axis", "align": "same"}], "joints": [{"id": "lid_open", "mate": "lid_hinge", "type": "revolute", "range": [0, "lid_max"], "label": "盖子翻开"}]}
+- 抽屉（滑动）：抽屉底面贴在柜子的底板上（opposite），关节写 prismatic，direction 是装好时拉出的方向，range 是能拉出的距离。
+  例：{"ground": "cabinet", "mates": [{"id": "drawer_in", "fixed": "cabinet.floor", "moving": "drawer.bottom", "align": "opposite", "gap": 1}], "joints": [{"id": "drawer_pull", "mate": "drawer_in", "type": "prismatic", "range": [0, "pull_max"], "direction": [0, -1, 0], "label": "拉出抽屉"}]}
+- 齿轮联动：两个齿轮各自绕轴转（两个 revolute 关节），couplings 里写 ratio = 被带动的转角 / 带动的转角，外啮合是负数（齿数比取反）。
+  例：{"ground": "plate", "mates": [{"id": "pinion_on", "fixed": "plate.shaft_a", "moving": "pinion.bore", "align": "same", "gap": 5}, {"id": "gear_on", "fixed": "plate.shaft_b", "moving": "gear.bore", "align": "same", "gap": 5}], "joints": [{"id": "pinion_turn", "mate": "pinion_on", "type": "revolute", "range": [0, 360], "label": "小齿轮转动"}, {"id": "gear_turn", "mate": "gear_on", "type": "revolute", "range": [-360, 360], "label": "大齿轮转动"}], "couplings": [{"driver": "pinion_turn", "driven": "gear_turn", "ratio": "-pinion_z / gear_z", "kind": "gear"}]}

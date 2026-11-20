@@ -225,3 +225,13 @@
 - 实际：第二版的看图审查是对单个 notebook 渲染四个视角，多零件的产品不是一个 notebook。
 - 改法：多零件交付时不做看图审查（单零件照旧做）；Task 11 的审查提示词改动照做，单零件时生效。`run_product_gate` 写在 `product/gate.py`，`product/flow.py` 导出它（`flow.py` 放流程控制 `ProductFlow`）。主循环的保存挪到 `agent/save.py`，`loop.py` 保持 300 行。
 - 影响：多零件产品没有看图审查这一关，交付文字里也没有审查那一行。以后要做时需要把产品截成四个视角。
+
+## D30（3.0 计划 2 Task 11）改 `test_review_pass_then_deliver`（计划漏列，用户同意）
+- 原计划：Task 11 只列了 `test_reviewer_prompt_is_verbatim`、`test_review_targets`。
+- 实际：审查清单末尾多了"整体做工"，`tests/test_review_loop.py::test_review_pass_then_deliver` 里剧本审查员只答了 3 项，断言也是 3 项。
+- 改法（用户同意）：这一个测试里审查员四项都答"符合"，断言改成 4 项和"4 项符合"，没有放松。
+
+## D30（3.0 计划 2 Task 11）改 `test_review_pass_then_deliver`（计划漏列，用户同意）
+- 原计划：Task 11 只列了 `test_reviewer_prompt_is_verbatim`、`test_review_targets`。
+- 实际：审查清单末尾多了"整体做工"，`tests/test_review_loop.py::test_review_pass_then_deliver` 里剧本审查员只答了 3 项，断言也是 3 项。
+- 改法（用户同意）：这一个测试里审查员四项都答"符合"，断言改成 4 项和"4 项符合"，没有放松。

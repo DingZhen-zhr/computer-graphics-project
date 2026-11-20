@@ -59,8 +59,11 @@ def test_constants():
 
 
 def test_reviewer_prompt_is_verbatim():
+    # 3.0 计划 2 Task 11（要改的旧测试）：原文后面接一句"整体做工"
     [expected] = blocks(verbatim("A"))
-    assert (PROMPT_DIR / "reviewer.md").read_text(encoding="utf-8").rstrip("\n") == expected
+    plan3 = PLAN2.parent / "2026-11-20-datum-2-multipart.md"
+    sentence = re.search(r"原文照抄：`(另外，在清单最后加一项.*?)`", plan3.read_text(encoding="utf-8")).group(1)
+    assert (PROMPT_DIR / "reviewer.md").read_text(encoding="utf-8").rstrip("\n") == expected + "\n" + sentence
 
 
 def test_submit_review_spec_is_verbatim():
@@ -93,8 +96,9 @@ def test_missing_view_label(tmp_path):
 
 
 def test_review_targets():
-    assert review_targets(brief()) == TARGETS
-    assert review_targets(brief(relations=[])) == ["底板", "立板"]
+    # 3.0 计划 2 Task 11（要改的旧测试）：期望的末尾多"整体做工"
+    assert review_targets(brief()) == TARGETS + ["整体做工"]
+    assert review_targets(brief(relations=[])) == ["底板", "立板", "整体做工"]
 
 
 def test_review_messages_have_no_modeling_context(tmp_path):

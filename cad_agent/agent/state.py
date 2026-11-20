@@ -11,7 +11,7 @@ PROMPT_DIR = Path(__file__).parent / "prompts"
 SNAPSHOT_TITLE = "【当前状态（程序生成，不是用户说的话）】"
 
 
-V2_PARTS = ("system_v2.md", "references_index.md", "sca_cheatsheet.md", "sca_cheatsheet_more.md")
+V2_PARTS = ("system_v2.md", "system_multipart.md", "references_index.md", "sca_cheatsheet.md", "sca_cheatsheet_more.md")
 
 
 def load_system_prompt(staged: bool = False) -> str:
@@ -32,6 +32,23 @@ def _plan_lines(ws: Workspace) -> str:
     return "\n".join(f"{s.id} {s.title}：{s.done_when} —— {status(s)}" for s in ws.plan.stages)
 
 
+def _part_lines(ws: Workspace) -> list[str]:
+    """多零件时，计划前面列各零件的进度；全部做完后再列装配的状态。单零件时是空表。"""
+    if not ws.brief.is_multipart() or not ws.parts:
+        return []
+    from cad_agent.product.materials import MATERIALS  # 避免循环导入
+
+    out = ["零件："]
+    for p in ws.brief.parts:
+        st = ws.parts.get(p.id)
+        status = "已做完" if st is not None and st.done else ("当前" if p.id == ws.active else "未开始")
+        out.append(f"{p.id} {p.name}（{MATERIALS[p.material].name}）—— {status}")
+    if all(st.done for st in ws.parts.values()):
+        state = "已通过" if ws.assembly_passed else ("没通过" if ws.last_assembly is not None else "未开始")
+        out.append(f"装配：{state}")
+    return out
+
+
 def _render_staged(ws: Workspace) -> str:
     """分阶段流程的快照，格式见第二版提示词文档第 3 节。"""
     from cad_agent.staged.summary import feature_block  # 避免循环导入
@@ -49,6 +66,7 @@ def _render_staged(ws: Workspace) -> str:
     if ok:
         checks = json.dumps(ws.checks_raw, ensure_ascii=False, indent=1) if ws.checks_raw else "无"
         last_build = "未运行" if ws.last_build_content is None else ws.last_build_content
+        lines += _part_lines(ws)
         lines += ["计划：", _plan_lines(ws), "特征（按顺序）：", feature_block(ws.features.items),
                   "检查项：", checks, "上次 build：", last_build]
     return "\n".join(lines)

@@ -53,9 +53,12 @@ class ReviewResult:
                 "overall": self.overall}
 
 
+OVERALL_TARGET = "整体做工"   # 3.0：清单最后一项，看做工（审查提示词里有对应的一句）
+
+
 def review_targets(brief: Brief) -> list[str]:
-    """清单：各组成部分的原文，后面接各条位置关系的原文。"""
-    return [*brief.features, *brief.relations]
+    """清单：各组成部分的原文，后面接各条位置关系的原文，最后是"整体做工"。"""
+    return [*brief.features, *brief.relations, OVERALL_TARGET]
 
 
 def _user_text(brief: Brief) -> str:
