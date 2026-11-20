@@ -1231,3 +1231,8 @@
 - `cad_agent/product/workspace.py`：`PartState`、`select_part`、`ensure_parts`、`part_param_names`，另加 `product_state` / `restore_product`（保存和恢复用）。`Workspace` 加 6 个字段，单零件时都是默认值。
 - `Session.part_dir(id)` 多零件时是 `parts/<id>`；`save_state` 加可选参数 `product`、`part_notebooks`，各零件写自己的目录，装配写 `assembly.json`（含 active、done、装配声明）、`assembly_checks.json`；`resume.load_workspace` 读回。主循环保存时带上 `product_state(ws)`。
 - 测试 `tests/test_product_workspace.py` 6 个（先看到导入失败），快速全量 1048 通过。
+
+## 3.0 计划 2 Task 5：零件 notebook 与装配 notebook
+- `render_notebook` 加 `notebook_id`、`material`、`color` 三个只限关键字的参数；默认值时输出和改动前逐字相同（对照样本 `tests/data/notebook_v2_golden.json` 是用改动前的代码生成的）。
+- `cad_agent/product/render.py`：`render_part_notebook`、`render_assembly_notebook`、`part_notebook_path`。偏离 D27（引用路径 `parts/<编号>/model.py`）。
+- 测试 `tests/test_product_render.py` 7 个，其中 1 个 `sca` 在真实 SCA 里把两个零件装起来；先看到导入失败。快速全量通过。

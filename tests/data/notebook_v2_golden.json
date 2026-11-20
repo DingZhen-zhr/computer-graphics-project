@@ -1,0 +1,136 @@
+[
+ {
+  "params": [],
+  "features": [
+   {
+    "slug": "base",
+    "role": "build",
+    "code": "base = scad.make_box_rsolid(width=base_l, height=36, depth=8, bottom_face_center=(0, 0, 0))",
+    "stage": ""
+   }
+  ],
+  "probe": null,
+  "text": "# /// script\n# requires-python = \">=3.10\"\n# dependencies = [\"simplecadapi\"]\n#\n# [tool.simplecadapi]\n# id = \"model\"\n# ///\nimport marimo\n\napp = marimo.App()\n\nwith app.setup:\n    import simplecadapi as scad\n    from simplecadapi import ql\n    import math\n\n\n@app.cell\ndef _():\n    # ---- feature: base (build) ----\n    base = scad.make_box_rsolid(width=base_l, height=36, depth=8, bottom_face_center=(0, 0, 0))\n    return (base,)\n\n\n@app.cell\ndef _(base):\n    model = scad.Part(part_id=\"model\", body=base)\n    return (model,)\n\n\nif __name__ == \"__main__\":\n    app.run()\n"
+ },
+ {
+  "params": [
+   {
+    "name": "base_l",
+    "value": 60,
+    "unit": "mm",
+    "source": "user",
+    "note": "",
+    "part": null
+   },
+   {
+    "name": "hole_d",
+    "value": 10,
+    "unit": "mm",
+    "source": "user",
+    "note": "",
+    "part": null
+   },
+   {
+    "name": "tilt_deg",
+    "value": 65,
+    "unit": "deg",
+    "source": "user",
+    "note": "",
+    "part": null
+   },
+   {
+    "name": "bolt_n",
+    "value": 6,
+    "unit": "1",
+    "source": "user",
+    "note": "",
+    "part": null
+   }
+  ],
+  "features": [
+   {
+    "slug": "base",
+    "role": "build",
+    "code": "base = scad.make_box_rsolid(width=base_l, height=36, depth=8, bottom_face_center=(0, 0, 0))",
+    "stage": ""
+   },
+   {
+    "slug": "drill",
+    "role": "subtract",
+    "code": "_tool = scad.make_cylinder_rsolid(radius=hole_d / 2, height=10, bottom_face_center=(0, 0, -1))\ndrill = scad.cut_rsolid(base, _tool)",
+    "stage": ""
+   }
+  ],
+  "probe": null,
+  "text": "# /// script\n# requires-python = \">=3.10\"\n# dependencies = [\"simplecadapi\"]\n#\n# [tool.simplecadapi]\n# id = \"model\"\n# ///\nimport marimo\n\napp = marimo.App()\n\nwith app.setup:\n    import simplecadapi as scad\n    from simplecadapi import ql\n    import math\n\n\n@app.cell\ndef _():\n    # ---- params ----\n    base_l = scad.var(\"base_l\", 60, unit=\"mm\")\n    hole_d = scad.var(\"hole_d\", 10, unit=\"mm\")\n    tilt_deg = scad.var(\"tilt_deg\", 65, unit=\"deg\")\n    bolt_n = 6\n    return base_l, hole_d, tilt_deg, bolt_n\n\n\n@app.cell\ndef _(base_l):\n    # ---- feature: base (build) ----\n    base = scad.make_box_rsolid(width=base_l, height=36, depth=8, bottom_face_center=(0, 0, 0))\n    return (base,)\n\n\n@app.cell\ndef _(base, hole_d):\n    # ---- feature: drill (subtract) ----\n    _tool = scad.make_cylinder_rsolid(radius=hole_d / 2, height=10, bottom_face_center=(0, 0, -1))\n    drill = scad.cut_rsolid(base, _tool)\n    return (drill,)\n\n\n@app.cell\ndef _(drill):\n    model = scad.Part(part_id=\"model\", body=drill)\n    return (model,)\n\n\nif __name__ == \"__main__\":\n    app.run()\n"
+ },
+ {
+  "params": [
+   {
+    "name": "base_l",
+    "value": 60,
+    "unit": "mm",
+    "source": "user",
+    "note": "",
+    "part": null
+   },
+   {
+    "name": "hole_d",
+    "value": 10,
+    "unit": "mm",
+    "source": "user",
+    "note": "",
+    "part": null
+   }
+  ],
+  "features": [
+   {
+    "slug": "base",
+    "role": "build",
+    "code": "base = scad.make_box_rsolid(width=base_l, height=36, depth=8, bottom_face_center=(0, 0, 0))",
+    "stage": ""
+   }
+  ],
+  "probe": "print(float(base_l))",
+  "text": "# /// script\n# requires-python = \">=3.10\"\n# dependencies = [\"simplecadapi\"]\n#\n# [tool.simplecadapi]\n# id = \"model\"\n# ///\nimport marimo\n\napp = marimo.App()\n\nwith app.setup:\n    import simplecadapi as scad\n    from simplecadapi import ql\n    import math\n\n\n@app.cell\ndef _():\n    # ---- params ----\n    base_l = scad.var(\"base_l\", 60, unit=\"mm\")\n    hole_d = scad.var(\"hole_d\", 10, unit=\"mm\")\n    return base_l, hole_d\n\n\n@app.cell\ndef _(base_l):\n    # ---- feature: base (build) ----\n    base = scad.make_box_rsolid(width=base_l, height=36, depth=8, bottom_face_center=(0, 0, 0))\n    return (base,)\n\n\n@app.cell\ndef _(base, base_l):\n    # ---- probe ----\n    import contextlib as _ctx\n    import io as _io\n    def _probe(model):\n        print(float(base_l))\n    _buf = _io.StringIO()\n    try:\n        with _ctx.redirect_stdout(_buf):\n            _probe(base)\n    finally:\n        with open(\"probe_out.txt\", \"w\", encoding=\"utf-8\") as _f:\n            _f.write(_buf.getvalue())\n    return ()\n\n\n@app.cell\ndef _(base):\n    model = scad.Part(part_id=\"model\", body=base)\n    return (model,)\n\n\nif __name__ == \"__main__\":\n    app.run()\n"
+ },
+ {
+  "params": [
+   {
+    "name": "base_l",
+    "value": 60,
+    "unit": "mm",
+    "source": "user",
+    "note": "",
+    "part": null
+   },
+   {
+    "name": "hole_d",
+    "value": 10,
+    "unit": "mm",
+    "source": "user",
+    "note": "",
+    "part": null
+   },
+   {
+    "name": "tilt_deg",
+    "value": 65,
+    "unit": "deg",
+    "source": "user",
+    "note": "",
+    "part": null
+   },
+   {
+    "name": "bolt_n",
+    "value": 6,
+    "unit": "1",
+    "source": "user",
+    "note": "",
+    "part": null
+   }
+  ],
+  "features": [],
+  "probe": "print(bolt_n)",
+  "text": "# /// script\n# requires-python = \">=3.10\"\n# dependencies = [\"simplecadapi\"]\n#\n# [tool.simplecadapi]\n# id = \"model\"\n# ///\nimport marimo\n\napp = marimo.App()\n\nwith app.setup:\n    import simplecadapi as scad\n    from simplecadapi import ql\n    import math\n\n\n@app.cell\ndef _():\n    # ---- params ----\n    base_l = scad.var(\"base_l\", 60, unit=\"mm\")\n    hole_d = scad.var(\"hole_d\", 10, unit=\"mm\")\n    tilt_deg = scad.var(\"tilt_deg\", 65, unit=\"deg\")\n    bolt_n = 6\n    return base_l, hole_d, tilt_deg, bolt_n\n\n\n@app.cell\ndef _():\n    placeholder_body = scad.make_box_rsolid(width=1, height=1, depth=1, bottom_face_center=(0, 0, 0))\n    return (placeholder_body,)\n\n\n@app.cell\ndef _(bolt_n):\n    # ---- probe ----\n    import contextlib as _ctx\n    import io as _io\n    def _probe(model):\n        print(bolt_n)\n    _buf = _io.StringIO()\n    try:\n        with _ctx.redirect_stdout(_buf):\n            _probe(None)\n    finally:\n        with open(\"probe_out.txt\", \"w\", encoding=\"utf-8\") as _f:\n            _f.write(_buf.getvalue())\n    return ()\n\n\n@app.cell\ndef _(placeholder_body):\n    model = scad.Part(part_id=\"model\", body=placeholder_body)\n    return (model,)\n\n\nif __name__ == \"__main__\":\n    app.run()\n"
+ }
+]

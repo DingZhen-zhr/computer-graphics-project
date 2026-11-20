@@ -13,6 +13,7 @@ from dataclasses import dataclass
 
 from cad_agent.brief import Param
 from cad_agent.code_names import _Names
+from cad_agent.product.materials import Material, rgb01
 
 ROLES = {"build", "add", "subtract", "intersect", "modify", "pattern"}
 SLUG_RE = re.compile(r"^[a-z][a-z0-9-]*$")
@@ -170,8 +171,13 @@ def _probe_cell(code: str, available: set[str], last: str | None) -> tuple[list[
     return sorted(inputs), body
 
 
-def render_notebook(params: list[Param], features: list[Feature], probe: str | None = None) -> RenderedNotebook:
-    """拼出 notebook。probe 不是 None 时，在最后一个特征之后加一个 probe 单元（没有特征时先加一个占位实体）。"""
+def render_notebook(params: list[Param], features: list[Feature], probe: str | None = None, *,
+                    notebook_id: str = "model", material: "Material | None" = None,
+                    color: str | None = None) -> RenderedNotebook:
+    """拼出 notebook。probe 不是 None 时，在最后一个特征之后加一个 probe 单元（没有特征时先加一个占位实体）。
+
+    notebook_id、material 是多零件用的（3.0）：编号写进文件头和零件的 part_id，给了材料时产品带上材料和颜色（笔记第 25 节）。
+    默认值时输出和以前逐字相同。"""
     if not features and probe is None:
         raise NotebookError("还没有任何特征，无法生成模型。请先用 upsert_feature 写至少一个特征")
     param_names = [p.name for p in params]
@@ -182,7 +188,7 @@ def render_notebook(params: list[Param], features: list[Feature], probe: str | N
         raise NotebookError("特征名有重复")
     analysed = {f.slug: _analyse(f) for f in features}
 
-    lines = HEADER.splitlines()
+    lines = HEADER.replace('id = "model"', f'id = "{notebook_id}"').splitlines()
     cell_lines: dict[str, tuple[int, int]] = {}
 
     def add_cell(sig: list[str], body: list[str]) -> tuple[int, int]:
@@ -232,6 +238,12 @@ def render_notebook(params: list[Param], features: list[Feature], probe: str | N
         sig, body = _probe_cell(probe, available, last)
         add_cell(sig, body)
     body_var = last or PLACEHOLDER
-    add_cell([body_var], [f'model = scad.Part(part_id="model", body={body_var})', "return (model,)"])
+    if material is None:
+        product = f'model = scad.Part(part_id="{notebook_id}", body={body_var})'
+    else:
+        rgb = ", ".join(f"{v:g}" for v in rgb01(color or material.color))
+        product = (f'model = scad.assign_material_rpart(scad.make_part_rpart("{notebook_id}", {body_var}), '
+                   f'scad.make_material_rmaterial("{material.key}", name="{material.key}", color=({rgb})))')
+    add_cell([body_var], [product, "return (model,)"])
     text = "\n".join(lines) + "\n" + FOOTER
     return RenderedNotebook(text=text, cell_lines=cell_lines)

@@ -207,3 +207,9 @@
 - 改法：两个新键插在 `relations` 前面。键的顺序只影响报错里列出可用字段的顺序。
 - 另外：`brief.py` 加完会超过 300 行，零件的解析和显示放进新文件 `cad_agent/brief_parts.py`；材料表 `cad_agent/product/materials.py` 提前在本任务建好（Task 3 只加测试）。
 - 影响：无。
+
+## D27（3.0 计划 2 Task 5）装配 notebook 引用 `parts/<编号>/model.py`，零件 notebook 的产品变量仍叫 `model`
+- 原计划：装配 notebook 用 `scad.use` 引用 `parts/<编号>.py`。
+- 实际：会话目录和版本目录里零件 notebook 放在 `parts/<编号>/model.py`（Task 4、Task 10）。引用 `parts/<编号>.py` 时，交付的 `assembly.py` 在版本目录里没法直接运行。
+- 改法：引用路径改成 `parts/<编号>/model.py`（函数 `part_notebook_path`），沙盒临时目录也按这个放。零件 notebook 的文件头和 `part_id` 是零件编号，产品变量名仍是 `model`：实测 SCA 按 `part_id` 找产品，不看变量名（`test_assembly_notebook_runs` 通过），这样零件编号和特征名、参数名重名时也不冲突。材料名字写材料的英文键。
+- 影响：Task 7、Task 10 按这个路径放文件。
