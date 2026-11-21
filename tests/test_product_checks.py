@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from cad_agent.product.checks import evaluate, mandatory_checks, parse_assembly_checks
+from cad_agent.product.checks import evaluate, mandatory_checks, parse_assembly_checks, real_hits
 from cad_agent.product.model import Assembly, Coupling, Joint, Mate, ProductError
 from cad_agent.sandbox.runner_assembly import AssemblyRun
 
@@ -148,3 +148,11 @@ def test_details_are_chinese_and_specific():
     assert res[1].detail == "装好后零件 body 和 lid 重叠了 12.5 立方毫米"
     assert res[2].detail == "盖子翻开 动到 110° 时，零件 body 和 lid 碰到了，重叠 7 立方毫米"
     assert all(any("一" <= ch <= "鿿" for ch in r.detail) for r in res)
+
+
+def test_real_hits_drop_allowed_contact():
+    """运动条只标真的碰撞：转动关节两边容差以内的贴合不算（3.0 复查第 2 条）。"""
+    hits = [{"a": "body", "b": "lid", "volume": 0.3}, {"a": "lid", "b": "body", "volume": 0.8},
+            {"a": "body", "b": "handle", "volume": 0.3}]
+    assert real_hits(_asm(), hits) == hits[1:]
+    assert real_hits(_asm(), []) == []

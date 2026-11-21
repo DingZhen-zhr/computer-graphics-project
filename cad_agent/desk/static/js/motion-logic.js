@@ -114,11 +114,13 @@ export function createPlayer(onFrame, { reduced = false, now = () => performance
     stop() { st.playing = false; if (st.joint) st.value = rest(); emit(); },
     tick() {
       if (!st.playing || !st.joint) return false;
-      const span = hi() - lo();
-      const k = Math.min(1, (now() - st.t0) / DURATION_MS);
-      const start = st.dir > 0 ? lo() : hi();
-      st.value = start + st.dir * span * ease(k);
-      if (k >= 1) { st.dir = -st.dir; st.t0 = now(); }
+      // 这一段从 st.from 走到这个方向的尽头；从中间接着播时，时间按剩下的路程缩短
+      const end = st.dir > 0 ? hi() : lo();
+      const whole = hi() - lo();
+      const ms = whole > 0 ? DURATION_MS * Math.abs(end - st.from) / whole : 0;
+      const k = ms > 0 ? Math.min(1, (now() - st.t0) / ms) : 1;
+      st.value = st.from + (end - st.from) * ease(k);
+      if (k >= 1) { st.value = end; st.from = end; st.dir = -st.dir; st.t0 = now(); }
       emit();
       return true;
     },

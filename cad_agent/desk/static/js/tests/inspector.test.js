@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { briefRows, briefSections, checkStatus, groupChecks, paramChangeText } from "../panels-logic.js";
+import { briefRows, briefSections, checkStatus, groupChecks, paramChangeText, checkChangeText } from "../panels-logic.js";
 
 test("briefRows: 来源标签和等你回答", () => {
   const rows = briefRows({ params: [
@@ -37,4 +37,13 @@ test("test_check_status_has_text", () => {
 test("参数变化的文字", () => {
   assert.equal(paramChangeText({ label: "孔径", unit: "mm", a: 6, b: 8 }), "孔径：6 → 8 毫米");
   assert.equal(paramChangeText({ name: "n", unit: "1", a: 4, b: 6 }), "n：4 → 6");
+});
+
+test("checkChangeText：用零件的名字和检查的说明，不露出程序里的编号（3.0 复查第 8 条）", () => {
+  const state = { product: { parts: [{ id: "lid", name: "盖子" }] },
+    checks: [{ id: "motion_clear_open", part: "assembly", detail: "盖子翻开 从 0° 到 110°，取了 24 个位置，都没有碰到" }] };
+  assert.equal(checkChangeText({ id: "motion_clear_open", part: "assembly", a: false, b: true }, state),
+    "装配：盖子翻开 从 0° 到 110°，取了 24 个位置，都没有碰到：没过 → 通过");
+  assert.equal(checkChangeText({ id: "lid_t", part: "lid", a: true, b: null }, state), "盖子：一项检查：通过 → 没有");
+  assert.equal(checkChangeText({ id: "hole", part: "main", a: true, b: false }, { checks: [] }), "一项检查：通过 → 没过");
 });

@@ -34,6 +34,14 @@ DEMO_TEXT = "示例会话只能看，不能改。"
 NOT_RUN_TEXT = "没有运行"
 END_KINDS = ("reply", "question", "confirm", "delivered", "failed", "stopped")
 PASS_THROUGH = ("gate", "review", "cases", "manual")
+
+
+def _changes_the_stage(kind: str, data: dict) -> bool:
+    """这几条日志会让舞台换样子，界面靠零碎的事件拼不出来：推一次完整状态。
+    确认需求单的那一轮开始（需求单收起来）、做完一个零件、装配检查完。"""
+    if kind in ("part_done", "assembly"):
+        return True
+    return kind == "user" and "sent_as" in data and data["sent_as"] != data.get("text")
 USAGE_KEYS = ("llm_calls", "tokens", "prompt_tokens", "completion_tokens", "cached_tokens", "reasoning_tokens")
 
 
@@ -67,6 +75,8 @@ class Workbench:
                     try:
                         self._on_record(kind, data)
                         self._ws_copy = copy.deepcopy(self.agent.ws)   # 换过智能体以后也要拷新的那个
+                        if _changes_the_stage(kind, data):
+                            self.bus.publish("state", state=self.state())
                     except Exception:  # noqa: BLE001 - 监听器出错不能打断智能体；原因写进程序日志
                         logger.exception("把日志翻译成界面事件时出错（%s）", kind)
 

@@ -215,3 +215,12 @@ def test_results_have_no_key(tmp_path, monkeypatch):
         if p.is_file():
             assert SECRET not in p.read_text(encoding="utf-8", errors="replace"), p.name
     assert metered and BudgetExceeded   # 保持导入
+
+
+def test_label_with_repeat_is_refused(tmp_path):
+    """记账模式只跑一遍：同时给 --repeat 大于 1 要直接说清楚，不能悄悄只跑一遍（复查第 6 条）。"""
+    import benchmarks.run as bench
+
+    out: list[str] = []
+    code = bench.main(["--label", "x", "--cap", "1", "--repeat", "2", "--out", str(tmp_path / "r")], print_fn=out.append)
+    assert code == 1 and "--repeat" in "\n".join(out)

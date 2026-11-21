@@ -65,3 +65,24 @@ test("test_bad_motion_file_falls_back_to_rest", async () => {
   const ok = await loadMotion("x", async () => ({ ok: true, json: async () => motion }));
   assert.equal(ok.joints[0].id, "open");
 });
+
+test("test_play_resumes_from_where_it_paused", () => {
+  // 复查第 10 条：暂停或拖动以后再播放，要从当前位置接着走，不跳回一端
+  let t = 0;
+  const p = createPlayer(null, { now: () => t });
+  p.select(joint);
+  p.seek(60);
+  p.play();
+  t = 1;
+  p.tick();
+  assert.ok(Math.abs(p.state().value - 60) < 1, String(p.state().value));
+  t = 2200;                                      // 剩下的 30° 只要三分之一个单程：这时已经到头
+  p.tick();
+  assert.equal(p.state().value, 90);
+  t = 3300;                                      // 接着往回走
+  p.tick();
+  assert.ok(p.state().value < 90 && p.state().value > 0 && p.state().playing);
+  t = 100000;
+  for (let i = 0; i < 5; i += 1) { t += 3000; p.tick(); }
+  assert.ok(p.state().value >= 0 && p.state().value <= 90);
+});

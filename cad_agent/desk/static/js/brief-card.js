@@ -10,7 +10,7 @@ const SUB = {
 function rowEl(r) {
   return h("div", { class: "row" }, h("span", {}, r.label),
     r.tag ? h("span", { class: `tag ${r.tag === "你给的" ? "user" : ""}` }, r.tag) : h("span", {}),
-    h("span", { class: "v" }, r.waiting ? h("span", { class: "wait" }, WAITING) : `${r.value}${r.unit ? ` ${r.unit}` : ""}`));
+    h("span", { class: "v" }, r.waiting ? h("span", { class: "wait" }, WAITING) : (r.unit === "deg" ? `${r.value}°` : `${r.value}${r.unit ? ` ${r.unit}` : ""}`)));
 }
 
 export function renderBrief(state, center, actions) {

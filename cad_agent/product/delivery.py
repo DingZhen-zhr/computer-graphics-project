@@ -14,7 +14,7 @@ from typing import TYPE_CHECKING, Any
 
 from ..checks.expr import eval_expr
 from ..checks.spec import CheckResult
-from .checks import evaluate, mandatory_checks
+from .checks import evaluate, mandatory_checks, real_hits
 from .kinematics import explode_directions, frame_from_geometry
 from .materials import MATERIALS
 from .render import render_part_notebook
@@ -50,7 +50,7 @@ def motion_data(ws: "Workspace", run: Any) -> dict:
     for j in ws.assembly.joints:
         joints.append({"id": j.id, "label": j.label, "type": j.type, "unit": UNIT_KEY[j.type],
                        "lo": _num(j.lo, values), "hi": _num(j.hi, values),
-                       "samples": [{"value": r["value"], "poses": r["poses"], "hits": r["hits"]} for r in run.samples.get(j.id, [])]})
+                       "samples": [{"value": r["value"], "poses": r["poses"], "hits": real_hits(ws.assembly, r["hits"])} for r in run.samples.get(j.id, [])]})
     return {"parts": parts, "rest": run.rest, "explode": {k: list(v) for k, v in explode.items()}, "joints": joints}
 
 

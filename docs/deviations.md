@@ -231,11 +231,6 @@
 - 实际：审查清单末尾多了"整体做工"，`tests/test_review_loop.py::test_review_pass_then_deliver` 里剧本审查员只答了 3 项，断言也是 3 项。
 - 改法（用户同意）：这一个测试里审查员四项都答"符合"，断言改成 4 项和"4 项符合"，没有放松。
 
-## D30（3.0 计划 2 Task 11）改 `test_review_pass_then_deliver`（计划漏列，用户同意）
-- 原计划：Task 11 只列了 `test_reviewer_prompt_is_verbatim`、`test_review_targets`。
-- 实际：审查清单末尾多了"整体做工"，`tests/test_review_loop.py::test_review_pass_then_deliver` 里剧本审查员只答了 3 项，断言也是 3 项。
-- 改法（用户同意）：这一个测试里审查员四项都答"符合"，断言改成 4 项和"4 项符合"，没有放松。
-
 ## D31（3.0 计划 2 Task 11）改 `test_cheatsheet_more_sections`（计划漏列，用户同意）
 - 实际：速查表补充末尾多了"## 装配的写法"，`tests/test_prompts_v2.py::test_cheatsheet_more_sections` 要求小节标题和第二版文档的列表完全相同。
 - 改法（用户同意）：期望值改成第二版的列表后面接"## 装配的写法"，前面的小节照样逐个比对。
@@ -290,3 +285,8 @@
 - 原计划：在线示例换成一次真实的多零件会话，README 截图换成展台界面。
 - 实际：真实模型的评测（计划 4 Task 4 起）还没跑，没有真实的多零件会话可以导出；`site/demo/` 仍是手机支架的回放，README 截图注明是第二版的。持续集成的超时 90 分钟够用（完整全量约 21 分钟），没改。
 - 后续：评测或演示预演跑出一次多零件会话后，重新导出 `site/demo/`（同时更新 `test_site_is_up_to_date` 用的会话目录）并换截图。
+
+## D41（3.0 收尾复查）两个文件超过 300 行，暂不拆
+- 规矩：一个文件超过 300 行就拆。
+- 实际：`cad_agent/staged/specs.py` 在 3.0 里加了多零件的检查写法，到 405 行；`benchmarks/assembly_accept.py` 301 行。复查时才发现。
+- 处理：这次收尾只修会影响使用的问题，这两个文件没有拆（拆 `specs.py` 要连带改很多导入，需要再跑一遍完整全量）。以后改到它们时一起拆。

@@ -251,6 +251,9 @@ def main(argv: list[str] | None = None, print_fn: Callable[..., None] = print) -
     if args.repeat < 1:
         print_fn("repeat 至少是 1")
         return 1
+    if args.label and args.repeat > 1:
+        print_fn("用 --label 记账时每个任务只跑一遍，不能同时给 --repeat；要多跑几遍就换个标签再跑")
+        return 1
     names: list[str] = args.tasks or TASK_SETS[args.task_set]
     if not names:
         print_fn("这一组还没有任务")

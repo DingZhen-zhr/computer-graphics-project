@@ -138,6 +138,20 @@ def joint_value_samples(lo: float, hi: float, n: int) -> list[float]:
     return [lo + (hi - lo) * i / (n - 1) for i in range(n)]
 
 
+def sample_given(asm: Assembly, jid: str, v: float, values: dict[str, float]) -> dict[str, float]:
+    """取样关节 jid 到 v 时该给哪个关节什么值：被联动带动的，顺着联动往上换算成最上面那个带动关节的值。"""
+    driven = {c.driven: c for c in asm.couplings}
+    seen = {jid}
+    while jid in driven:
+        c = driven[jid]
+        ratio = _num(c.ratio, values)
+        if abs(ratio) < 1e-12 or c.driver in seen:
+            break   # 传动比是 0 或者联动绕成了圈：换算不了，照原样给
+        jid, v = c.driver, v / ratio
+        seen.add(jid)
+    return {jid: v}
+
+
 def joint_values(asm: Assembly, given: dict[str, float], values: dict[str, float]) -> dict[str, float]:
     """全部关节的值：联动带动的按 ratio × 带动的关节；没给的取 0（0 不在范围里时取 lo）。"""
     out: dict[str, float] = {}

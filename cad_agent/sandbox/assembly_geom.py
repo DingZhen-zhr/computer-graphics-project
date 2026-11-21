@@ -103,7 +103,7 @@ def min_distance(a: Any, b: Any) -> float:
 
 
 def line_distance_angle(p1, d1, p2, d2) -> tuple[float, float]:
-    """两条轴线的距离和夹角（度，0～90，不分方向）。平行时距离是点到线的距离。"""
+    """两条轴线的距离和夹角（度，0～90，不分方向）。夹角不到 1° 时距离是点到线的距离。"""
     def dot(u, v): return u[0] * v[0] + u[1] * v[1] + u[2] * v[2]
     def sub(u, v): return (u[0] - v[0], u[1] - v[1], u[2] - v[2])
     def cross(u, v): return (u[1] * v[2] - u[2] * v[1], u[2] * v[0] - u[0] * v[2], u[0] * v[1] - u[1] * v[0])
@@ -111,7 +111,7 @@ def line_distance_angle(p1, d1, p2, d2) -> tuple[float, float]:
     ang = math.degrees(math.acos(min(1.0, abs(dot(d1, d2)) / (norm(d1) * norm(d2)))))
     w = sub(p2, p1)
     n = cross(d1, d2)
-    if norm(n) < 1e-9:
+    if ang < 1.0:   # 差不多平行（含稍微斜一点、但在同一平面里的）：异面直线公式会算成 0，按点到线算
         return norm(cross(w, d1)) / norm(d1), ang
     return abs(dot(w, n)) / norm(n), ang
 

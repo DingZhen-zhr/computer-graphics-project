@@ -1,7 +1,8 @@
 // 修改前后的对比：叠在一起（b 是实体，a 是半透明轮廓）或左右并排（共用一个相机）；下面列出参数和检查的变化。
 // 某一版没有三维文件时，那一边用截图代替。Esc 或"关掉对比"回到当前版本。
 import { $, clear, h } from "./dom.js";
-import { paramChangeText } from "./panels-logic.js";
+import { checkChangeText, paramChangeText } from "./panels-logic.js";
+import { getState } from "./store.js";
 
 export const NO_STL = "这个版本没有三维文件，先用截图代替。";
 let ui = null;
@@ -50,7 +51,7 @@ function render() {
   $("compare-split").classList.toggle("gone", ui.mode !== "split");
   const ch = $("compare-changes");
   ch.classList.remove("gone");
-  const checks = (d.checks || []).map((c) => `${c.part && c.part !== "main" ? `${c.part} · ` : ""}${c.id}：${c.a === null ? "没有" : c.a ? "通过" : "没过"} → ${c.b === null ? "没有" : c.b ? "通过" : "没过"}`);
+  const checks = (d.checks || []).map((c) => checkChangeText(c, getState()));
   clear(ch, (d.params || []).length ? d.params.map((p) => h("div", { class: "num" }, paramChangeText(p))) : h("div", { class: "mute" }, "参数没有变化"),
     checks.length ? [h("div", { class: "small mute compare-sub" }, "检查的变化"), checks.map((t) => h("div", { class: "small" }, t))] : null,
     d.notes && d.notes.length ? d.notes.map((n) => h("div", { class: "small mute" }, n)) : null);

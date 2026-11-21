@@ -97,3 +97,32 @@ def test_command_line(tmp_path, monkeypatch, capsys):
     assert (tmp_path / "pkg/04-参数化源文件与STEP/done").is_dir() and not (tmp_path / "pkg/05-运行日志/empty").exists()
     assert submission_main([str(tmp_path / "pkg"), "--session", "nope"]) == 2
     assert "没有这些会话" in capsys.readouterr().out
+
+
+def test_key_in_any_file_type_blocks_export(tmp_path, monkeypatch):
+    """不管文件后缀是什么都要扫描（复查第 3 条：.env、.log 这类以前不扫就复制）。"""
+    monkeypatch.setenv("DEEPSEEK_API_KEY", SECRET)
+    s = _session(tmp_path / "sessions", "leak2")
+    (s / "versions" / "v1" / "model.step").write_text(f"HEADER {SECRET}", encoding="utf-8")
+    r = build_submission([s], tmp_path / "out", repo_root=ROOT)
+    assert r.folder is None and any("model.step" in w for w in r.warnings)
+
+
+def test_keys_of_every_provider_are_compared(monkeypatch):
+    """钥匙串里每一家服务商存的 key 都要比对，不只是当前选的那家（复查第 3 条）。"""
+    import cad_agent.keystore as keystore
+    from cad_agent import submission
+
+    monkeypatch.setattr(keystore, "get_key", lambda pid, env: SECRET if pid == "claude" else None)
+    assert SECRET in submission._secrets()
+
+
+def test_home_paths_in_session_files_are_replaced(tmp_path):
+    """会话日志里的截图、STEP 路径带着本机用户名：放进提交包时换成 ~（复查第 4 条）。"""
+    home = str(Path.home())
+    s = _session(tmp_path / "sessions", "paths")
+    line = json.dumps({"kind": "delivered", "text": f"截图：{home}\.datum\sessions\paths\versions\v1\view.png"}, ensure_ascii=False)
+    (s / "log.jsonl").write_text(line + "\n", encoding="utf-8")
+    r = build_submission([s], tmp_path / "out", repo_root=ROOT)
+    text = (r.folder / "05-运行日志/paths/log.jsonl").read_text(encoding="utf-8")
+    assert home not in text and home.replace("\\", "\\\\") not in text and "~" in text

@@ -1,10 +1,12 @@
 /* 浮层：需求单卡片、抽屉、调参数面板、对比条、提示条、确认框。 */
 .brief-card {
-  position: fixed; z-index: 6; left: 50%; top: 50%; width: min(560px, calc(100vw - 480px)); max-height: calc(100vh - 300px); overflow: auto;
-  transform: translate(-50%, -56%); border-radius: 22px; padding: 24px 28px; background: var(--panel); border: 1px solid var(--line);
+  position: fixed; z-index: 6; left: 50%; top: 150px; width: min(560px, calc(100vw - 480px)); overflow: auto;
+  /* 标题下面开始排，下面给字幕（离底 150px、最多三行左右）留出地方：窗口矮的时候卡片里面滚动，不和字幕叠在一起 */
+  max-height: calc(100vh - 150px - 270px);
+  transform: translate(-50%, 0); border-radius: 22px; padding: 24px 28px; background: var(--panel); border: 1px solid var(--line);
   backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px); transition: transform 0.45s cubic-bezier(0.2, 0.8, 0.2, 1), opacity 0.45s;
 }
-.brief-card.away { transform: translate(-50%, -140%) scale(0.6); opacity: 0; pointer-events: none; }
+.brief-card.away { transform: translate(-50%, -100%) scale(0.6); opacity: 0; pointer-events: none; }
 .brief-card h2 { font-size: 22px; font-weight: 700; }
 .brief-card .sub { color: var(--mute); font-size: 13px; margin: 4px 0 12px; }
 .brief-card h3 { font-size: 12px; color: var(--mute); font-weight: 500; margin: 14px 0 4px; }

@@ -144,7 +144,7 @@ def _relative(a: list[float], b: list[float]) -> list[float]:
 
 def _sweep(job: dict, asm: Any, frames: dict, rest: dict, raw_shapes: dict, out: dict) -> None:
     from cad_agent.checks.expr import eval_expr
-    from cad_agent.product.kinematics import joint_value_samples, joint_values, poses_at
+    from cad_agent.product.kinematics import joint_value_samples, joint_values, poses_at, sample_given
     from cad_agent.sandbox.assembly_geom import bbox, overlap_volume, placed
     from cad_agent.sandbox.runner import summarize_exception
 
@@ -162,11 +162,11 @@ def _sweep(job: dict, asm: Any, frames: dict, rest: dict, raw_shapes: dict, out:
                     targets = sorted(targets + [want])
         for i, v in enumerate(targets):
             row: dict[str, Any] = {"value": _r(v), "poses": {}, "hits": [], "error": None,
-                                   "joints": {k: _r(x) for k, x in joint_values(asm, {j.id: v}, values).items()}}
+                                   "joints": {k: _r(x) for k, x in joint_values(asm, sample_given(asm, j.id, v, values), values).items()}}
             try:
                 if fail == f"{j.id}:{i}":
                     raise RuntimeError("测试用：故意在这个位置出错")
-                poses = poses_at(asm, frames, rest, {j.id: v}, values)
+                poses = poses_at(asm, frames, rest, sample_given(asm, j.id, v, values), values)   # 被带动的关节：换算成带动它的那个
                 row["poses"] = {pid: _mat(m) for pid, m in poses.items()}
                 shapes = {pid: placed(raw_shapes[pid], poses[pid]) for pid in ids}
                 boxes = {pid: bbox(s) for pid, s in shapes.items()}

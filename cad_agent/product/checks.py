@@ -97,6 +97,13 @@ def mandatory_checks(asm: Assembly, part_ids: list[str]) -> list[dict]:
             + [{"id": f"motion_clear_{j.id}", "type": "motion_clear", "joint": j.id} for j in asm.joints])
 
 
+def real_hits(asm: Assembly, hits: list[dict]) -> list[dict]:
+    """取样里真的算碰撞的那些：允许接触的配对按 CONTACT_TOL_MM3，其余按 OVERLAP_TOL_MM3（和 motion_clear 同一个标准）。"""
+    contact = contact_pairs(asm)
+    return [h for h in hits
+            if float(h.get("volume") or 0) > (CONTACT_TOL_MM3 if frozenset((h.get("a"), h.get("b"))) in contact else OVERLAP_TOL_MM3)]
+
+
 def _res(c: dict, passed: bool, detail: str, measured: float | None = None, expected: float | None = None) -> CheckResult:
     return CheckResult(c["id"], c["type"], passed, measured, expected, c.get("tol"), detail)
 

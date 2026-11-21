@@ -392,3 +392,28 @@ def test_busy_state_shows_the_users_message(tmp_path):
         llm.gate.set()
     wait_idle(wb)
     assert wb.state()["transcript"][-1]["text"] == "好的"
+
+
+def test_confirming_the_brief_pushes_state_at_turn_start(tmp_path):
+    """确认需求单的那一轮：一开始就推一次完整状态，界面才会把需求单收起来（3.0 桌面窗口走查发现）。"""
+    unconfirmed = staged_brief()
+    unconfirmed.confirmed = False
+    llm = ScriptedLLM([scripted_call("request_confirmation", {}, "整理好了"), LLMReply("好，开始做。", [], {})])
+    wb, _ = make_wb(tmp_path, llm, brief=unconfirmed)
+    say(wb, "做一个支架")
+    assert wb.state()["phase"] == "confirm"
+    events = say(wb, "确认")   # 界面上"没问题，开始做"按钮发的就是这两个字
+    seq = types(events)
+    first = seq.index("state")
+    assert first < seq.index("turn_end")
+    assert events[first]["state"]["phase"] != "confirm"
+
+
+def test_part_done_and_assembly_push_state(tmp_path):
+    """多零件：每做完一个零件、装配检查完，都推一次完整状态，左边的零件清单和舞台才会跟着变。"""
+    wb, session = make_wb(tmp_path, ScriptedLLM([]))
+    for kind, data in (("part_done", {"id": "body", "name": "盒体"}),
+                       ("assembly", {"passed": True, "failed": [], "hits": [], "reason": None})):
+        before = wb.bus.last_seq()
+        session.log(kind, **data)
+        assert types(wb.bus.since(before)) == ["state"], kind

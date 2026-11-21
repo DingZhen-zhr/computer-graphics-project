@@ -26,33 +26,48 @@ class SubmissionReport:
 
 
 def _secrets() -> list[str]:
-    """环境变量里名字含 KEY、TOKEN 的值，和钥匙串里存的 key（只在内存里比较，不打印）。"""
+    """环境变量里名字含 KEY、TOKEN 的值，和钥匙串里每一家服务商存的 key（只在内存里比较，不打印）。"""
     vals = [v.strip() for k, v in os.environ.items() if ("KEY" in k.upper() or "TOKEN" in k.upper()) and len(v.strip()) >= 12]
     try:
         from cad_agent.keystore import get_key
-        from cad_agent.settings import load_settings
+        from cad_agent.llm.providers import load_providers
 
-        stored = get_key(load_settings().provider, "")
-        if stored:
-            vals.append(stored)
+        for p in load_providers():
+            stored = get_key(p.id, "")
+            if stored:
+                vals.append(stored.strip())
     except Exception:  # noqa: BLE001 - 钥匙串不可用时只用环境变量比较
         pass
     return [v for v in set(vals) if v]
 
 
 def _scan(files: list[Path], base: Path, secrets: list[str]) -> list[str]:
+    """不管后缀，每个文件都按字节搜一遍；文字文件报出第几行。"""
     hits = []
     for f in files:
-        if f.suffix.lower() not in TEXT_SUFFIXES:
-            continue
         try:
-            lines = f.read_text(encoding="utf-8", errors="replace").splitlines()
+            data = f.read_bytes()
         except OSError:
             continue
-        for i, line in enumerate(lines, 1):
-            if any(s in line for s in secrets):
-                hits.append(f"{f.relative_to(base).as_posix()} 第 {i} 行里有 key")
+        if not any(s.encode("utf-8") in data for s in secrets):
+            continue
+        lines = data.decode("utf-8", errors="replace").splitlines()
+        rows = [i for i, line in enumerate(lines, 1) if any(s in line for s in secrets)] or [1]
+        hits += [f"{f.relative_to(base).as_posix()} 第 {i} 行里有 key" for i in rows]
     return hits
+
+
+def _hide_home(path: Path) -> None:
+    """会话里的文字文件：本机用户目录换成 ~（日志里写着截图、STEP 的完整路径，带着用户名）。"""
+    if path.suffix.lower() not in TEXT_SUFFIXES:
+        return
+    home = str(Path.home())
+    text = path.read_text(encoding="utf-8", errors="replace")
+    new = text
+    for form in (home.replace("\\", "\\\\"), home, home.replace("\\", "/")):
+        new = new.replace(form, "~")
+    if new != text:
+        path.write_text(new, encoding="utf-8")
 
 
 def _copy_tree(src: Path, dst: Path) -> list[Path]:
@@ -116,6 +131,8 @@ def build_submission(sessions: list[Path], target: Path, *, repo_root: Path) -> 
         dst = folder / rel
         dst.parent.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(src, dst)
+        if rel.startswith(("04-", "05-")):
+            _hide_home(dst)
     items = [
         {"要求": "代码", "位置": "01-代码/", "状态": "已放入"},
         {"要求": "提示词与工具定义", "位置": "02-提示词与工具定义/", "状态": "已放入"},

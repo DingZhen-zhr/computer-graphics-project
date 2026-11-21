@@ -5,7 +5,7 @@ from __future__ import annotations
 import pytest
 
 from cad_agent.product.kinematics import (apply_point, explode_directions, frame_from_geometry, joint_value_samples,
-                                          poses_at, rest_placements)
+                                          poses_at, rest_placements, sample_given)
 from cad_agent.product.model import Assembly, Coupling, Joint, Mate
 
 I4 = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]
@@ -127,3 +127,21 @@ def test_explode_directions():
     rest2 = rest_placements(asm2, fr2, {})
     _close(apply_point(rest2["drawer"], (0, 0, 0)), (0, -50, 0))
     _close(explode_directions(asm2, fr2, rest2)["drawer"], (0, -1, 0))
+
+
+def test_sampling_a_driven_joint_moves_its_driver():
+    """取样被联动带动的关节时，要换算成带动它的关节的值；否则带动的关节停在 0，被带动的也跟着不动（3.0 复查第 1 条）。"""
+    asm, frames = _gears()
+    values = {"r": -0.5}
+    assert sample_given(asm, "j1", 36, values) == {"j1": 36}
+    given = sample_given(asm, "j2", -18, values)
+    assert given == {"j1": pytest.approx(36)}
+    rest = rest_placements(asm, frames, {})
+    import math
+    c, s = math.cos(math.radians(-18)), math.sin(math.radians(-18))
+    _close(apply_point(poses_at(asm, frames, rest, given, values)["g2"], (10, 0, 0)), (60 + 10 * c, 10 * s, 0))
+
+
+def test_sampling_a_driven_joint_with_zero_ratio_keeps_the_value():
+    asm, _ = _gears()
+    assert sample_given(asm, "j2", -18, {"r": 0}) == {"j2": -18}

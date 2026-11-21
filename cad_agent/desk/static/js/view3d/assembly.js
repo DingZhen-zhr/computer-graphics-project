@@ -69,7 +69,9 @@ export function mountAssembly({ partsEl, cardEl, toolsEl, labelsEl }, scene, { o
     cardEl.replaceChildren(h("h3", {}, p.name),
       h("div", {}, `外形 ${size ? size.map(fmtNum).join(" × ") : "—"}`),
       h("div", {}, `材料 ${MATERIAL_NAMES[p.material] || p.material}`),
-      h("div", {}, `${p.checks.total} 项检查，全部量过`));
+      // 只有做完而且都过了才说"全部量过"；正在做、没开始的照实说（3.0 复查第 7 条）
+      h("div", {}, p.status === "done" && p.checks.passed === p.checks.total ? `${p.checks.total} 项检查，全部量过`
+        : p.status === "done" ? `${p.checks.passed}/${p.checks.total}` : p.status === "current" ? "正在做" : "没开始"));
   }
 
   function focus(id) {

@@ -73,3 +73,13 @@ export function paramChangeText(p) {
   const unit = UNIT_TEXT[p.unit] ?? p.unit ?? "";
   return `${p.label || p.name}：${fmtNum(p.a)} → ${fmtNum(p.b)}${unit ? ` ${unit}` : ""}`;
 }
+
+// 对比里一条检查的变化：零件用名字，检查用当前版本里的说明；说明找不到（这一版已经没有这条）就写"一项检查"
+const PASS_TEXT = (v) => (v === null || v === undefined ? "没有" : v ? "通过" : "没过");
+export function checkChangeText(c, state) {
+  const parts = (state && state.product && state.product.parts) || [];
+  const where = c.part === "assembly" ? "装配" : c.part && c.part !== "main" ? ((parts.find((p) => p.id === c.part) || {}).name || "一个零件") : "";
+  const found = ((state && state.checks) || []).find((x) => x.id === c.id && (x.part || "main") === (c.part || "main"));
+  const what = (found && found.detail) || "一项检查";
+  return `${where ? `${where}：` : ""}${what}：${PASS_TEXT(c.a)} → ${PASS_TEXT(c.b)}`;
+}
