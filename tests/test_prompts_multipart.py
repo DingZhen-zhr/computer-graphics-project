@@ -108,3 +108,16 @@ def test_no_unasked_trim():
     text = (PROMPT_DIR / "system_multipart.md").read_text(encoding="utf-8")
     assert "孔口倒一个小角" not in text and "最后一步默认是" not in text
     assert "倒角、圆角、沉孔这类修饰，用户没提就不加" in text and "在澄清的提问里问一句" in text
+
+
+def test_collision_right_after_start_suggests_flipping_first():
+    # 3.0 修改清单第 5 条：刚动就碰上，先查方向，不先改零件
+    from cad_agent.product.tools import hint_hit
+
+    near = hint_hit("盖子翻开", -4.783, "°", "body", "lid", 35.279, 110)
+    assert near.startswith("盖子翻开 动到 -4.783° 时，零件 body 和 lid 碰到了，重叠 35.279 立方毫米。")
+    assert "多半是动的方向反了" in near
+    far = hint_hit("盖子翻开", 100, "°", "body", "lid", 7, 110)
+    assert "多半是动的方向反了" not in far and "给它们留出动的空间" in far
+    text = (PROMPT_DIR / "system_multipart.md").read_text(encoding="utf-8")
+    assert "刚离开装好的位置就碰到，多半是方向反了" in text

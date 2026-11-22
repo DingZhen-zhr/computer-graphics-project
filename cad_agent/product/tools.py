@@ -29,6 +29,8 @@ HINT_OVERLAP = ("装好后零件 {a} 和 {b} 重叠了 {v} 立方毫米。看是
                 "位置不对就改 set_connectors 或 set_assembly。")
 HINT_HIT = ("{label} 动到 {value}{unit} 时，零件 {a} 和 {b} 碰到了，重叠 {v} 立方毫米。给它们留出动的空间：加大间隙、缩短会碰到的部分，"
             "或者改动的范围（改范围要先问用户）。")
+HINT_WRONG_WAY = ("刚离开装好的位置就碰到，多半是动的方向反了：先在 set_assembly 里把这个关节的范围反过来（比如 [0, 110] 改成 [-110, 0]），"
+                  "或者把连接点的方向反过来，再 build_assembly 试一次；方向对了还碰，再改零件。")
 HINT_FAILED = "先看每条 detail 里选中了哪些几何：选错了就改检查条件，选对了但数值不对就改模型。"
 HINT_DONE = "全部通过，程序会自动交付。"
 UNIT = {"revolute": "°", "prismatic": " 毫米"}
@@ -36,6 +38,12 @@ UNIT = {"revolute": "°", "prismatic": " 毫米"}
 
 def _g(v: float) -> str:
     return f"{round(float(v), 3):g}"
+
+
+def hint_hit(label: str, value: float, unit: str, a: str, b: str, volume: float, span: float) -> str:
+    """动起来碰到时的提示。碰的位置离装好的位置（0）不到取样范围的十分之一，多加一句先查方向（3.0 修改清单第 5 条）。"""
+    text = HINT_HIT.format(label=label, value=_g(value), unit=unit, a=a, b=b, v=_g(volume))
+    return text + HINT_WRONG_WAY if span > 0 and abs(value) <= 0.1 * span else text
 
 
 def invalidate_assembly(ws: Any) -> None:
@@ -209,7 +217,8 @@ class ProductTools:
             if f"motion_clear_{j.id}" in bad:
                 hit = next((h for h in self._first_hits(run) if h["joint"] == j.id), None)
                 if hit is not None:
-                    return HINT_HIT.format(label=j.label, value=_g(hit["value"]), unit=UNIT[j.type], a=hit["a"], b=hit["b"], v=_g(hit["volume"]))
+                    span = max((abs(r["value"]) for r in run.samples.get(j.id) or []), default=0.0)
+                    return hint_hit(j.label, hit["value"], UNIT[j.type], hit["a"], hit["b"], hit["volume"], span)
         if bad:
             return HINT_FAILED
         if gate is not None and gate.unconstrained:
