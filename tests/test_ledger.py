@@ -224,3 +224,37 @@ def test_label_with_repeat_is_refused(tmp_path):
     out: list[str] = []
     code = bench.main(["--label", "x", "--cap", "1", "--repeat", "2", "--out", str(tmp_path / "r")], print_fn=out.append)
     assert code == 1 and "--repeat" in "\n".join(out)
+
+
+def test_task_cap_stops_one_task_and_runs_the_next(tmp_path):
+    # 3.0 修改清单第 1 条：一个任务到了自己的花费上限就停，下一个任务照常开始，总账本没到上限
+    from benchmarks.report_v3 import render_v3_md
+
+    vdir = tmp_path / "v1"
+    vdir.mkdir()
+    (vdir / "model.py").write_text("# 假的", encoding="utf-8")
+
+    class Agent:
+        def __init__(self, llm):  # noqa: ANN001
+            self.llm = llm
+
+        def handle_user(self, text):  # noqa: ANN001, ANN201
+            self.llm.chat([], [])
+            return SimpleNamespace(kind="delivered", version_dir=vdir, repairs=0, llm_calls=1, tokens=0, prompt_tokens=0,
+                                   completion_tokens=0, cached_tokens=0, reasoning_tokens=0, cost=1.0)
+
+    def real(task, make_agent, sim_user, out_dir):  # noqa: ANN001
+        return run_task(task, make_agent, sim_user, out_dir, run_job=Runner(good_result()))
+
+    make_sim = factories()[1]
+    msgs: list[str] = []
+    res = run_metered(["battery_box", "flange"], config=cfg(), label="round2", cap=20, task_cap=1.5, allow_peak=False,
+                      results_dir=tmp_path / "r", make_agent=lambda root, wrap: Agent(wrap(FakeLLM(), "agent")), make_sim_user=make_sim,
+                      run_task_fn=real, print_fn=msgs.append, now=Clock(NIGHT), ledger_path=tmp_path / "ledger.json")
+    first, second = res
+    assert first["stopped_for_task_cap"] and not first.get("stopped_for_cap")
+    assert first["stages"][0]["delivered"] and first["stages"][-1]["reason"] == "到了这个任务的花费上限"
+    assert second["task"] == "flange" and second["stopped_for_task_cap"] and "skipped_for_cap" not in second
+    led = Ledger.load(tmp_path / "ledger.json", 20)
+    assert led.spent == 4.0 and led.remaining() == 16.0
+    assert "到任务上限停了" in render_v3_md(res)

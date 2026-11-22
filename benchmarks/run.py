@@ -18,7 +18,7 @@ from benchmarks.report import (LENGTH_TYPES, SKIPPED_TEXT, SUMMARY_HEADER, TABLE
                                max_dimension_deviation, render_results_md, render_summary_md)
 from benchmarks.sim_user import SimUser
 from benchmarks.assembly_accept import AcceptSpecError, validate_entries
-from benchmarks.ledger import BudgetExceeded
+from benchmarks.ledger import BudgetExceeded, TaskCapExceeded
 from benchmarks.assembly_accept import evaluate as assembly_evaluate
 from cad_agent.checks.spec import MANDATORY_IDS, CheckSpecError, parse_checks
 from cad_agent.cli import build_agent
@@ -149,15 +149,16 @@ def run_task(task: dict, make_agent: Callable[[Path], object], sim_user: SimUser
     names = stage_names(task)
     messages = [task["initial"], *task.get("modifications", [])]
     stages: list[dict] = []
-    stopped = False
+    stopped: str | None = None   # "stopped_for_cap"（总账本到上限）或 "stopped_for_task_cap"（这个任务到上限）
     for index, (stage, message) in enumerate(zip(names, messages)):
         if index > 0:  # 修改阶段：先让模拟用户知道这条修改，再发出修改请求
             sim_user.add_change(message)
         try:
             turn = _converse(agent, sim_user, message, max_turns, totals, costs)
-        except BudgetExceeded:   # 到了花费上限：立刻停，已有的阶段结果照常留下（3.0 计划 4）
-            stopped = True
-            stages.append({"stage": stage, "delivered": False, "acceptance": [], "reason": "到了花费上限"})
+        except BudgetExceeded as e:   # 到了花费上限：立刻停，已有的阶段结果照常留下（3.0 计划 4）
+            per_task = isinstance(e, TaskCapExceeded)
+            stopped = "stopped_for_task_cap" if per_task else "stopped_for_cap"
+            stages.append({"stage": stage, "delivered": False, "acceptance": [], "reason": "到了这个任务的花费上限" if per_task else "到了花费上限"})
             break
         if turn is None:
             reason = f"对话 {max_turns} 轮仍未交付"
@@ -173,7 +174,7 @@ def run_task(task: dict, make_agent: Callable[[Path], object], sim_user: SimUser
         "cost": sum(costs) if costs and all(c is not None for c in costs) else None,
         "duration_s": round(time.monotonic() - started, 2),
         "sim_llm_calls": getattr(sim_user, "calls", 0), "sim_tokens": getattr(sim_user, "tokens", 0),
-        "sim_cost": getattr(sim_user, "cost", None), **({"stopped_for_cap": True} if stopped else {}),
+        "sim_cost": getattr(sim_user, "cost", None), **({stopped: True} if stopped else {}),
     }
 
 
@@ -238,6 +239,7 @@ def main(argv: list[str] | None = None, print_fn: Callable[..., None] = print) -
     parser.add_argument("--set", dest="task_set", choices=list(TASK_SETS), default="dev", help="跑哪一组任务，默认 dev")
     parser.add_argument("--label", help="3.0：这一遍的标签（如 round1）；给了就按账本计价、到上限立刻停")
     parser.add_argument("--cap", type=float, default=20, help="3.0：账本的花费上限（元），所有标签共用，默认 20")
+    parser.add_argument("--task-cap", type=float, default=2.5, help="3.0：用 --label 记账时，一个任务最多花多少元，到了就停下这个任务接着跑下一个，默认 2.5")
     parser.add_argument("--allow-peak", action="store_true", help="3.0：允许在高峰时段跑（默认只在空闲时段跑）")
     parser.add_argument("--repeat", type=int, default=1, help="每个任务跑几遍，默认 1")
     parser.add_argument("--tasks", nargs="+", default=[], help="直接指定要跑的任务；给了就以它为准，不看 --set")

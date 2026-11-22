@@ -28,7 +28,7 @@ def _row(r: dict) -> str:
     if is_skipped(r):
         why = "到了花费上限，没跑" if r.get("skipped_for_cap") or r.get("skipped_for_budget") else "空闲时段结束，没跑"
         return f"| {r['task']} | {why} | - | - | - | - | - |"
-    ok = "成功" if r.get("success") else ("到上限停了" if r.get("stopped_for_cap") else "没成功")
+    ok = "成功" if r.get("success") else ("到上限停了" if r.get("stopped_for_cap") else "到任务上限停了" if r.get("stopped_for_task_cap") else "没成功")
     return (f"| {r['task']} | {ok} | {_n(max_dimension_deviation(r) if r.get('stages') else None, 3)} | {_n(r.get('duration_s'), 0)} | "
             f"{r.get('repairs', 0)} | {r.get('llm_calls', 0)} | {_n(_cost(r))} |")
 

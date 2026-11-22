@@ -11,7 +11,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Callable
 
-from benchmarks.ledger import LEDGER, BudgetExceeded, Ledger, LedgerError, metered
+from benchmarks.ledger import LEDGER, BudgetExceeded, Ledger, LedgerError, TaskCapExceeded, metered
 from benchmarks.report import render_results_md, render_summary_md
 from benchmarks.report_v3 import render_v3_md
 from benchmarks.run import _write_results, load_task, run_task
@@ -50,8 +50,10 @@ def check_ready(config: Config, ledger_path: Path, cap: float, allow_peak: bool,
 def run_metered(names: list[str], *, config: Config, label: str, cap: float, allow_peak: bool, results_dir: Path,
                 make_agent: Callable, make_sim_user: Callable, run_task_fn: Callable = run_task,
                 print_fn: Callable[..., None] = print, now: Callable[[], datetime] = datetime.now,
-                ledger_path: Path = LEDGER) -> list[dict] | None:
-    """make_agent(root, wrap) / make_sim_user(hidden_spec, wrap)：wrap(llm, who) 返回记账的模型。拒绝开跑时返回 None。"""
+                ledger_path: Path = LEDGER, task_cap: float | None = None) -> list[dict] | None:
+    """task_cap（元）：一个任务（智能体加模拟用户）花到这个数就停下这个任务，接着跑下一个；None 表示不设。
+
+    make_agent(root, wrap) / make_sim_user(hidden_spec, wrap)：wrap(llm, who) 返回记账的模型。拒绝开跑时返回 None。"""
     ledger, why = check_ready(config, ledger_path, cap, allow_peak, now())
     if why:
         print_fn(why)
@@ -69,10 +71,12 @@ def run_metered(names: list[str], *, config: Config, label: str, cap: float, all
             print_fn(f"== 任务 {name}：空闲时段已经结束，不再开始 ==")
             continue
         task = load_task(name)
-        wrap = lambda llm, who, _t=name: metered(llm, ledger, config, label, _t, who, now)   # noqa: E731
+        wrap = lambda llm, who, _t=name: metered(llm, ledger, config, label, _t, who, now, task_cap)   # noqa: E731
         print_fn(f"== 开始任务 {name} ==")
         try:
             result = run_task_fn(task, lambda root: make_agent(root, wrap), make_sim_user(task["hidden_spec"], wrap), results_dir / name)
+        except TaskCapExceeded:
+            result = {"task": name, **BLANK, "stopped_for_task_cap": True}
         except BudgetExceeded:
             result = {"task": name, **BLANK, "stopped_for_cap": True}
         except Exception as e:  # noqa: BLE001 - 一个任务出错（包括模拟用户调用出错）不影响其余任务，原因记下来
@@ -113,7 +117,7 @@ def main_metered(args, config: Config, names: list[str], print_fn: Callable[...,
 
     results_dir = Path(args.out) / f"{datetime.now().strftime('%Y%m%d-%H%M%S')}-{args.label}"
     results = run_metered(names, config=config, label=args.label, cap=args.cap, allow_peak=args.allow_peak, results_dir=results_dir,
-                          make_agent=make_agent, make_sim_user=make_sim_user, print_fn=print_fn)
+                          make_agent=make_agent, make_sim_user=make_sim_user, print_fn=print_fn, task_cap=args.task_cap)
     if results is None:
         return 2
     print_fn("\n" + render_summary_md(results) + "\n" + render_results_md(results))

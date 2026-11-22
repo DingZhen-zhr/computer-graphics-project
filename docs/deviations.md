@@ -290,3 +290,10 @@
 - 规矩：一个文件超过 300 行就拆。
 - 实际：`cad_agent/staged/specs.py` 在 3.0 里加了多零件的检查写法，到 405 行；`benchmarks/assembly_accept.py` 301 行。复查时才发现。
 - 处理：这次收尾只修会影响使用的问题，这两个文件没有拆（拆 `specs.py` 要连带改很多导入，需要再跑一遍完整全量）。以后改到它们时一起拆。
+
+## D42 评测加了单个任务的花费上限（3.0 修改清单第 1 条，用户批准）
+
+- 原计划：`benchmarks.run` 只有总上限 `--cap`。
+- 实际情况：第一轮 toolbox 一个任务花了 ¥10.45，把总上限用掉一半多，4 个留出任务没跑。
+- 怎么改：加 `--task-cap`（默认 2.5 元），`run_metered` 和 `metered` 多一个可选参数 `task_cap`，到了就抛 `TaskCapExceeded`（`BudgetExceeded` 的子类），结果记 `stopped_for_task_cap`，接着跑下一个任务。
+- 影响：计划 4 Task 7 第二轮的命令会带上这个上限；结果表里多一种"到任务上限停了"。

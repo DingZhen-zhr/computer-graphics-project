@@ -25,6 +25,10 @@ class BudgetExceeded(Exception):
     """累计花费到了上限：当前任务立刻停。"""
 
 
+class TaskCapExceeded(BudgetExceeded):
+    """这一个任务的花费到了它自己的上限：这个任务停，下一个任务照常开始（3.0 修改清单第 1 条）。"""
+
+
 @dataclass
 class Ledger:
     cap: float
@@ -65,6 +69,9 @@ class Ledger:
         if self.spent >= self.cap:
             raise BudgetExceeded(f"已花费 ¥{self.spent:.2f}，到了上限 ¥{self.cap:.2f}")
 
+    def task_spent(self, label: str, task: str) -> float:
+        return round(sum(e["cost"] for e in self.entries if e["label"] == label and e["task"] == task), 6)
+
     def remaining(self) -> float:
         return max(0.0, round(self.cap - self.spent, 6))
 
@@ -78,8 +85,10 @@ class Ledger:
 class _Metered:
     """包在 LLM 外面：每次调用之后按调用结束时刻的价格重新算费用，记进账本（到上限时抛 BudgetExceeded）。"""
 
-    def __init__(self, inner: LLM, ledger: Ledger, config, label: str, task: str, who: str, now: Callable[[], datetime]) -> None:
+    def __init__(self, inner: LLM, ledger: Ledger, config, label: str, task: str, who: str, now: Callable[[], datetime],
+                 task_cap: float | None = None) -> None:
         self.inner, self.ledger, self.config, self.label, self.task, self.who, self.now = inner, ledger, config, label, task, who, now
+        self.task_cap = task_cap
 
     def chat(self, messages: list[dict], tools: list[dict], **kw) -> LLMReply:   # noqa: ANN003 - 原样转给真正的模型
         reply = self.inner.chat(messages, tools, **kw)
@@ -89,9 +98,11 @@ class _Metered:
         cost = call_cost(reply.usage or {}, pricing) or 0.0
         reply.cost = cost
         self.ledger.add(self.label, self.task, self.who, cost, priced_as, ts=at)
+        if self.task_cap is not None and self.ledger.task_spent(self.label, self.task) >= self.task_cap:
+            raise TaskCapExceeded(f"任务 {self.task} 已花费 ¥{self.ledger.task_spent(self.label, self.task):.2f}，到了这个任务的上限 ¥{self.task_cap:.2f}")
         return reply
 
 
 def metered(llm: LLM, ledger: Ledger, config, label: str, task: str, who: str,
-            now: Callable[[], datetime] = datetime.now) -> LLM:
-    return _Metered(llm, ledger, config, label, task, who, now)
+            now: Callable[[], datetime] = datetime.now, task_cap: float | None = None) -> LLM:
+    return _Metered(llm, ledger, config, label, task, who, now, task_cap)
