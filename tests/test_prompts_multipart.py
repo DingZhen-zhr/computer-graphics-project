@@ -101,3 +101,10 @@ def test_assembly_examples_are_valid():
         for c in ex.get("couplings", []):
             names |= expr_names(c["ratio"])
         assert parse_assembly(ex, parts, cons, names)
+
+
+def test_no_unasked_trim():
+    # 3.0 修改清单第 4 条：倒角、圆角、沉孔这类修饰，用户没提就不加，要加先在提问里问
+    text = (PROMPT_DIR / "system_multipart.md").read_text(encoding="utf-8")
+    assert "孔口倒一个小角" not in text and "最后一步默认是" not in text
+    assert "倒角、圆角、沉孔这类修饰，用户没提就不加" in text and "在澄清的提问里问一句" in text
