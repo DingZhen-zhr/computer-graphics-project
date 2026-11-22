@@ -43,9 +43,11 @@ def test_readme_has_screenshot():
     assert m and (ROOT / m.group(1)).is_file()
 
 
-def test_readme_has_no_success_rate_for_v2():
+def test_readme_reports_v3_success_rate():
     section = _section("## 验证到什么程度")
-    assert "没有做过真实模型的成功率评测" in section
+    assert "docs/results-v3.md" in section
+    assert "留出任务" in section
+    assert "没有核对" in section
     assert "docs/results-v1.1.md" in section
 
 
