@@ -211,7 +211,7 @@ def work(vdir: Path, checks: list[dict]) -> list[dict]:
         if con.get("flip"):   # 声明里写了方向反过来（关节的正方向跟着它）
             d = [-v for v in d]
         found_axes[j["id"]] = (_apply(placements[pid], p), _applyv(placements[pid], d), j, mate["moving"].split(".")[0])
-    out, matched = [], {}
+    out, matched, signs = [], {}, {}
     for c in checks:
         t = c["type"]
         if t in POINT_TYPES:
@@ -220,8 +220,9 @@ def work(vdir: Path, checks: list[dict]) -> list[dict]:
             r = _joint(c, found_axes, values)
             if r.get("joint_id"):
                 matched[c["id"]] = r.pop("joint_id")
+                signs[matched[c["id"]]] = r.pop("sign")
         else:
-            r = _at_pose(c, matched, found_axes, asm, rest, values)
+            r = _at_pose(c, matched, found_axes, asm, rest, values, signs)
         out.append({"id": c["id"], "type": t, **r})
     return [{"mandatory_ok": valid}] + out
 
@@ -242,17 +243,26 @@ def _joint(c: dict, axes: dict, values: dict) -> dict:
             if math.sqrt(sum(a * a for a in cr)) / n > float(c["pos_tol"]):
                 continue
         lo, hi = sorted((_eval(j["range"][0], values), _eval(j["range"][1], values)))
-        ok = lo <= float(c["lo"]) + 1e-6 and hi >= float(c["hi"]) - 1e-6
-        return {"passed": ok, "measured": hi, "expected": float(c["hi"]), "joint_id": jid,
-                "detail": f"找到关节 {j['label']}，范围 {lo:g} 到 {hi:g}"}
+        # 方向不分正负，所以"轴反过来、角度也反过来"是同一个运动：原样盖不住要求的范围时，换成反过来的写法再比
+        # （3.0 修改清单第 2 条）。真的转错方向，后面的 at_pose 照样不通过。
+        sign = 1
+        if not _covers(lo, hi, c) and _covers(-hi, -lo, c):
+            sign, lo, hi = -1, -hi, -lo
+        ok = _covers(lo, hi, c)
+        return {"passed": ok, "measured": hi, "expected": float(c["hi"]), "joint_id": jid, "sign": sign,
+                "detail": f"找到关节 {j['label']}，范围 {lo:g} 到 {hi:g}" + ("（按反过来的方向算）" if sign < 0 else "")}
     return {"passed": False, "measured": None, "expected": None, "detail": "没有找到方向和位置都对的关节"}
 
 
-def _at_pose(c: dict, matched: dict, axes: dict, asm: dict, rest: dict, values: dict) -> dict:
+def _covers(lo: float, hi: float, c: dict) -> bool:
+    return lo <= float(c["lo"]) + 1e-6 and hi >= float(c["hi"]) - 1e-6
+
+
+def _at_pose(c: dict, matched: dict, axes: dict, asm: dict, rest: dict, values: dict, signs: dict | None = None) -> dict:
     jid = matched.get(c["joint"])
     if jid is None:
         return {"passed": False, "measured": None, "expected": None, "detail": "前面没有找到这个关节"}
-    moves = {jid: float(c["value"])}
+    moves = {jid: (signs or {}).get(jid, 1) * float(c["value"])}
     for cp in asm.get("couplings", []):   # 被它带动的关节一起动
         if cp["driver"] in moves:
             moves[cp["driven"]] = _eval(cp["ratio"], values) * moves[cp["driver"]]
