@@ -32,6 +32,7 @@ class Offpeak:
     start: str
     end: str
     pricing: Pricing
+    weekends: bool = False   # 周六、周日全天都按空闲价（3.0 修改清单第 6 条）
 
     def contains(self, t: "datetime.time") -> bool:
         s, e = (datetime.time.fromisoformat(x) for x in (self.start, self.end))
@@ -88,7 +89,9 @@ class Config:
     offpeak: Offpeak | None = None       # 空闲时段和价格（[llm.offpeak]），评测按时段计价用
 
     def is_offpeak(self, now: "datetime.datetime") -> bool:
-        return self.offpeak is not None and self.offpeak.contains(now.time())
+        if self.offpeak is None:
+            return False
+        return (self.offpeak.weekends and now.weekday() >= 5) or self.offpeak.contains(now.time())
 
     def price_at(self, now: "datetime.datetime") -> Pricing:
         """这一刻的价格：空闲时段内是空闲价，否则是高峰价（[llm.pricing]）。两段都要填，缺了抛 ConfigError。"""
@@ -152,7 +155,11 @@ def _parse_offpeak(data: dict) -> Offpeak:
             datetime.time.fromisoformat(str(v))
         except ValueError:
             raise ConfigError(f"[llm.offpeak] 的 {k} 要写成本机时间 \"HH:MM\"，收到 {v!r}") from None
-    return Offpeak(str(times["start"]), str(times["end"]), _parse_pricing("llm.offpeak", {k: v for k, v in data.items() if k not in times}))
+    weekends = data.get("weekends", False)
+    if not isinstance(weekends, bool):
+        raise ConfigError(f"[llm.offpeak] 的 weekends 要写 true 或 false，收到 {weekends!r}")
+    rest = {k: v for k, v in data.items() if k not in times and k != "weekends"}
+    return Offpeak(str(times["start"]), str(times["end"]), _parse_pricing("llm.offpeak", rest), weekends)
 
 
 def _parse_pricing(section: str, data: dict) -> Pricing:

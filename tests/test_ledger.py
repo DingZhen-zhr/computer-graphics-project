@@ -258,3 +258,16 @@ def test_task_cap_stops_one_task_and_runs_the_next(tmp_path):
     led = Ledger.load(tmp_path / "ledger.json", 20)
     assert led.spent == 4.0 and led.remaining() == 16.0
     assert "到任务上限停了" in render_v3_md(res)
+
+
+def test_weekends_are_offpeak_all_day_when_configured():
+    # 3.0 修改清单第 6 条：周末全天空闲价（周日 15:00 空闲，周一 15:00 高峰）
+    from cad_agent.config import _parse_offpeak
+
+    week = Offpeak("18:00", "09:00", OFF, weekends=True)
+    c = Config(base_url="x", model="m", pricing=PEAK, offpeak=week)
+    assert c.price_at(datetime(2026, 11, 22, 15, 0)) == OFF and c.is_offpeak(datetime(2026, 11, 21, 12, 0))
+    assert c.price_at(datetime(2026, 11, 23, 15, 0)) == PEAK and c.price_at(datetime(2026, 11, 23, 19, 0)) == OFF
+    assert not cfg().is_offpeak(datetime(2026, 11, 22, 15, 0))   # 不写 weekends 时照旧只看钟点
+    parsed = _parse_offpeak({"start": "18:00", "end": "09:00", "weekends": True, "input_hit": 0.02, "input_miss": 1, "output": 4})
+    assert parsed.weekends and parsed.pricing.output == 4
