@@ -19,6 +19,7 @@ export const TEXT = {
   stepTodo: "没开始",
   notePlaceholder: "正在做。想补充或改什么，直接说，它做完手上这一步就会看",
   noted: "记下了，它做完手上这一步就会看",
+  allSuggested: "都按建议",
 };
 
 function lastAssistant(state) {
@@ -54,9 +55,11 @@ function buildingSubtitle(state) {
   return `正在做，第 ${k} 步，共 ${stages.length} 步`;
 }
 
-// 只有一个问题、而且问题里给了选项（"A 还是 B"、"建议 X"）时，给出可以直接点的按钮
+// 几个问题都带建议值时给"都按建议"；只有一个问题、而且问题里给了选项（"A 还是 B"、"建议 X"）时，给出可以直接点的按钮
 export function choicesFor(entry) {
-  if (!entry || entry.kind !== "question" || !Array.isArray(entry.questions) || entry.questions.length !== 1) return [];
+  if (!entry || entry.kind !== "question" || !Array.isArray(entry.questions)) return [];
+  if (entry.questions.length > 1) return entry.questions.every((q) => q.includes("建议")) ? [TEXT.allSuggested] : [];   // 每个都有建议值才行，不然没建议的那个没人答
+  if (entry.questions.length !== 1) return [];
   const q = entry.questions[0];
   const either = q.match(/([^，。？?、\s]{1,12})还是([^，。？?、\s]{1,12})[？?]?/);
   if (either) return [either[1], either[2]];

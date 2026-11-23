@@ -326,3 +326,14 @@ def test_unbuilt_edits_set_by_each_edit():
         box.unbuilt_edits = False
         assert "error" not in j(box.call(name, args)), name
         assert box.unbuilt_edits, name
+
+
+ASK_ONCE = ("   - 要问的一次问完：把还没定的尺寸和做法都放进同一次提问，每个都给建议值，用户回\"都按建议\"就全部按建议值记下。"
+            "用户回答以后，只有答案互相矛盾、或者缺了做不下去的东西时才再问；量法、对齐这类小事按常见做法定下，写进需求单，"
+            "确认时用户能看到，不要为它单独再问一轮。")
+
+
+def test_ask_once_with_suggestions():
+    """计划 6 Task 4：问答一次问完（学老师平台；对应 toolbox 第二轮卡在问答轮数上的 F7）。"""
+    text = (PROMPT_DIR / "system_v2.md").read_text(encoding="utf-8")
+    assert ASK_ONCE in text.splitlines()

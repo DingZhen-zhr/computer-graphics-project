@@ -128,3 +128,10 @@ test("note texts", () => {
 test("stepsView multi part hidden while still asking", () => {
   for (const phase of ["clarify", "confirm"]) assert.equal(stepsView({ ...base, busy: true, phase, product: parts3("todo") }), null);
 });
+
+// ---- 一次问完（计划 6 Task 4）
+test("choicesFor offers all-suggested for several questions with suggestions", () => {
+  const e = { kind: "question", questions: ["铰链轴放在哪？建议 5 mm。", "最多翻开多少度？建议 110 度。"] };
+  assert.deepEqual(choicesFor(e), ["都按建议"]);
+  assert.deepEqual(choicesFor({ kind: "question", questions: ["多宽？", "多高？"] }), []);
+});
