@@ -18,13 +18,14 @@ from cad_agent.agent.automation import (AUTO_BUILD_NOTE, AUTO_BUILD_PREFIX, SKIP
                                         should_auto_build, should_auto_confirm, should_build_before_reply, staged_build_ready)
 from cad_agent.agent.context import Context, with_warning
 from cad_agent.agent.counters import _Counters
+from cad_agent.agent.notes import NoteBox
 from cad_agent.agent.delivery import failure_text
 from cad_agent.agent.staged_hooks import StagedHooks
 from cad_agent.cases import Case, pick_cases, render_cases
 from cad_agent.agent.review_step import ReviewDecision, ReviewStep, deliver, review_then_deliver
 from cad_agent.agent.state import load_system_prompt, render_snapshot
 from cad_agent.config import Config
-from cad_agent.agent.turn import (AFFIRMATIVE, CONFIRMED_MESSAGE, STOPPED_TEXT, AgentTurn, Kind, _raw_arguments,  # noqa: F401
+from cad_agent.agent.turn import (AFFIRMATIVE, CONFIRMED_MESSAGE, STOPPED_TEXT, AgentTurn, Kind, _raw_arguments, assistant_message,  # noqa: F401
                                   is_affirmative)
 from cad_agent.llm.client import LLM, LLMError, LLMReply, LLMStopped, ToolCall
 from cad_agent.product.flow import ProductFlow
@@ -57,10 +58,15 @@ class Agent:
         self.on_delta: Callable[[str], None] | None = None   # 界面设置；有文字片段时调用（设了才用流式请求）
         self._stop = threading.Event()         # 用户要求停止；每轮开始时清掉
         self.toolbox.should_stop = self._stop.is_set   # 沙盒运行中也能停
+        self.notes = NoteBox()                  # 工作中用户补充的话（计划 6）
 
     def request_stop(self) -> None:
         """线程安全：置停止标志。主循环在每次模型调用、每个片段、每次工具调用之前检查，沙盒子进程会被结束。"""
         self._stop.set()
+
+    def add_note(self, text: str) -> None:
+        """线程安全：用户在这一轮进行中补充的话，下一次调用模型前送到。"""
+        self.notes.put(text)
 
     @property
     def ws(self) -> Workspace:
@@ -93,6 +99,9 @@ class Agent:
         while True:
             if self._stop.is_set():
                 return self._end("stopped", STOPPED_TEXT, c)
+            for note in self.notes.drain():
+                self.context.add_note(note)
+                self.session.log("note", text=note)
             try:
                 reply = self._chat(llm)
             except LLMStopped:
@@ -100,7 +109,7 @@ class Agent:
             except LLMError as e:
                 return self._end("failed", f"模型调用失败：{e}。需求单和已经写好的特征都还在，可以稍后再发一次。", c)
             c.add(reply)
-            self.context.append(self._assistant_message(reply))
+            self.context.append(assistant_message(reply))
             self.session.log("assistant", content=reply.content, usage=reply.usage, cost=reply.cost,
                              tool_calls=[{"name": tc.name, "args": tc.arguments} for tc in reply.tool_calls])
             if not reply.tool_calls:
@@ -131,16 +140,6 @@ class Agent:
                 self.session.log("cases", ids=[c.id for c in picked])
                 snap += "\n\n" + render_cases(picked)
         return snap
-
-    @staticmethod
-    def _assistant_message(reply: LLMReply) -> dict:
-        msg: dict = {"role": "assistant", "content": reply.content}
-        if reply.tool_calls:
-            msg["tool_calls"] = [
-                {"id": tc.id, "type": "function", "function": {"name": tc.name, "arguments": _raw_arguments(tc)}}
-                for tc in reply.tool_calls
-            ]
-        return msg
 
     # ---------------------------------------------------------------- 工具
     def _run_tools(self, reply: LLMReply, c: _Counters) -> AgentTurn | None:

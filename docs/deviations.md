@@ -317,3 +317,10 @@
 - 实际情况：这个第二版的旧测试要求 README 写着"没有做过真实模型的成功率评测"，和 Task 9 冲突。
 - 怎么改：2026-11-23 用户同意后，改名为 `test_readme_reports_v3_success_rate`，断言这一节指向 `docs/results-v3.md`、写了留出任务、写了"没有核对"；原来 `docs/results-v1.1.md` 的断言保留，README 里留了一句指向它。
 - 影响：只有这一个测试。
+
+## D46 计划 6 Task 2：`Workbench.submit` 正忙时不再抛 Busy
+
+- 原来：`Workbench.submit(text) -> None`，正忙时抛 `Busy`，接口回 409。
+- 现在：`Workbench.submit(text) -> str`，返回 `"turn"`（开了新的一轮）或 `"note"`（正忙，作为补充送给正在工作的智能体）；接口忙时回 200、`{"ok": true, "note": true}`。改参数、删会话正忙时仍是 409。
+- 原因：学老师平台"工作中可以插话"（计划 6）。
+- 影响：两个旧测试照计划 6 的清单改了；`test_busy_rejects_params_message_and_delete` 里"只有 1 轮"的断言也改成 2 轮（第二条作为补充接着开了一轮）。

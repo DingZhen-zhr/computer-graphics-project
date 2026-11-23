@@ -8,6 +8,8 @@ from __future__ import annotations
 import json
 
 USER_HEADER = "【用户说】"
+NOTE_HEADER = "【你工作时用户补充的话，先看这条再继续】"
+NOTE_MARK = "（中途补充）"
 CONFIRM_COMPACT = "（已把需求单发给用户确认）"
 CHANGE_PREFIX = "本版变化："
 WARNING_THRESHOLD = 5  # 本轮工具调用只剩这么多次或更少时，开始在工具返回里提醒
@@ -52,6 +54,7 @@ class Context:
         self._turn_user: dict | None = None  # 本轮的 user 消息（快照 + 原话）
         self._current: list[dict] = []      # 本轮已发生的 assistant / tool 消息
         self._fold_at = 0                    # 分阶段时：本轮里上一个折叠点（_current 里的位置）
+        self._notes: list[tuple[str, dict]] = []         # 本轮用户中途补充的话（折叠时保留）
 
     def restore(self, past: list[dict]) -> None:
         """直接设置"之前各轮的折叠版"（从会话目录恢复时用）。"""
@@ -62,10 +65,18 @@ class Context:
         self._turn_user = {"role": "user", "content": f"{snapshot}\n\n{USER_HEADER}\n{user_content}"}
         self._current = []
         self._fold_at = 0
+        self._notes = []
+
+    def add_note(self, text: str) -> None:
+        """用户在这一轮进行中补充的一句话：作为一条 user 消息追加，折叠和本轮结束时都保留。"""
+        msg = {"role": "user", "content": f"{NOTE_HEADER}\n{text}"}
+        self._notes.append((text, msg))
+        self._current.append(msg)
 
     def fold(self, summary: str) -> None:
         """把本轮上一个折叠点之后的全部消息换成一条 user 消息（阶段小结），折叠点移到它后面。"""
-        self._current = self._current[: self._fold_at] + [{"role": "user", "content": summary}]
+        kept = [m for m in self._current[self._fold_at:] if any(m is n for _, n in self._notes)]
+        self._current = self._current[: self._fold_at] + [{"role": "user", "content": summary}] + kept
         self._fold_at = len(self._current)
 
     def append(self, message: dict) -> None:
@@ -74,7 +85,8 @@ class Context:
     def end_turn(self, kind: str, text: str) -> None:
         if self._raw_user is None:
             return
-        self._past += [{"role": "user", "content": self._raw_user}, {"role": "assistant", "content": compact_text(kind, text)}]
+        said = "\n".join([self._raw_user] + [NOTE_MARK + t for t, _ in self._notes])
+        self._past += [{"role": "user", "content": said}, {"role": "assistant", "content": compact_text(kind, text)}]
         self._raw_user, self._turn_user, self._current = None, None, []
         self._fold_at = 0
 

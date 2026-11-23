@@ -106,7 +106,8 @@ def _dispatch(hub: Hub, method: str, segs: list[str], query: dict, body: Any, re
     if route == ("GET", "state"):
         return hub.open(sid).state()
     if route == ("POST", "message"):
-        hub.open(sid).submit(_text(body, "text"))
+        if hub.open(sid).submit(_text(body, "text")) == "note":
+            return {"ok": True, "note": True}   # 正忙：作为补充送进去了
         return {"ok": True}
     if route == ("POST", "stop"):
         hub.open(sid).stop()

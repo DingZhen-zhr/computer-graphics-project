@@ -621,3 +621,46 @@ def test_stl_failure_does_not_block_delivery(tmp_path):
     rows = [r for r in log_rows(session) if r["kind"] == "stl_error"]
     assert len(rows) == 1 and "boom" in rows[0]["message"]
     assert [r["kind"] for r in log_rows(session)][-1] == "delivered"
+
+
+# ---- 工作中补充（计划 6 Task 2）
+class NoteOnFirstCall(ScriptedLLM):
+    """第一次被调用时，模拟用户在它工作期间补充了一句话。"""
+
+    def __init__(self, replies, note):
+        super().__init__(replies)
+        self.note, self.agent = note, None
+
+    def chat(self, messages, tools, **kw):
+        reply = super().chat(messages, tools, **kw)
+        if len(self.calls) == 1:
+            self.agent.add_note(self.note)
+        return reply
+
+
+def _note_agent(tmp_path, confirmed, first):
+    llm = NoteOnFirstCall([first, LLMReply("好的", [], {})], "加高到 70")
+    agent, ws, _, runner, session = make_agent(tmp_path, [], confirmed=confirmed)
+    agent.llm = llm
+    llm.agent = agent
+    return agent, llm, session
+
+
+def _logged(session, kind):
+    rows = [json.loads(line) for line in (session.dir / "log.jsonl").read_text(encoding="utf-8").splitlines()]
+    return [r for r in rows if r.get("kind") == kind]
+
+
+def test_note_reaches_model_before_next_call(tmp_path):
+    agent, llm, session = _note_agent(tmp_path, True, scripted_call("no_such_tool", {}))
+    agent.handle_user("开始")
+    assert len(llm.calls) == 2
+    assert not any("加高到 70" in str(m.get("content")) for m in llm.calls[0])
+    assert any("加高到 70" in str(m.get("content")) for m in llm.calls[1])
+    assert [r["text"] for r in _logged(session, "note")] == ["加高到 70"]
+
+
+def test_note_during_clarify_reaches_model(tmp_path):
+    agent, llm, session = _note_agent(tmp_path, False, scripted_call("no_such_tool", {}))   # update_brief 会直接结束这一轮
+    agent.handle_user("做个手机支架")
+    assert any("加高到 70" in str(m.get("content")) for m in llm.calls[1])

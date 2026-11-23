@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
 
-from cad_agent.llm.client import ToolCall
+from cad_agent.llm.client import LLMReply, ToolCall
 
 Kind = Literal["reply", "question", "confirm", "delivered", "failed", "stopped"]
 AFFIRMATIVE = {"y", "yes", "ok", "确认", "可以", "没问题", "好", "对", "行"}
@@ -41,6 +41,17 @@ def _raw_arguments(tc: ToolCall) -> str:
     if set(tc.arguments) == {"__raw__"}:
         return str(tc.arguments["__raw__"])
     return json.dumps(tc.arguments, ensure_ascii=False)
+
+
+def assistant_message(reply: LLMReply) -> dict:
+    """放回对话历史里的 assistant 消息（带工具调用）。"""
+    msg: dict = {"role": "assistant", "content": reply.content}
+    if reply.tool_calls:
+        msg["tool_calls"] = [
+            {"id": tc.id, "type": "function", "function": {"name": tc.name, "arguments": _raw_arguments(tc)}}
+            for tc in reply.tool_calls
+        ]
+    return msg
 
 
 STOPPED_TEXT = "已停止。已经写下的内容都保留着，可以接着说。"

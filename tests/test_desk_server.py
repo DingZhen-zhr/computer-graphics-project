@@ -208,8 +208,9 @@ def test_busy_is_409(serve):
     sid = hub.create()
     assert c.call("POST", f"/api/sessions/{sid}/message", {"text": "你好"})[0] == 200
     assert gate.entered.wait(5)
-    for method, path, body in (("POST", f"/api/sessions/{sid}/message", {"text": "再来"}),
-                               ("POST", f"/api/sessions/{sid}/params", {"values": {"phone_w": 90}}),
+    status, data, _ = c.call("POST", f"/api/sessions/{sid}/message", {"text": "再来"})   # 计划 6：忙时是补充
+    assert status == 200 and data == {"ok": True, "note": True}
+    for method, path, body in (("POST", f"/api/sessions/{sid}/params", {"values": {"phone_w": 90}}),
                                ("DELETE", f"/api/sessions/{sid}", None)):
         status, data, _ = c.call(method, path, body)
         assert status == 409 and data["error"], path

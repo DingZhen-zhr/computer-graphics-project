@@ -202,16 +202,33 @@ class Workbench:
             self.session.set_meta(updated=datetime.datetime.now().isoformat(timespec="seconds"))
             self.bus.publish("state", state=self.state())
 
-    def submit(self, text: str) -> None:
+    def submit(self, text: str) -> str:
+        """开一轮新的对话，返回 "turn"；正忙时作为补充送给正在工作的智能体，返回 "note"。"""
         if self.demo or self.agent is None:
             raise PermissionError(DEMO_TEXT)
         if not isinstance(text, str) or not text.strip():
             raise ValueError("消息不能为空")
+        with self._mu:
+            if self._busy:
+                self.agent.add_note(text.strip())
+                self.bus.publish("note", text=text.strip())
+                return "note"
         self._claim()
         self._thread = threading.Thread(target=self._work, args=(text.strip(),), daemon=True, name=f"{brand.COMMAND}-turn")
         self._thread.start()
+        return "turn"
 
     def _work(self, text: str) -> None:
+        while True:
+            self._one_turn(text)
+            with self._mu:   # 查补充和清"正忙"在同一把锁里，补充不会落在两者之间丢掉
+                left = self.agent.notes.drain()
+                if not left:
+                    self._release()
+                    return
+            text = "\n".join(left)   # 一轮结束时才送到的补充：接着开一轮处理它（仍算正忙）
+
+    def _one_turn(self, text: str) -> None:
         try:
             self.agent.handle_user(text)
         except Exception:  # noqa: BLE001 - 任何意外都变成一条 error 事件，界面不能卡死；堆栈只进程序日志
@@ -223,8 +240,6 @@ class Workbench:
                 except Exception:  # noqa: BLE001
                     logger.exception("写 error 日志失败")
                 self.bus.publish("error", message=CRASH_TEXT)
-        finally:
-            self._release()
 
     def stop(self) -> None:
         if self.agent is not None:

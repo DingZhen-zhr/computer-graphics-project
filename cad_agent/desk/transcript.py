@@ -60,7 +60,7 @@ def build_transcript(rows: list[dict], version_extra: Callable[[str], dict] | No
 
     for row in rows:
         kind = row.get("kind")
-        if kind == "user":
+        if kind in ("user", "note"):   # note：工作中补充的话，也是用户说的
             out.append({"role": "user", "text": str(row.get("text", ""))})
             work, auto_reason = None, None
         elif kind == "auto" and row.get("action") == "build":

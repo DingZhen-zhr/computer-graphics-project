@@ -190,14 +190,13 @@ def test_busy_rejects_params_message_and_delete(tmp_path):
     wb, _ = make_wb(tmp_path, llm)
     wb.submit("第一条")
     assert llm.entered.wait(5) and wb.is_busy() and wb.state()["busy"] is True
-    with pytest.raises(Busy):
-        wb.submit("第二条")
+    assert wb.submit("第二条") == "note"   # 计划 6：忙时发的话作为补充送进去，不再抛 Busy
     with pytest.raises(Busy):
         wb.apply_params({"phone_w": 90})
     llm.gate.set()
     wait_idle(wb)
     end = [e for e in wb.bus.since(0) if e["type"] == "turn_end"]
-    assert len(end) == 1 and end[0]["kind"] == "reply" and end[0]["text"] == "好的"
+    assert [(e["kind"], e["text"]) for e in end] == [("reply", "好的")] * 2   # 计划 6：第二条作为补充，接着开了一轮
 
 
 def test_empty_message_is_value_error(tmp_path):
@@ -417,3 +416,55 @@ def test_part_done_and_assembly_push_state(tmp_path):
         before = wb.bus.last_seq()
         session.log(kind, **data)
         assert types(wb.bus.since(before)) == ["state"], kind
+
+
+# ---- 工作中补充（计划 6 Task 2）
+class GateSeqLLM:
+    """第一次调用卡住直到放行，然后按顺序返回 replies；记下每次收到的消息。"""
+
+    def __init__(self, replies) -> None:
+        self.gate, self.entered, self.replies, self.calls = threading.Event(), threading.Event(), list(replies), []
+
+    def chat(self, messages, tools, *, on_delta=None, should_stop=None):
+        self.calls.append([dict(m) for m in messages])
+        if len(self.calls) == 1:
+            self.entered.set()
+            assert self.gate.wait(15), "测试没有放行"
+        return self.replies.pop(0)
+
+
+def _users(wb):
+    return [t["text"] for t in wb.state()["transcript"] if t["role"] == "user"]
+
+
+def test_submit_while_busy_becomes_note(tmp_path):
+    llm = GateSeqLLM([scripted_call("no_such_tool", {}), LLMReply("好的", [], {})])
+    wb, _ = make_wb(tmp_path, llm)
+    assert wb.submit("第一条") == "turn"
+    assert llm.entered.wait(5)
+    assert wb.submit("第二条") == "note"
+    llm.gate.set()
+    wait_idle(wb)
+    assert any("第二条" in str(m.get("content")) for m in llm.calls[1])
+    assert _users(wb) == ["第一条", "第二条"]
+    assert len([e for e in wb.bus.since(0) if e["type"] == "turn_end"]) == 1
+
+
+def test_note_left_at_turn_end_starts_next_turn(tmp_path):
+    llm = GateSeqLLM([LLMReply("好的", [], {}), LLMReply("收到", [], {})])
+    wb, _ = make_wb(tmp_path, llm)
+    wb.submit("第一条")
+    assert llm.entered.wait(5)
+    assert wb.submit("第二条") == "note"
+    llm.gate.set()
+    wait_idle(wb)
+    assert len([e for e in wb.bus.since(0) if e["type"] == "turn_end"]) == 2
+    assert any("第二条" in str(m.get("content")) for m in llm.calls[1])
+    assert _users(wb) == ["第一条", "第二条"]
+
+
+def test_demo_session_cannot_add_note(tmp_path):
+    wb = Workbench(None, Session(tmp_path / "sessions"), demo=True)
+    wb._busy = True
+    with pytest.raises(PermissionError):
+        wb.submit("补一句")

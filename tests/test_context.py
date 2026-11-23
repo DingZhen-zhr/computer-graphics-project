@@ -1,6 +1,6 @@
 import json
 
-from cad_agent.agent.context import CONFIRM_COMPACT, USER_HEADER, Context, compact_text, with_warning
+from cad_agent.agent.context import CONFIRM_COMPACT, NOTE_HEADER, USER_HEADER, Context, compact_text, with_warning
 
 SNAPSHOT = "【当前状态（程序生成，不是用户说的话）】\n阶段：澄清中（需求单未确认）"
 
@@ -66,3 +66,32 @@ def test_with_warning():
     assert json.loads(with_warning(content, 0))["warning"] == "本轮工具调用只剩 0 次"
     for plain in ("不是 JSON", "[1, 2]", "42"):
         assert with_warning(plain, 1) == plain
+
+
+# ---- 工作中补充（计划 6 Task 2）
+def test_note_is_user_message_in_turn():
+    c = Context("sys")
+    c.start_turn("做个盒子", "快照")
+    c.add_note("改成 95 度")
+    last = c.messages()[-1]
+    assert last["role"] == "user" and last["content"].startswith(NOTE_HEADER) and "改成 95 度" in last["content"]
+
+
+def test_note_survives_fold():
+    c = Context("sys")
+    c.start_turn("做个盒子", "快照")
+    c.append({"role": "assistant", "content": "好"})
+    c.add_note("加高到 70")
+    c.fold("小结")
+    msgs = c.messages()
+    i = next(k for k, m in enumerate(msgs) if m["content"] == "小结")
+    assert any("加高到 70" in m["content"] for m in msgs[i + 1:])
+
+
+def test_note_kept_when_turn_ends():
+    c = Context("sys")
+    c.start_turn("做个盒子", "快照")
+    c.add_note("加高到 70")
+    c.end_turn("reply", "好")
+    user = [m for m in c.messages() if m["role"] == "user"][-1]["content"]
+    assert "做个盒子" in user and "加高到 70" in user
