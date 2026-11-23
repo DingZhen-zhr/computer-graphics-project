@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { choicesFor, phaseView, scoreView, TEXT } from "../stage-logic.js";
+import { choicesFor, phaseView, scoreView, stepsView, TEXT } from "../stage-logic.js";
 
 const session = { id: "s", title: "t", demo: false };
 const base = { session, busy: false, phase: "clarify", transcript: [], brief: null, plan: null, versions: [], checks: [], product: null };
@@ -70,4 +70,43 @@ test("scoreView", () => {
   const s = scoreView({ ...base, phase: "delivered", checks: [{ passed: true }, { passed: true }] });
   assert.deepEqual(s, { text: "2/2", label: "项全部量过，都对" });
   assert.equal(scoreView({ ...base, phase: "modeling", checks: [{ passed: true }, { passed: false }] }).label, "项已经量过");
+});
+
+// ---- 进度清单（计划 6 Task 1）
+const stagePlan = { current: "s2", stages: [{ id: "s1", title: "底板", passed: true }, { id: "s2", title: "开孔", passed: false }] };
+const parts3 = (assembly) => ({ parts: [
+  { id: "a", name: "盒体", status: "done", checks: { passed: 3, total: 3 } },
+  { id: "b", name: "盖子", status: "current", checks: { passed: 0, total: 2 } },
+  { id: "c", name: "提手", status: "todo", checks: { passed: 0, total: 0 } }], assembly });
+
+test("stepsView single part lists stages", () => {
+  const v = stepsView({ ...base, busy: true, phase: "modeling", plan: stagePlan, checks: [{ stage: "s1", passed: true }] });
+  assert.deepEqual(v.items.map((i) => i.status), ["done", "run"]);
+  assert.deepEqual(v.items.map((i) => i.note), ["✓ 1/1", "进行中"]);
+  assert.ok(v.items.every((i) => i.clickable));
+  assert.deepEqual([v.done, v.total], [1, 2]);
+});
+
+test("stepsView multi part lists parts then assembly", () => {
+  const v = stepsView({ ...base, busy: true, phase: "modeling", product: parts3("todo") });
+  assert.deepEqual(v.items.map((i) => i.title), ["盒体", "盖子", "提手", "装起来"]);
+  assert.deepEqual(v.items.map((i) => i.status), ["done", "run", "todo", "todo"]);
+  assert.equal(v.items[0].note, "✓ 3/3");
+  assert.ok(v.items.every((i) => !i.clickable));
+  assert.deepEqual([v.done, v.total], [1, 4]);
+});
+
+test("stepsView assembly failed shows failed", () => {
+  const prod = { parts: parts3("failed").parts.map((p) => ({ ...p, status: "done" })), assembly: "failed" };
+  const v = stepsView({ ...base, busy: false, phase: "modeling", product: prod });
+  const last = v.items[v.items.length - 1];
+  assert.deepEqual([last.status, last.note], ["failed", "没过，在改"]);
+});
+
+test("stepsView hides when nothing to show", () => {
+  assert.equal(stepsView(base), null);
+});
+
+test("stepsView multi part hides after delivery", () => {
+  assert.equal(stepsView({ ...base, busy: false, phase: "delivered", versions: [{ name: "v1" }], product: parts3("passed") }), null);
 });

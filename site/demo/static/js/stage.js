@@ -1,7 +1,7 @@
 // 舞台外壳：标题、副标题、字幕、可以直接点的回答、输入框（运行时变成停止）、四角的按钮、左边的步骤、右边的大数字。
 import { isStatic } from "./api.js";
 import { $, clear, h } from "./dom.js";
-import { phaseView, scoreView, TEXT } from "./stage-logic.js";
+import { phaseView, scoreView, stepsView, TEXT } from "./stage-logic.js";
 
 export { phaseView } from "./stage-logic.js";
 
@@ -32,19 +32,19 @@ export function focusPrompt() { if (ui) ui.input.focus(); }
 
 function renderSteps(state) {
   const el = $("steps");
-  const stages = (state.plan && state.plan.stages) || [];
-  if (state.product || !stages.length) { el.classList.add("gone"); return; }
+  const v = stepsView(state);
+  const multi = !!(state.product && state.product.parts && state.product.parts.length);
+  const parts = $("parts");
+  if (parts) parts.classList.toggle("gone", !!(v && multi));   // 多零件清单和零件面板在同一个位置
+  if (!v) { el.classList.add("gone"); return; }
   el.classList.remove("gone");
-  const checksOf = (id) => (state.checks || []).filter((c) => c.stage === id);
-  clear(el, stages.map((s) => {
-    const running = state.busy && s.id === state.plan.current;
-    const n = checksOf(s.id);
-    const done = s.passed;
+  const cls = { done: "status-ok", failed: "status-bad" };
+  clear(el, [h("small", {}, `${TEXT.stepsDone} ${v.done}/${v.total}`), ...v.items.map((s) => {
+    const body = [h("i", { class: s.status }), s.title, h("em", { class: `num ${cls[s.status] || "mute"}` }, s.note)];
+    if (!s.clickable) return h("div", { class: "step" }, ...body);
     return h("button", { type: "button", class: ui.stepFocus === s.id ? "on" : "", "aria-pressed": String(ui.stepFocus === s.id),
-      onclick: () => { ui.stepFocus = ui.stepFocus === s.id ? null : s.id; ui.actions.showStage(ui.stepFocus); renderSteps(state); } },
-      h("i", { class: done ? "done" : running ? "run" : "" }), s.title,
-      h("em", { class: `num ${done ? "status-ok" : "mute"}` }, done ? `✓ ${n.filter((c) => c.passed).length}/${n.length}` : running ? "进行中" : "没开始"));
-  }));
+      onclick: () => { ui.stepFocus = ui.stepFocus === s.id ? null : s.id; ui.actions.showStage(ui.stepFocus); renderSteps(state); } }, ...body);
+  })]);
 }
 
 export function renderStage(state) {

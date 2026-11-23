@@ -12,6 +12,11 @@ export const TEXT = {
   assembling: "正在装起来",
   allPassed: "项全部量过，都对",
   someChecked: "项已经量过",
+  assemble: "装起来",
+  stepFailed: "没过，在改",
+  stepsDone: "已完成",
+  stepRun: "进行中",
+  stepTodo: "没开始",
 };
 
 function lastAssistant(state) {
@@ -97,4 +102,32 @@ export function scoreView(state) {
   if (!checks.length) return null;
   const passed = checks.filter((c) => c.passed).length;
   return { text: `${passed}/${checks.length}`, label: passed === checks.length && state.phase === "delivered" ? TEXT.allPassed : TEXT.someChecked };
+}
+
+// 左边的进度清单：单零件列阶段（可以点），多零件列零件和最后的"装起来"（只看）。交付后多零件不列（那里是零件面板）。
+export function stepsView(state) {
+  const prod = state.product;
+  if (prod && prod.parts && prod.parts.length) {
+    if (!state.busy && (state.versions || []).length) return null;
+    const allDone = prod.parts.every((p) => p.status === "done");
+    const items = prod.parts.map((p) => {
+      const status = p.status === "done" ? "done" : p.status === "current" && state.busy ? "run" : "todo";
+      const c = p.checks || { passed: 0, total: 0 };
+      return { id: p.id, title: p.name, status, clickable: false,
+        note: status === "done" ? `✓ ${c.passed}/${c.total}` : status === "run" ? TEXT.stepRun : TEXT.stepTodo };
+    });
+    const a = prod.assembly === "passed" ? "done" : prod.assembly === "failed" ? "failed" : allDone && state.busy ? "run" : "todo";
+    items.push({ id: "assembly", title: TEXT.assemble, status: a, clickable: false,
+      note: a === "done" ? "✓" : a === "failed" ? TEXT.stepFailed : a === "run" ? TEXT.stepRun : TEXT.stepTodo });
+    return { items, done: items.filter((i) => i.status === "done").length, total: items.length };
+  }
+  const stages = (state.plan && state.plan.stages) || [];
+  if (!stages.length) return null;
+  const items = stages.map((s) => {
+    const n = (state.checks || []).filter((c) => c.stage === s.id);
+    const status = s.passed ? "done" : state.busy && s.id === state.plan.current ? "run" : "todo";
+    return { id: s.id, title: s.title, status, clickable: true,
+      note: status === "done" ? `✓ ${n.filter((c) => c.passed).length}/${n.length}` : status === "run" ? TEXT.stepRun : TEXT.stepTodo };
+  });
+  return { items, done: items.filter((i) => i.status === "done").length, total: items.length };
 }
