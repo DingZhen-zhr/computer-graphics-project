@@ -17,6 +17,8 @@ export const TEXT = {
   stepsDone: "已完成",
   stepRun: "进行中",
   stepTodo: "没开始",
+  notePlaceholder: "正在做。想补充或改什么，直接说，它做完手上这一步就会看",
+  noted: "记下了，它做完手上这一步就会看",
 };
 
 function lastAssistant(state) {
@@ -108,6 +110,7 @@ export function scoreView(state) {
 export function stepsView(state) {
   const prod = state.product;
   if (prod && prod.parts && prod.parts.length) {
+    if (state.phase === "clarify" || state.phase === "confirm") return null;   // 还在问，没开始做
     if (!state.busy && (state.versions || []).length) return null;
     const allDone = prod.parts.every((p) => p.status === "done");
     const items = prod.parts.map((p) => {
@@ -130,4 +133,11 @@ export function stepsView(state) {
       note: status === "done" ? `✓ ${n.filter((c) => c.passed).length}/${n.length}` : status === "run" ? TEXT.stepRun : TEXT.stepTodo };
   });
   return { items, done: items.filter((i) => i.status === "done").length, total: items.length };
+}
+
+// 输入框的按钮和回车做什么：发送、工作中补充、停止，示例会话什么都不做
+export function sendMode(state, hasText) {
+  if (state.session && state.session.demo) return "none";
+  if (state.busy) return hasText ? "note" : "stop";
+  return hasText ? "send" : "none";
 }

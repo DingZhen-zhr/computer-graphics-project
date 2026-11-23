@@ -1,7 +1,7 @@
 // 舞台外壳：标题、副标题、字幕、可以直接点的回答、输入框（运行时变成停止）、四角的按钮、左边的步骤、右边的大数字。
 import { isStatic } from "./api.js";
 import { $, clear, h } from "./dom.js";
-import { phaseView, scoreView, stepsView, TEXT } from "./stage-logic.js";
+import { phaseView, scoreView, sendMode, stepsView, TEXT } from "./stage-logic.js";
 
 export { phaseView } from "./stage-logic.js";
 
@@ -15,8 +15,11 @@ export function mountStage(actions) {
   input.addEventListener("keydown", (e) => {
     if (e.key === "Enter" && !e.shiftKey && !e.isComposing) { e.preventDefault(); submit(); }
   });
-  input.addEventListener("input", () => { input.style.height = "auto"; input.style.height = `${Math.min(input.scrollHeight, 132)}px`; });
-  send.addEventListener("click", () => (ui.state && ui.state.busy ? actions.stop() : submit()));
+  input.addEventListener("input", () => { input.style.height = "auto"; input.style.height = `${Math.min(input.scrollHeight, 132)}px`; syncSend(); });
+  send.addEventListener("click", () => {
+    if (ui.state && sendMode(ui.state, !!ui.input.value.trim()) === "stop") actions.stop();
+    else submit();
+  });
   clear($("prompt"), input, send);
   ui = { actions, input, send, state: null, stepFocus: null };
 }
@@ -24,8 +27,24 @@ export function mountStage(actions) {
 async function submit() {
   const text = ui.input.value.trim();
   const s = ui.state;
-  if (!text || !s || s.busy || (s.session && s.session.demo)) return;
-  if (await ui.actions.send(text)) { ui.input.value = ""; ui.input.style.height = "auto"; }
+  const mode = s ? sendMode(s, !!text) : "none";
+  if (mode !== "send" && mode !== "note") return;   // 空输入框按回车不会停止，停止只能点按钮
+  if (await ui.actions.send(text)) {
+    ui.input.value = ""; ui.input.style.height = "auto";
+    if (mode === "note") $("caption").textContent = TEXT.noted;
+    syncSend();
+  }
+}
+
+// 按钮跟着"忙不忙、有没有字"变：有字是发送或补充，忙且没字是停止
+function syncSend() {
+  const s = ui.state;
+  if (!s) return;
+  const mode = sendMode(s, !!ui.input.value.trim());
+  const stop = mode === "stop";
+  ui.send.classList.toggle("stop", stop);
+  ui.send.textContent = stop ? "■" : "↑";
+  ui.send.setAttribute("aria-label", stop ? "停止这一轮" : mode === "note" ? "补充" : "发送");
 }
 
 export function focusPrompt() { if (ui) ui.input.focus(); }
@@ -61,11 +80,9 @@ export function renderStage(state) {
   $("choices").classList.toggle("welcome", welcome);
   const busy = !!state.busy;
   ui.input.disabled = demo || !state.session;
-  ui.send.classList.toggle("stop", busy);
-  ui.send.textContent = busy ? "■" : "↑";
-  ui.send.setAttribute("aria-label", busy ? "停止这一轮" : "发送");
+  syncSend();
   if (demo) ui.input.placeholder = isStatic() ? STATIC_NOTE : DEMO_NOTE;
-  else ui.input.placeholder = TEXT.placeholder;
+  else ui.input.placeholder = busy ? TEXT.notePlaceholder : TEXT.placeholder;
   const score = scoreView(state);
   $("score").classList.toggle("gone", !score || v.center !== "model");
   if (score) { $("score-n").textContent = score.text; $("score-l").textContent = score.label; }

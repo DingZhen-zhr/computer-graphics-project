@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { choicesFor, phaseView, scoreView, stepsView, TEXT } from "../stage-logic.js";
+import { choicesFor, phaseView, scoreView, sendMode, stepsView, TEXT } from "../stage-logic.js";
 
 const session = { id: "s", title: "t", demo: false };
 const base = { session, busy: false, phase: "clarify", transcript: [], brief: null, plan: null, versions: [], checks: [], product: null };
@@ -109,4 +109,22 @@ test("stepsView hides when nothing to show", () => {
 
 test("stepsView multi part hides after delivery", () => {
   assert.equal(stepsView({ ...base, busy: false, phase: "delivered", versions: [{ name: "v1" }], product: parts3("passed") }), null);
+});
+
+// ---- 工作中补充（计划 6 Task 3）
+test("sendMode", () => {
+  const demo = { ...base, session: { ...session, demo: true } };
+  assert.equal(sendMode({ ...base, busy: false }, true), "send");
+  assert.equal(sendMode({ ...base, busy: true }, true), "note");
+  assert.equal(sendMode({ ...base, busy: true }, false), "stop");
+  for (const [busy, has] of [[false, false], [false, true], [true, false], [true, true]]) assert.equal(sendMode({ ...demo, busy }, has), "none");
+});
+
+test("note texts", () => {
+  assert.equal(TEXT.notePlaceholder, "正在做。想补充或改什么，直接说，它做完手上这一步就会看");
+  assert.equal(TEXT.noted, "记下了，它做完手上这一步就会看");
+});
+
+test("stepsView multi part hidden while still asking", () => {
+  for (const phase of ["clarify", "confirm"]) assert.equal(stepsView({ ...base, busy: true, phase, product: parts3("todo") }), null);
 });
