@@ -138,6 +138,24 @@ def test_window_mode_opens_pywebview(home, monkeypatch):
     assert calls["started"] and "browser" not in calls
 
 
+def test_window_mode_enables_downloads(home, monkeypatch):
+    """Mac 的 pywebview Cocoa 后端需要 ALLOW_DOWNLOADS=True 才能响应 <a download>。"""
+    class FakeWebview:
+        settings = {"ALLOW_DOWNLOADS": False}
+
+        @staticmethod
+        def create_window(title, url, **kw):
+            pass
+
+        @staticmethod
+        def start(*a, **kw):
+            pass
+
+    monkeypatch.setitem(sys.modules, "webview", FakeWebview)
+    assert app.main([]) == 0
+    assert FakeWebview.settings["ALLOW_DOWNLOADS"] is True
+
+
 def test_cli_mode_uses_keystore_when_no_config(home, monkeypatch):
     from cad_agent import cli
 

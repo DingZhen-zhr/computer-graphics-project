@@ -139,6 +139,8 @@ def _window(url: str) -> bool:
     try:
         import webview
 
+        if isinstance(getattr(webview, "settings", None), dict):
+            webview.settings["ALLOW_DOWNLOADS"] = True   # macOS Cocoa 后端默认关闭 <a download>
         webview.create_window(TITLE, url, width=WINDOW_SIZE[0], height=WINDOW_SIZE[1], min_size=MIN_SIZE)
         webview.start()
         return True
