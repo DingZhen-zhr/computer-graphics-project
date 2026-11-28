@@ -36,6 +36,14 @@ function versionsPage(state, actions) {
   if (!versions.length) return h("p", { class: "mute small" }, "还没有做好的版本。做好之后，每一版都存在这里，可以下载、对比。");
   const multi = !!state.product;
   const parts = multi ? state.product.parts : [];
+  const dlLink = (cls, vName, rel, filename, label) => h("a", {
+    class: cls, href: actions.fileUrl(vName, rel), download: filename,
+    onclick: (e) => {
+      if (!(window.pywebview && window.pywebview.api && actions.download)) return;
+      e.preventDefault();
+      actions.download(vName, rel, filename);
+    },
+  }, label);
   return versions.map((v) => h("div", { class: "version" },
     v.has_png === false ? h("span", {}) : h("img", { src: actions.fileUrl(v.name, "view.png"), alt: `${v.name} 的截图`, loading: "lazy" }),
     h("div", {},
@@ -43,10 +51,9 @@ function versionsPage(state, actions) {
       (v.changes || []).length ? h("div", { class: "small mute" }, v.changes.join("；")) : null,
       h("div", { class: "acts" },
         versions.length > 1 ? h("button", { type: "button", class: "btn-glass btn-small", onclick: () => actions.compare(v.name) }, "对比") : null,
-        h("a", { class: "btn-glass btn-small", href: actions.fileUrl(v.name, multi ? "product.step" : "model.step"), download: `${v.name}.step` },
-          multi ? "下载整个产品 STEP" : "下载 STEP"),
-        multi ? null : h("a", { class: "btn-glass btn-small", href: actions.fileUrl(v.name, "model.stl"), download: `${v.name}.stl` }, "下载 STL"),
-        parts.map((p) => h("a", { class: "btn-text btn-small", href: actions.fileUrl(v.name, `parts/${p.id}/model.step`), download: `${v.name}-${p.id}.step` }, `${p.name} STEP`)),
+        dlLink("btn-glass btn-small", v.name, multi ? "product.step" : "model.step", `${v.name}.step`, multi ? "下载整个产品 STEP" : "下载 STEP"),
+        multi ? null : dlLink("btn-glass btn-small", v.name, "model.stl", `${v.name}.stl`, "下载 STL"),
+        parts.map((p) => dlLink("btn-text btn-small", v.name, `parts/${p.id}/model.step`, `${v.name}-${p.id}.step`, `${p.name} STEP`)),
         actions.readOnly ? null : h("button", { type: "button", class: "btn-text btn-small", onclick: () => actions.reveal(v.name) }, "在文件夹中显示"),
         actions.readOnly ? null : h("button", { type: "button", class: "btn-text btn-small", onclick: async () => {
           const r = await formDialog("存为案例", [{ name: "title", label: "名字", value: (state.brief && state.brief.part && state.brief.part.name) || "" },

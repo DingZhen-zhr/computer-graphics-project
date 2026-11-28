@@ -93,6 +93,14 @@ const actions = {
   close: () => closeAll(),
   fileUrl,
   readOnly: isStatic(),
+  download: async (v, rel, filename) => {
+    const api = window.pywebview && window.pywebview.api;
+    if (!api || typeof api.save_file !== "function") return false;
+    const r = await api.save_file(app.currentId, v, rel, filename);
+    if (r && r.ok) toast(`已保存：${r.name || filename}`);
+    else if (r && !r.cancelled) toast(r.error || "保存失败");
+    return true;
+  },
   reveal: async (v) => { const { status, body } = await post(`/api/sessions/${sid()}/reveal`, { version: v }); if (status !== 200) toast(body.error); },
   saveCase: async (title, tags) => {
     const { status, body } = await post(`/api/sessions/${sid()}/case`, { title, tags });

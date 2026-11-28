@@ -156,6 +156,56 @@ def test_window_mode_enables_downloads(home, monkeypatch):
     assert FakeWebview.settings["ALLOW_DOWNLOADS"] is True
 
 
+def test_window_js_api_save_file_copies_whitelisted_file(home, tmp_path, monkeypatch):
+    """桌面窗口通过 js_api.save_file 调原生保存框复制白名单文件（绕开 Mac WKDownloadDelegate 缺陷）。"""
+    hub = app.build_hub(Settings())
+    sid = hub.create()
+    v1 = hub.sessions_dir / sid / "versions" / "v1"
+    v1.mkdir(parents=True)
+    (v1 / "model.step").write_text("STEP-DATA", encoding="utf-8")
+    hub.close()
+
+    dest = tmp_path / "picked.step"
+    holder: dict = {}
+
+    class FakeWindow:
+        def __init__(self, result):
+            self.result = result
+            self.calls: list[dict] = []
+
+        def create_file_dialog(self, dialog_type, **kw):
+            self.calls.append({"type": dialog_type, **kw})
+            return self.result
+
+    class FakeWebview:
+        class FileDialog:
+            SAVE = 30
+
+        @staticmethod
+        def create_window(title, url, **kw):
+            holder["js_api"] = kw.get("js_api")
+            win = FakeWindow(str(dest))
+            holder["win"] = win
+            return win
+
+        @staticmethod
+        def start(*a, **kw):
+            api = holder["js_api"]
+            holder["ok"] = api.save_file(sid, "v1", "model.step", "v1.step")
+            holder["bad"] = api.save_file(sid, "v1", "../brief.json", "x.json")
+            holder["win"].result = None
+            holder["cancel"] = api.save_file(sid, "v1", "model.step", "v1.step")
+
+    monkeypatch.setitem(sys.modules, "webview", FakeWebview)
+    monkeypatch.setattr(app, "open_browser", lambda url: None)
+    monkeypatch.setattr(app, "wait_for_exit", lambda: None)
+    assert app.main([]) == 0
+    assert holder["ok"] == {"ok": True, "name": "picked.step"}
+    assert dest.read_text(encoding="utf-8") == "STEP-DATA"
+    assert holder["bad"]["ok"] is False
+    assert holder["cancel"] == {"ok": False, "cancelled": True}
+
+
 def test_cli_mode_uses_keystore_when_no_config(home, monkeypatch):
     from cad_agent import cli
 
