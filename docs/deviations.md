@@ -334,3 +334,9 @@
   1. 两处 `node --test` 调用加上 `--test-reporter=tap`，断言一字不改，兼容 Node 22 和 Node 25。
   2. `test_cli_mode_uses_keystore_when_no_config` 改用 `os.environ.pop(config.api_key_env, None)`（配 `try/finally`）清理它自己写入的环境变量，断言一字不改。
 - 影响：仅影响这两处测试兼容与隔离；本机终端存在 `ALL_PROXY=socks5://127.0.0.1:7897` 时，运行命令去掉 `ALL_PROXY`/`all_proxy`，不新增 `socksio` 依赖。
+
+## D48 改 `test_mac_checklist_has_all_items` 接受已勾选的 `- [x]`（用户同意）
+
+- 实际情况：`docs/mac-checklist.md` 和 `AGENTS.md` 要求每做完一项就把 `- [ ]` 改成 `- [x]`；而旧测试 `tests/test_readme.py::test_mac_checklist_has_all_items` 第 91 行只收集 `startswith("- [ ]")` 的行，勾选第 1、2 项后即断言失败（`AssertionError: 系统版本`）。
+- 怎么改（2026-11-28 用户同意）：第 91 行改为 `startswith(("- [ ]", "- [x]"))`，让已勾选的项也计入检查；条数和关键词断言一字未改。
+- 影响：仅影响这一条测试。

@@ -37,19 +37,19 @@ body.has-motion .choices { bottom: 176px; }
 .corner.tune-open svg { width: 16px; height: 16px; }
 
 /* 左边：单零件是步骤，多零件是零件清单 */
-.steps, .parts { position: fixed; left: 34px; top: 40%; transform: translateY(-50%); display: flex; flex-direction: column; gap: 4px; width: 220px; max-height: calc(100vh - 380px); overflow: auto; }
-.steps button, .steps .step, .parts button {
+#steps, .parts { position: fixed; left: 34px; top: 40%; transform: translateY(-50%); display: flex; flex-direction: column; gap: 4px; width: 220px; max-height: calc(100vh - 380px); overflow: auto; }
+#steps button, #steps .step, .parts button {
   display: grid; grid-template-columns: 12px 1fr auto; gap: 10px; align-items: center; padding: 8px 12px;
   border-radius: 12px; text-align: left; font-size: 14px; color: var(--mute);
 }
-.steps button:hover, .steps button.on, .parts button:hover, .parts button.on { background: var(--glass); color: var(--ink); }
-.steps i, .parts i { width: 10px; height: 10px; border-radius: 50%; background: var(--line); }
+#steps button:hover, #steps button.on, .parts button:hover, .parts button.on { background: var(--glass); color: var(--ink); }
+#steps i, .parts i { width: 10px; height: 10px; border-radius: 50%; background: var(--line); }
 .parts i { border-radius: 50%; }
-.steps i.done { background: var(--ok); }
-.steps i.failed { background: var(--bad); }
-.steps small { color: var(--mute); font-size: 12px; padding: 0 12px 4px; }
-.steps i.run, .parts .run { animation: pulse 1s infinite; }
-.steps em, .parts em { font-style: normal; font-size: 12px; }
+#steps i.done { background: var(--ok); }
+#steps i.failed { background: var(--bad); }
+#steps small { color: var(--mute); font-size: 12px; padding: 0 12px 4px; }
+#steps i.run, .parts .run { animation: pulse 1s infinite; }
+#steps em, .parts em { font-style: normal; font-size: 12px; }
 .parts small { color: var(--mute); font-size: 12px; padding: 0 12px 4px; }
 .parts .all { display: block; margin-top: 6px; font-size: 13px; padding: 7px 12px; }
 

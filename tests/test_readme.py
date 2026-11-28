@@ -88,7 +88,7 @@ def test_readme_has_no_old_commands():
 
 def test_mac_checklist_has_all_items():
     text = MAC.read_text(encoding="utf-8")
-    items = [line for line in text.splitlines() if line.lstrip().startswith("- [ ]")]
+    items = [line for line in text.splitlines() if line.lstrip().startswith(("- [ ]", "- [x]"))]
     assert len(items) >= 15
     for word in ("系统版本", "芯片", "安装命令", "应用程序", "datum doctor", "引导", "--demo-script", "旋转", "阶段刻度",
                  "参数", "深色", "字体", "STEP", "在文件夹中显示", "重开", "datum uninstall"):

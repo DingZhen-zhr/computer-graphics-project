@@ -121,3 +121,10 @@ def test_buttons_defined():
     base = (CSS_DIR / "base.css").read_text(encoding="utf-8")
     for cls in (".btn-primary", ".btn-glass", ".btn-text"):
         assert cls in base, cls
+
+
+def test_stage_steps_do_not_hijack_onboarding_ruler():
+    """舞台左侧步骤栏不能用泛化的 .steps 选择器，否则会覆盖引导页的 .ruler.steps。"""
+    stage = (CSS_DIR / "stage.css").read_text(encoding="utf-8")
+    assert not re.search(r"(?<![\w-])\.steps\b", stage), "stage.css 不应使用 .steps，应限定为 #steps"
+    assert "#steps, .parts {" in stage
