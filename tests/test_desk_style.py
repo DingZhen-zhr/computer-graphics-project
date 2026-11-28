@@ -135,3 +135,10 @@ def test_prompt_focus_outline_is_on_capsule():
     stage = (CSS_DIR / "stage.css").read_text(encoding="utf-8")
     assert ".prompt textarea:focus-visible" in stage and "outline: none" in stage
     assert ".prompt:has(textarea:focus-visible)" in stage
+
+
+def test_prompt_fits_demo_note_without_scrollbar():
+    """示例会话提示语在底部输入框里一整行放得下，禁用态不出现截断滚动条。"""
+    stage = (CSS_DIR / "stage.css").read_text(encoding="utf-8")
+    assert "width: min(680px, calc(100vw - 480px));" in stage
+    assert ".prompt textarea:disabled" in stage and "overflow: hidden" in stage
