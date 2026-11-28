@@ -63,13 +63,16 @@ def _content_type(path: Path) -> str:
 
 
 def reveal_path(path: Path) -> None:
-    """在系统的文件管理器里显示这个目录。"""
+    """在系统的文件管理器里显示这个目录或选中这个文件。"""
     if sys.platform == "win32":
-        os.startfile(str(path))  # noqa: S606 - 只打开程序自己的版本目录
+        if path.is_file():
+            subprocess.Popen(["explorer", f"/select,{path}"])
+        else:
+            os.startfile(str(path))  # noqa: S606 - 只打开程序自己的版本目录
     elif sys.platform == "darwin":
-        subprocess.Popen(["open", str(path)])
+        subprocess.Popen(["open", "-R", str(path)] if path.is_file() else ["open", str(path)])
     else:
-        subprocess.Popen(["xdg-open", str(path)])
+        subprocess.Popen(["xdg-open", str(path.parent if path.is_file() else path)])
 
 
 def _csp(html: str) -> str:

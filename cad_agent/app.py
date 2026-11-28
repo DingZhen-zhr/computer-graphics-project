@@ -32,7 +32,6 @@ from cad_agent.brief import Brief
 from cad_agent.cases import load_cases
 from cad_agent.config import Config, ConfigError
 from cad_agent.desk.hub import Hub
-from cad_agent.desk.native_save import DesktopApi
 from cad_agent.desk.server import make_desk_server
 from cad_agent.desk.settings_api import make_settings_routes
 from cad_agent.keystore import get_key
@@ -135,17 +134,14 @@ def wait_for_exit() -> None:
         print("\n已退出。")
 
 
-def _window(url: str, hub: Hub | None = None) -> bool:
+def _window(url: str) -> bool:
     """开 pywebview 窗口，关掉窗口才返回。导入或启动失败返回 False（已经打印了说明）。"""
     try:
         import webview
 
         if isinstance(getattr(webview, "settings", None), dict):
             webview.settings["ALLOW_DOWNLOADS"] = True   # macOS Cocoa 后端默认关闭 <a download>
-        api = DesktopApi(hub) if hub is not None else None
-        win = webview.create_window(TITLE, url, width=WINDOW_SIZE[0], height=WINDOW_SIZE[1], min_size=MIN_SIZE, js_api=api)
-        if api is not None:
-            api.window = win
+        webview.create_window(TITLE, url, width=WINDOW_SIZE[0], height=WINDOW_SIZE[1], min_size=MIN_SIZE)
         webview.start()
         return True
     except Exception as e:  # noqa: BLE001 - 缺 WebView2 等各种原因都改用浏览器；原因打印出来
@@ -259,7 +255,7 @@ def main(argv: list[str] | None = None) -> int:
     try:
         if args.smoke:
             return _smoke(server.server_address[1], token)
-        if args.browser or not _window(url, hub):
+        if args.browser or not _window(url):
             _browser(url)
     finally:
         server.shutdown()

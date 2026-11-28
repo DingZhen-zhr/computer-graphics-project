@@ -39,7 +39,7 @@ function versionsPage(state, actions) {
   const dlLink = (cls, vName, rel, filename, label) => h("a", {
     class: cls, href: actions.fileUrl(vName, rel), download: filename,
     onclick: (e) => {
-      if (!(window.pywebview && window.pywebview.api && actions.download)) return;
+      if (actions.readOnly || !actions.download) return;
       e.preventDefault();
       actions.download(vName, rel, filename);
     },

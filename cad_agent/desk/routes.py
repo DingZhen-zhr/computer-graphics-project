@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import math
 import re
+import shutil
 from pathlib import Path
 from typing import Any, Callable
 
@@ -132,7 +133,33 @@ def _dispatch(hub: Hub, method: str, segs: list[str], query: dict, body: Any, re
     if route == ("POST", "reveal"):
         reveal(_version_dir(hub, sid, _need_dict(body).get("version")))
         return {"ok": True}
+    if route == ("POST", "download"):
+        d = _need_dict(body)
+        src = version_file(hub, sid, [_text(d, "version"), *_text(d, "file").split("/")])
+        dest = _copy_to_downloads(src, _text(d, "filename"))
+        reveal(dest)
+        return {"ok": True, "name": dest.name}
     raise ApiError(404, "没有这个接口")
+
+
+def downloads_dir() -> Path:
+    d = Path.home() / "Downloads"
+    d.mkdir(parents=True, exist_ok=True)
+    return d
+
+
+def _copy_to_downloads(src: Path, filename: str) -> Path:
+    safe = Path(filename).name
+    if not safe or safe in (".", ".."):
+        raise ApiError(400, "文件名不对")
+    root = downloads_dir()
+    dest = root / safe
+    stem, suf, n = dest.stem, dest.suffix, 2
+    while dest.exists():
+        dest = root / f"{stem}-{n}{suf}"
+        n += 1
+    shutil.copyfile(src, dest)
+    return dest
 
 
 def version_file(hub: Hub, sid: str, rest: list[str]) -> Path:

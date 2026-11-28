@@ -384,3 +384,22 @@ def test_message_without_text_key_is_400(serve):
     sid = hub.create()
     status, data, _ = c.call("POST", f"/api/sessions/{sid}/message", {"txt": "x"})
     assert status == 400 and data["error"]
+
+
+def test_download_saves_to_downloads_and_reveals(serve, tmp_path, monkeypatch):
+    """POST /download 把白名单文件存进下载目录（重名自动加序号）并在文件管理器选中，越权路径 404。"""
+    from cad_agent.desk import routes
+
+    dl = tmp_path / "dl"
+    dl.mkdir()
+    revealed: list = []
+    monkeypatch.setattr(routes, "downloads_dir", lambda: dl)
+    monkeypatch.setattr(desk_server, "reveal_path", revealed.append)
+    c, hub, sid = delivered(serve)
+    status, data, _ = c.call("POST", f"/api/sessions/{sid}/download", {"version": "v1", "file": "model.step", "filename": "v1.step"})
+    assert status == 200 and data["ok"] is True and data["name"] == "v1.step"
+    assert (dl / "v1.step").is_file() and revealed == [dl / "v1.step"]
+    status2, data2, _ = c.call("POST", f"/api/sessions/{sid}/download", {"version": "v1", "file": "model.step", "filename": "v1.step"})
+    assert status2 == 200 and data2["name"] == "v1-2.step" and (dl / "v1-2.step").is_file()
+    status3, _, _ = c.call("POST", f"/api/sessions/{sid}/download", {"version": "v1", "file": "../brief.json", "filename": "x.json"})
+    assert status3 == 404
