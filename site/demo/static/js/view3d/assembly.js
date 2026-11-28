@@ -81,6 +81,7 @@ export function mountAssembly({ partsEl, cardEl, toolsEl, labelsEl }, scene, { o
     renderCard();
   }
 
+  const labelSides = {};
   scene.onFrame((camera) => {
     if (!ui.product || !ui.names) { labelsEl.classList.add("gone"); return; }
     labelsEl.classList.remove("gone");
@@ -92,7 +93,8 @@ export function mountAssembly({ partsEl, cardEl, toolsEl, labelsEl }, scene, { o
       const v = c.clone().project(camera);
       return { id: p.id, x: ((v.x + 1) / 2) * w, y: ((1 - v.y) / 2) * hh, visible: v.z < 1 };
     });
-    const boxes = layoutLabels(pts, { width: w, height: hh });
+    const boxes = layoutLabels(pts, { width: w, height: hh, prevSides: labelSides });
+    for (const b of boxes) labelSides[b.id] = b.left;
     const names = Object.fromEntries(ui.product.parts.map((p) => [p.id, p.name]));
     const keep = new Set(boxes.map((b) => b.id));
     for (const el of [...labelsEl.querySelectorAll(".label")]) if (!keep.has(el.dataset.id)) el.remove();

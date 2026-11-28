@@ -65,12 +65,15 @@ export function isolateOpacity(partId, focusId, xray) {
   return xray ? 0.22 : 0.12;
 }
 
-// 名字标签：放在零件屏幕位置的左上或右上（看在屏幕哪一半），彼此重叠时依次往上挪
-export function layoutLabels(points, { width, height = 0, boxW = 90, boxH = 24, gap = 6, offset = 40 } = {}) {
+// 名字标签：放在零件屏幕位置的左上或右上（看在屏幕哪一半，带中线迟滞防抖），彼此重叠时依次往上挪
+export function layoutLabels(points, { width, height = 0, boxW = 90, boxH = 24, gap = 6, offset = 40, prevSides = null, deadband = 24 } = {}) {
   const placed = [];
-  const order = points.map((p, i) => ({ ...p, i })).filter((p) => p.visible !== false).sort((a, b) => a.y - b.y);
+  const mid = width / 2;
+  const order = points.map((p, i) => ({ ...p, i })).filter((p) => p.visible !== false)
+    .sort((a, b) => (Math.abs(a.y - b.y) < 1 ? a.i - b.i : a.y - b.y));
   for (const p of order) {
-    const left = p.x < width / 2;
+    const prev = prevSides && Object.prototype.hasOwnProperty.call(prevSides, p.id) ? prevSides[p.id] : null;
+    const left = prev === null ? p.x < mid : (prev ? p.x < mid + deadband : p.x < mid - deadband);
     const x = left ? p.x - offset - boxW : p.x + offset;
     let y = p.y - offset - boxH;
     const overlaps = (yy) => placed.some((q) => x < q.x + q.w && q.x < x + boxW && yy < q.y + q.h + gap && q.y < yy + boxH + gap);

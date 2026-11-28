@@ -67,3 +67,13 @@ test("test_labels_do_not_overlap", () => {
   assert.ok(boxes.every((b) => b.left));   // 都在屏幕左半边：标签放在左上
   assert.equal(layoutLabels([{ id: "x", x: 10, y: 10, visible: false }], { width: 100 }).length, 0);
 });
+
+test("test_labels_keep_side_within_deadband", () => {
+  const prev = { a: true, b: false };
+  const near = layoutLabels([{ id: "a", x: 610, y: 300 }, { id: "b", x: 590, y: 300 }], { width: 1200, height: 800, prevSides: prev });
+  assert.equal(near.find((q) => q.id === "a").left, true);
+  assert.equal(near.find((q) => q.id === "b").left, false);
+  const far = layoutLabels([{ id: "a", x: 640, y: 300 }, { id: "b", x: 560, y: 300 }], { width: 1200, height: 800, prevSides: prev });
+  assert.equal(far.find((q) => q.id === "a").left, false);
+  assert.equal(far.find((q) => q.id === "b").left, true);
+});
