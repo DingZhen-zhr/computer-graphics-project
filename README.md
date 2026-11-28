@@ -298,7 +298,7 @@ cases = true           # 案例库
 - **测试**：全部测试在 Windows 和 Mac（GitHub Actions，`macos-15`，Apple 芯片）上通过。持续集成里还用源码跑了安装脚本、`datum doctor --offline`、无窗口启动，并且再装一次。
   - 持续集成的 Mac 机器是 macOS 15。GitHub 已经不提供 Apple 芯片的 macOS 14 了，所以 macOS 14 本身没有自动测试。
 - **Windows 实机**：在一台 Windows 11 上走过完整流程，用的是假模型剧本加真实的 SCA 沙盒，记录在 `docs/walkthrough-windows.md`。也在这台电脑上用安装脚本实际装过，见 `docs/install-notes.md`。
-- **Mac 界面**：还没有人工看过，等有 M 芯片 Mac 的组员按 `docs/mac-checklist.md` 做一遍。
+- **Mac 界面**：已在一台 Apple M5 Mac（macOS 27.3）上按 `docs/mac-checklist.md` 走完 17 项人工清单（含单零件、多零件工具盒、下载 STEP、卸载），过程和顺带修掉的问题记在 `docs/mac-checklist.md`。
 - **成功率**（3.0，真实模型 `deepseek-flash`，详见 `docs/results-v3.md`）：14 个评测任务各取最近一次结果，12 个成功。
   - 开发任务 10 个：单零件 8/8 成功；多零件 0/2（带铰链盖的工具盒两轮都没做出来，抽屉柜第一轮被总花费上限截断，没有重跑）。
   - 留出任务 4 个（定修改清单时没看过它们的对话）：4/4 成功，其中包括一个多零件的齿轮副。
