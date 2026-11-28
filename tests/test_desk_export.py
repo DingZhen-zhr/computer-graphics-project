@@ -111,7 +111,7 @@ def test_export_command_line(tmp_path):
 @pytest.mark.skipif(NODE is None, reason="没有 node")
 def test_static_mode_api():
     test_file = ROOT / "cad_agent" / "desk" / "static" / "js" / "tests" / "api-static.test.js"
-    r = subprocess.run([NODE, "--test", str(test_file)], capture_output=True, text=True, encoding="utf-8",
+    r = subprocess.run([NODE, "--test", "--test-reporter=tap", str(test_file)], capture_output=True, text=True, encoding="utf-8",
                        env={**os.environ, "NODE_NO_WARNINGS": "1"}, timeout=120)
     assert r.returncode == 0, r.stdout[-3000:] + r.stderr[-2000:]
     assert re.search(r"^# fail 0$", r.stdout, re.M)

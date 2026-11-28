@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import http.client
 import json
+import os
 import socket
 import sys
 import time
@@ -143,13 +144,18 @@ def test_cli_mode_uses_keystore_when_no_config(home, monkeypatch):
     keyring.set_password("datum", "deepseek", FAKE_KEY)
     captured: dict = {}
     monkeypatch.setattr(cli, "main", lambda argv=None, **kw: captured.update(argv=argv, **kw) or 0)
-    assert app.main(["--cli"]) == 0
-    config = captured["config"]
-    assert config.provider == "deepseek" and config.api_key() == FAKE_KEY
-    monkeypatch.delenv(config.api_key_env, raising=False)
-    captured.clear()
-    assert app.main(["--cli", "--config", "x.toml"]) == 0
-    assert captured["argv"] == ["--config", "x.toml"] and "config" not in captured
+    config = None
+    try:
+        assert app.main(["--cli"]) == 0
+        config = captured["config"]
+        assert config.provider == "deepseek" and config.api_key() == FAKE_KEY
+        os.environ.pop(config.api_key_env, None)
+        captured.clear()
+        assert app.main(["--cli", "--config", "x.toml"]) == 0
+        assert captured["argv"] == ["--config", "x.toml"] and "config" not in captured
+    finally:
+        if config is not None:
+            os.environ.pop(config.api_key_env, None)
 
 
 def test_missing_key_turn_fails_with_hint(home):

@@ -324,3 +324,13 @@
 - 现在：`Workbench.submit(text) -> str`，返回 `"turn"`（开了新的一轮）或 `"note"`（正忙，作为补充送给正在工作的智能体）；接口忙时回 200、`{"ok": true, "note": true}`。改参数、删会话正忙时仍是 409。
 - 原因：学老师平台"工作中可以插话"（计划 6）。
 - 影响：两个旧测试照计划 6 的清单改了；`test_busy_rejects_params_message_and_delete` 里"只有 1 轮"的断言也改成 2 轮（第二条作为补充接着开了一轮）。
+
+## D47 迁到 Mac 后的两处测试兼容修复（用户同意）
+
+- 实际情况：
+  1. 本机装的是 Node v25.8.2，`node --test` 在非 TTY 管道输出下默认改用 spec 格式（`ℹ fail 0`），不再是 Node 22 的 TAP 格式（`# fail 0`），导致 `tests/test_desk_static.py::test_node_tests_pass` 和 `tests/test_desk_export.py::test_static_mode_api` 断言 `^# fail 0$` 失败（JS 测试本身全部通过）。
+  2. `tests/test_app.py::test_cli_mode_uses_keystore_when_no_config` 中，`home` fixture 先 `monkeypatch.delenv("DEEPSEEK_API_KEY", raising=False)`（本机原本没设，未记录恢复项），随后 `app.main(["--cli"])` 直接写入 `os.environ`，第 149 行又调用 `monkeypatch.delenv` 反而把假 key 记成了 teardown 要恢复的"原始值"，泄漏给后续的 `tests/test_submission.py` 触发 key 拦截。
+- 怎么改（2026-11-28 用户同意）：
+  1. 两处 `node --test` 调用加上 `--test-reporter=tap`，断言一字不改，兼容 Node 22 和 Node 25。
+  2. `test_cli_mode_uses_keystore_when_no_config` 改用 `os.environ.pop(config.api_key_env, None)`（配 `try/finally`）清理它自己写入的环境变量，断言一字不改。
+- 影响：仅影响这两处测试兼容与隔离；本机终端存在 `ALL_PROXY=socks5://127.0.0.1:7897` 时，运行命令去掉 `ALL_PROXY`/`all_proxy`，不新增 `socksio` 依赖。

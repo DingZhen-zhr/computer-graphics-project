@@ -1371,3 +1371,14 @@
   - 花费：账本 22.26（第一轮按钟点记了高峰价，偏大）；实际扣费第一轮 ¥12.5（控制台）+ 第二轮约 ¥2.25（没核对）≈ ¥14.75，没超 ¥20。
   - 达到的：14 个任务里 12 个成功，单零件 11/11，留出 4/4，成功任务最大尺寸偏差 0.213 mm。
   - 没达到的：多零件 1/3（toolbox 两轮没成功，drawer_cabinet 被截断没重跑）；关节方向等价、碰撞先查方向这两条修改没有在 toolbox 上得到验证；每个任务只跑一次；经验复用对照没做。
+
+## 迁到 Mac（2026-11-28）
+
+- 机器与环境：macOS 27.3（Build 26C5035r，Apple M5），Python 3.12.15（`.venv`），git 2.53.0，uv 0.13.5，Node v25.8.2。已从 `~/Downloads/mac-transfer.zip` 解压 `config.toml`、`benchmarks/results/ledger-v3.json` 等文件到仓库根目录。
+- 首次快速全量遇到三类问题（均停下来报告并获用户同意按 1A + 2A + 3 处理，记偏离 D47）：
+  1. 终端存在 `ALL_PROXY=socks5://127.0.0.1:7897` 且未装 `socksio`：运行时去掉 `ALL_PROXY`/`all_proxy`，不新增依赖；
+  2. Node v25.8.2 默认非 TTY 输出改为 spec 格式（`ℹ fail 0`）：两处 `node --test` 调用加上 `--test-reporter=tap`，断言不变；
+  3. `tests/test_app.py::test_cli_mode_uses_keystore_when_no_config` 在无预设 `DEEPSEEK_API_KEY` 环境下 teardown 会把假 key 写回环境变量，导致 `tests/test_submission.py` 拦截：改用 `os.environ.pop` 配 `try/finally` 清理。
+- 测试结果（`env -u ALL_PROXY -u all_proxy PYTHONUTF8=1`）：
+  - 快速全量（`-m "not sca"`）：**1175 passed，5 skipped**（26.31 秒）；
+  - 完整全量（含全部真实 SCA）：**1328 passed，5 skipped**（10 分 20 秒）。

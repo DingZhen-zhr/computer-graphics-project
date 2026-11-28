@@ -28,7 +28,7 @@ def test_node_tests_pass():
     files = sorted(str(p) for p in (JS / "tests").glob("*.test.js"))
     assert files, "还没有 node 测试"
     env = {**os.environ, "NODE_NO_WARNINGS": "1"}
-    result = subprocess.run([NODE, "--test", *files], capture_output=True, text=True, encoding="utf-8", env=env, timeout=120)
+    result = subprocess.run([NODE, "--test", "--test-reporter=tap", *files], capture_output=True, text=True, encoding="utf-8", env=env, timeout=120)
     assert result.returncode == 0, result.stdout[-3000:] + result.stderr[-2000:]
     assert re.search(r"^# fail 0$", result.stdout, re.M), result.stdout[-2000:]
 
