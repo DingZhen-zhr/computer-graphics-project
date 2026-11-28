@@ -1395,3 +1395,19 @@
   - Task 7（本次提交）：收尾小结。
 - **测试数量**：代码自同日 `0c4bb98` 在 Mac 上跑完完整全量后未改动，沿用该次完整全量结果：**1328 passed，5 skipped**（含全部真实 SCA 测试，10 分 20 秒）；快速全量 **1175 passed，5 skipped**（26.31 秒）。
 - **问题和处理**：迁到 Mac 后首次跑测试遇到代理缺少 `socksio`、Node 25 默认非 TTY 输出格式变更、`test_app.py` 环境变量清理泄漏假 key 三处问题，已按用户同意（1A + 2A + 3）处理并记偏离 D47。
+
+## 3.0 计划 5 Task 4：演示预演 —— 跳过（用户决定，2026-11-28）
+
+- 账本剩余实际可用余额约 ¥5.25，用户决定跳过真实模型的演示预演。
+
+## 3.0 Mac 人工清单与修复（2026-11-28）
+
+- 在 Apple M5 Mac（macOS Golden Gate 27.3）上逐项完成 `docs/mac-checklist.md` 全部 17 项（签名 `DingZhen`），并更新 `README.md` 里关于 Mac 的说明。
+- 实机走查发现并修复的问题（均先写失败测试再修、快速全量 1181 passed）：
+  1. 引导页进度条 `.ruler.steps` 与 `stage.css` `.steps` 冲突导致错位（`dce1671`）；
+  2. macOS 开启 SOCKS5 系统代理时缺 `socksio` 导致桌面端报“服务内部出错了”，经用户同意新增 `socksio>=1.0` 依赖（D49，`e722487`）；
+  3. 底部胶囊输入框聚焦描边画在内层 `textarea` 未对齐（`e722487`）；
+  4. 示例会话禁用输入框提示语折行截断并出滚动条（`f203c01`）；
+  5. `pywebview 6.2.1` 在 macOS 上 `<a download>` 失效且 CSP 拦 `window.pywebview`，改为后端 `POST /api/sessions/<id>/download` 保存到 `~/Downloads` 并在访达 `open -R` 选中（`70fd950`、`04f0a57`）；
+  6. 多零件名字标签在中线附近无迟滞来回跳动，加 24px 迟滞区（`d478368`）。
+  7. `test_mac_checklist_has_all_items` 不认已勾选的 `- [x]`，经用户同意改为同时接受 `- [ ]` 与 `- [x]`（D48，`dce1671`）。
