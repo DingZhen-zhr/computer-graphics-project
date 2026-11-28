@@ -1382,3 +1382,16 @@
 - 测试结果（`env -u ALL_PROXY -u all_proxy PYTHONUTF8=1`）：
   - 快速全量（`-m "not sca"`）：**1175 passed，5 skipped**（26.31 秒）；
   - 完整全量（含全部真实 SCA）：**1328 passed，5 skipped**（10 分 20 秒）。
+
+## 3.0 计划 6 小结（向老师平台学的三处，2026-11-28）
+
+- **各任务完成情况**：
+  - Task 1（`385f165`）：多零件时也显示进度清单（`stepsView`、`renderSteps`、`stage.css`、`stage.test.js`）。
+  - Task 2（`7b31229`）：工作中可以补充（后端 `NoteBox`、`Context.add_note`、`loop.py`、`Workbench.submit` 忙时投递补充、记偏离 D46）。
+  - Task 3（`48ece1b`）：工作中可以补充（界面 `sendMode`、忙时不禁用输入框、字幕提示）。
+  - Task 4（`1ba1d10`）：问答一次问完、"都按建议"按钮（`system_v2.md`、原文照抄文档同步、重导 `docs/prompts-and-tools.md`、`choicesFor`）。
+  - Task 5（`1231fdf`）：toolbox 隐藏需求写清提手跨距的量法（F7，不改验收）。
+  - Task 6：**跳过（用户决定）**，不再花钱跑第三轮真实模型验证（因此“一次问完”和 F7 修复未用真实模型复测，照实记为没有验证）。
+  - Task 7（本次提交）：收尾小结。
+- **测试数量**：代码自同日 `0c4bb98` 在 Mac 上跑完完整全量后未改动，沿用该次完整全量结果：**1328 passed，5 skipped**（含全部真实 SCA 测试，10 分 20 秒）；快速全量 **1175 passed，5 skipped**（26.31 秒）。
+- **问题和处理**：迁到 Mac 后首次跑测试遇到代理缺少 `socksio`、Node 25 默认非 TTY 输出格式变更、`test_app.py` 环境变量清理泄漏假 key 三处问题，已按用户同意（1A + 2A + 3）处理并记偏离 D47。
