@@ -128,3 +128,10 @@ def test_stage_steps_do_not_hijack_onboarding_ruler():
     stage = (CSS_DIR / "stage.css").read_text(encoding="utf-8")
     assert not re.search(r"(?<![\w-])\.steps\b", stage), "stage.css 不应使用 .steps，应限定为 #steps"
     assert "#steps, .parts {" in stage
+
+
+def test_prompt_focus_outline_is_on_capsule():
+    """底部输入框获得焦点时，描边画在外层胶囊 .prompt 上，不画在内层 textarea 上。"""
+    stage = (CSS_DIR / "stage.css").read_text(encoding="utf-8")
+    assert ".prompt textarea:focus-visible" in stage and "outline: none" in stage
+    assert ".prompt:has(textarea:focus-visible)" in stage

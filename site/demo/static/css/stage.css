@@ -28,6 +28,8 @@ body.has-motion .choices { bottom: 176px; }
   display: flex; align-items: flex-end; gap: 8px; padding: 6px 6px 6px 20px;
 }
 .prompt textarea { flex: 1; background: none; border: 0; padding: 8px 0; max-height: 132px; line-height: 1.5; }
+.prompt textarea:focus-visible { outline: none; }
+.prompt:has(textarea:focus-visible) { outline: 2px solid var(--acc); outline-offset: 2px; }
 .prompt .send { width: 38px; height: 38px; flex: none; border-radius: 50%; background: var(--acc); color: var(--acc-ink); display: flex; align-items: center; justify-content: center; }
 .prompt .send.stop { background: var(--bad); color: var(--acc-ink); }
 

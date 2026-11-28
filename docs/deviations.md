@@ -340,3 +340,10 @@
 - 实际情况：`docs/mac-checklist.md` 和 `AGENTS.md` 要求每做完一项就把 `- [ ]` 改成 `- [x]`；而旧测试 `tests/test_readme.py::test_mac_checklist_has_all_items` 第 91 行只收集 `startswith("- [ ]")` 的行，勾选第 1、2 项后即断言失败（`AssertionError: 系统版本`）。
 - 怎么改（2026-11-28 用户同意）：第 91 行改为 `startswith(("- [ ]", "- [x]"))`，让已勾选的项也计入检查；条数和关键词断言一字未改。
 - 影响：仅影响这一条测试。
+
+## D49 新增依赖 `socksio>=1.0` 支持系统 SOCKS5 代理（用户同意）
+
+- 原计划：设计文档第 3 节要求不新增 Python 依赖。
+- 实际情况：在 macOS 上系统代理开启 SOCKS5 时，即便双击 `Datum.app` 从访达启动，`httpx2` 也会通过系统代理设置读到 `socks5://...`，创建 `openai` / `anthropic` 客户端时直接报 `ImportError: Using SOCKS proxy, but the 'socksio' package is not installed.`，导致桌面端反复提示“服务内部出错了，可以刷新页面再试”。
+- 怎么改（2026-11-28 用户同意）：在 `pyproject.toml` 依赖列表加入 `socksio>=1.0`，并补测试 `tests/test_app.py::test_socksio_dependency_declared`。
+- 影响：所有开着 SOCKS5 系统代理的用户（Mac/Windows）都能正常使用桌面端与测试套件，无需手动清理代理环境变量。

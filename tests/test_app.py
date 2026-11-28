@@ -197,6 +197,12 @@ def test_entry_points_declared():
     assert any(d.startswith("pywebview") for d in data["project"]["dependencies"])
 
 
+def test_socksio_dependency_declared():
+    """系统开着 SOCKS5 代理时 httpx2 需要 socksio（偏离 D49）。"""
+    data = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
+    assert any(d.startswith("socksio") for d in data["project"]["dependencies"])
+
+
 def test_demo_script_resumes_where_the_session_left_off(home):
     """走查时关掉窗口再打开：剧本从这个会话已经用掉的回复后面接着往下走，不从头再来。"""
     from cad_agent.session import Session
